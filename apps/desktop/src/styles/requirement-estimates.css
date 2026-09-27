@@ -1,0 +1,367 @@
+.project-status-badge--partial {
+  color: #5a6624;
+  background: #f1f3e3;
+}
+
+.project-status-badge--incomplete {
+  color: #856325;
+  background: #f7f1e6;
+}
+
+.project-status-badge--neutral {
+  color: var(--color-muted-foreground);
+  background: var(--color-paper2);
+}
+
+.project-requirement-id {
+  display: block;
+  color: var(--color-muted-foreground);
+  font: 11px var(--font-mono);
+  margin-bottom: 5px;
+}
+
+.project-status-summary {
+  margin: 16px 0;
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: rgb(87 71 217 / 4.5%);
+}
+
+.project-coverage-warning,
+.project-inspected-code {
+  font-size: 13px;
+  color: #68636e;
+  margin: 14px 0;
+}
+
+.project-coverage-warning summary,
+.project-inspected-code summary {
+  cursor: pointer;
+}
+
+.project-inspected-code li {
+  margin: 12px 0;
+}
+
+.requirement-estimates {
+  margin: 28px 0;
+}
+
+.estimate-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.estimate-heading h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 5px;
+}
+
+.estimate-heading p,
+.estimate-footnote {
+  color: var(--color-muted-foreground);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.estimate-column-headings {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--color-muted-foreground);
+  margin: 20px 0 8px;
+}
+
+.estimate-column-headings > div,
+.estimate-controls {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.requirement-estimates .estimate-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 24px;
+  padding: 18px 0;
+  border-top: 1px solid rgb(128 128 128 / 16%);
+}
+
+.estimate-requirement p {
+  margin: 5px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.estimate-status {
+  width: 116px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.estimate-size {
+  width: 72px;
+  text-align: center;
+}
+
+.estimate-time {
+  width: 110px;
+  text-align: center;
+}
+
+.estimate-value {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  border-radius: 7px;
+  padding: 7px 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.estimate-value:hover,
+.estimate-value:focus-visible {
+  background: rgb(113 105 194 / 10%);
+  outline: 2px solid transparent;
+}
+
+.estimate-value:focus-visible {
+  outline-color: #8580bd;
+}
+
+.estimate-value.estimate-size {
+  font-weight: 600;
+}
+
+.estimate-value.is-unknown {
+  color: #93909e;
+}
+
+.estimate-value sup {
+  margin-left: 3px;
+  color: #898494;
+}
+
+.estimate-evidence {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.estimate-evidence > summary,
+.estimate-method > summary,
+.estimate-assessment > summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--color-muted-foreground);
+  font-size: 12px;
+}
+
+.estimate-evidence[open] {
+  padding: 12px 0;
+}
+
+.estimate-evidence-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.estimate-evidence-links button {
+  padding: 5px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-muted-foreground);
+  font: 11px var(--font-mono);
+}
+
+.estimate-evidence-links button:hover {
+  color: var(--color-brand);
+  border-color: color-mix(in srgb, var(--color-brand) 45%, var(--color-border));
+}
+
+.estimate-assessment {
+  margin: 14px 0;
+}
+
+.estimate-method {
+  margin-top: 18px;
+}
+
+.product-workspace.estimate-dialog {
+  width: calc(100vw - 32px);
+  max-width: 480px;
+  height: auto;
+  max-height: calc(100vh - 48px);
+  min-height: 0;
+  overflow: auto;
+  padding: 28px;
+  align-content: start;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-card);
+  box-shadow: 0 24px 80px rgb(23 21 43 / 18%);
+}
+
+.estimate-dialog header p {
+  color: var(--color-muted-foreground);
+  font-size: 13px;
+}
+
+.estimate-size-options {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.estimate-size-options button {
+  flex: 1;
+  border: 1px solid rgb(128 128 128 / 25%);
+  background: transparent;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 14px;
+}
+
+.estimate-size-options button[aria-pressed='true'] {
+  border-color: #8274d4;
+  background: rgb(113 105 194 / 10%);
+  color: #7060c7;
+}
+
+.estimate-size-options button:hover {
+  background: rgb(113 105 194 / 8%);
+}
+
+.estimate-reason {
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.estimate-connect-panel {
+  padding: 16px;
+  border: 1px solid rgb(128 128 128 / 20%);
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.estimate-connect-panel p {
+  margin: 0 0 12px;
+}
+
+.estimate-days-input input {
+  display: block;
+  width: 120px;
+  border: 1px solid rgb(128 128 128 / 25%);
+  background: transparent;
+  border-radius: 7px;
+  padding: 9px;
+  margin-top: 6px;
+}
+
+.estimate-duration-form .product-muted {
+  font-size: 12px;
+  margin: 12px 0 18px;
+}
+
+.estimate-comparisons {
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.estimate-history {
+  margin-top: 20px;
+  font-size: 13px;
+}
+
+.estimate-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgb(128 128 128 / 15%);
+}
+
+.estimate-history-row > div {
+  min-width: 0;
+}
+
+.estimate-history-row p {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.estimate-history-link {
+  padding: 0;
+  text-decoration: underline;
+}
+
+.estimate-history-row > button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.estimate-close {
+  margin-top: 18px;
+}
+
+.history-source-dialog {
+  max-width: 680px !important;
+}
+
+.legacy-report-panel {
+  display: none !important;
+}
+
+.estimation-pending {
+  margin: 28px 0;
+}
+
+@media (width <= 800px) {
+  .project-health-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (width <= 760px) {
+  .estimate-column-headings {
+    display: none;
+  }
+
+  .requirement-estimates .estimate-row {
+    grid-template-columns: 1fr;
+  }
+
+  .estimate-controls {
+    justify-content: flex-start;
+  }
+
+  .estimate-heading {
+    flex-wrap: wrap;
+  }
+
+  .estimate-status {
+    width: auto;
+    min-width: 100px;
+  }
+}
+
+@media (width <= 480px) {
+  .project-health {
+    padding: 18px;
+  }
+
+  .project-health-heading {
+    display: block;
+    margin-bottom: 16px;
+  }
+}

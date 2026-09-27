@@ -1,0 +1,11 @@
+node_modules
+dist
+package-lock.json
+docs/screenshots
+LICENSE
+
+release
+coverage
+playwright-report
+test-results
+pnpm-lock.yaml

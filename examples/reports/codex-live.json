@@ -1,0 +1,162 @@
+{
+  "schemaVersion": "1.0",
+  "workflowVersion": "1",
+  "id": "8e0dc2bd-d6ef-48fc-8edc-19277559d827",
+  "projectId": "fixture-project",
+  "baselineId": "3c39f3c6-be8d-437a-8c6c-de0f900aab52",
+  "generatedAt": "2026-09-20T22:27:03.011Z",
+  "runtime": {
+    "provider": "codex",
+    "auth": "subscription",
+    "model": "gpt-5.6-sol"
+  },
+  "runtimeVersion": "codex-cli 0.145.0",
+  "baseline": {
+    "overview": "A minimal book-management project that allows users to view the available books and add new books.",
+    "requirements": [
+      {
+        "id": "REQ-1",
+        "text": "Users can list books."
+      },
+      {
+        "id": "REQ-2",
+        "text": "Users can create books."
+      }
+    ],
+    "milestones": []
+  },
+  "snapshots": [
+    {
+      "repositoryId": "frontend",
+      "sha": "72c9ee3adc48e87d8990a2707e47884735ab1c4f",
+      "branch": "main",
+      "role": "default",
+      "reason": "User notes identify main as the baseline, so this is the required default-implementation snapshot. app.txt shows a GET /books flow that renders a list, providing frontend evidence for REQ-1; no create-book flow is present."
+    },
+    {
+      "repositoryId": "backend",
+      "sha": "c2bca1fbb94c1e9c1ede4fcf280ce30d3b29329e",
+      "branch": "main",
+      "role": "default",
+      "reason": "User notes identify main as the baseline, so this is the required default-implementation snapshot. app.txt shows a GET /items endpoint returning items, which is list-like but does not match the frontend's /books path; no create-book endpoint is present."
+    }
+  ],
+  "summary": "On the frozen main snapshots, book listing is only partially implemented: the frontend requests GET /books and renders a list, while the backend exposes GET /items, so end-to-end compatibility is not demonstrated. The two repositories must align on a list endpoint and response contract, then verify the integrated flow. Book creation is missing from both frontend and backend; it requires a submission UI, a compatible creation endpoint and behavior, and end-to-end verification. The required book fields, validation, persistence, and create API contract are unspecified. Assessment coverage is limited to app.txt in each repository; no feature or integration branches, automated or integration tests, PR/review/merge metadata, runtime evidence, or deployment records were available, so actual integration and deployment status remain unknown.",
+  "assessments": [
+    {
+      "requirementId": "REQ-1",
+      "status": "partial",
+      "deviation": true,
+      "explanation": "The frozen frontend main snapshot contains a book-list flow that requests GET /books and renders a list, while the frozen backend main snapshot exposes GET /items and returns items. Each side has list-like behavior, but the route contract is contradictory across the only available branches, so users cannot be shown to list books end to end.",
+      "evidence": [
+        {
+          "repositoryId": "frontend",
+          "sha": "72c9ee3adc48e87d8990a2707e47884735ab1c4f",
+          "path": "app.txt",
+          "startLine": 1,
+          "endLine": 2,
+          "explanation": "The frontend requests GET /books and renders the resulting list."
+        },
+        {
+          "repositoryId": "backend",
+          "sha": "c2bca1fbb94c1e9c1ede4fcf280ce30d3b29329e",
+          "path": "app.txt",
+          "startLine": 1,
+          "endLine": 2,
+          "explanation": "The backend instead exposes GET /items and returns items, demonstrating the incompatible route contract."
+        }
+      ],
+      "remainingWork": [
+        "Align the frontend and backend on the same book-list endpoint and response contract.",
+        "Verify the aligned frontend/backend flow works end to end."
+      ],
+      "unknowns": [
+        "No integration-test or deployment-run evidence is available, so actual runtime behavior and deployment are unverified."
+      ]
+    },
+    {
+      "requirementId": "REQ-2",
+      "status": "missing",
+      "deviation": false,
+      "explanation": "Neither frozen main snapshot contains a create-book flow. Repository inventories contain only AGENTS.md and app.txt; searches across both snapshots for POST, create, and add returned no implementation hits, and the inspected app.txt files contain only GET-based listing behavior. This is absent behavior rather than contradictory behavior.",
+      "evidence": [
+        {
+          "repositoryId": "frontend",
+          "sha": "72c9ee3adc48e87d8990a2707e47884735ab1c4f",
+          "path": "app.txt",
+          "startLine": 1,
+          "endLine": 2,
+          "explanation": "The entire frontend implementation file describes only GET /books and list rendering; no create interaction or submission is present."
+        },
+        {
+          "repositoryId": "backend",
+          "sha": "c2bca1fbb94c1e9c1ede4fcf280ce30d3b29329e",
+          "path": "app.txt",
+          "startLine": 1,
+          "endLine": 2,
+          "explanation": "The entire backend implementation file describes only GET /items and returning items; no create endpoint is present."
+        }
+      ],
+      "remainingWork": [
+        "Implement a frontend interaction that submits a new book.",
+        "Implement a compatible backend create-book endpoint and its book-creation behavior.",
+        "Verify creation end to end between the frozen frontend and backend branches."
+      ],
+      "unknowns": [
+        "The baseline does not specify the book fields, validation rules, persistence semantics, or create API contract.",
+        "No integration-test or deployment-run evidence is available."
+      ]
+    }
+  ],
+  "deviations": [
+    {
+      "requirementId": "REQ-1",
+      "explanation": "The frozen frontend main snapshot contains a book-list flow that requests GET /books and renders a list, while the frozen backend main snapshot exposes GET /items and returns items. Each side has list-like behavior, but the route contract is contradictory across the only available branches, so users cannot be shown to list books end to end.",
+      "evidence": [
+        {
+          "repositoryId": "frontend",
+          "sha": "72c9ee3adc48e87d8990a2707e47884735ab1c4f",
+          "path": "app.txt",
+          "startLine": 1,
+          "endLine": 2,
+          "explanation": "The frontend requests GET /books and renders the resulting list."
+        },
+        {
+          "repositoryId": "backend",
+          "sha": "c2bca1fbb94c1e9c1ede4fcf280ce30d3b29329e",
+          "path": "app.txt",
+          "startLine": 1,
+          "endLine": 2,
+          "explanation": "The backend instead exposes GET /items and returns items, demonstrating the incompatible route contract."
+        }
+      ]
+    }
+  ],
+  "risks": [
+    "The frontend/backend list-route mismatch (GET /books versus GET /items) prevents demonstrated end-to-end compatibility on the frozen main snapshots.",
+    "The snapshots provide no automated-test or runtime evidence, so configured behavior may differ from actual execution.",
+    "Create-book behavior is absent on both sides, leaving the primary write workflow unavailable."
+  ],
+  "dependencies": [
+    "REQ-1 depends on a shared frontend/backend route and response contract for listing books.",
+    "REQ-2 depends on coordinated frontend submission and backend creation interfaces; the required data and persistence contract is not defined by the baseline."
+  ],
+  "unknowns": [
+    "Only frozen main snapshots were available; no feature or integration branches were available for comparison.",
+    "PR, merge, review, integration-test, and deployment-run evidence was unavailable, so integration and deployment status cannot be established."
+  ],
+  "warnings": [
+    "Only committed snapshots are assessed. Uncommitted changes are excluded.",
+    "frontend: No available upstream; synchronization was skipped. Existing committed snapshots will be assessed; remote freshness is unverified.",
+    "backend: No available upstream; synchronization was skipped. Existing committed snapshots will be assessed; remote freshness is unverified.",
+    "Only the frozen main snapshot exists for each repository; no feature or integration branches were available to assess or omit.",
+    "Frontend/backend compatibility is not established: the frontend requests GET /books while the backend exposes GET /items.",
+    "REQ-2 (create books) is not evidenced in either available snapshot.",
+    "The inventory does not declare a defaultBranch; main is classified as default solely because repository notes explicitly call main the baseline.",
+    "PR metadata and deployment-run evidence are unavailable for both repositories, so merge, review, and deployment status cannot be assessed.",
+    "Each repository contains only AGENTS.md and app.txt, and the sole implementation commit has the generic subject \"Fixture implementation\"; coverage conclusions are therefore limited to the inspected app.txt files.",
+    "PR metadata and deployment-run evidence are unavailable in the local Git prototype.",
+    "PR metadata and deployment-run evidence are unavailable in the local Git prototype."
+  ],
+  "validation": "structure-and-evidence-checked"
+}

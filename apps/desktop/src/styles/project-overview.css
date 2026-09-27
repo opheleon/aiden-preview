@@ -1,0 +1,407 @@
+/* Ported from prodgrade_ui/webapp/src/components/product/product-workspace.css.
+   Keep these class names aligned so the local app and hosted product share one UI language. */
+
+.product-workspace {
+  color: var(--color-foreground);
+  background: var(--color-background);
+}
+
+.product-workspace-port {
+  width: 100%;
+  overflow: visible;
+}
+
+.starter-content {
+  display: flex;
+  max-width: none;
+  min-height: calc(100vh - 44px);
+  padding: 0;
+}
+
+.goal-starter {
+  width: 100%;
+  max-width: 760px;
+  margin: auto;
+  padding: 48px 24px;
+}
+
+.goal-starter-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 40px;
+}
+
+.goal-starter-brand img {
+  width: 30px;
+  height: 30px;
+}
+
+.goal-starter-brand strong {
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+.goal-starter h1 {
+  max-width: 580px;
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  font-weight: 500;
+  line-height: 1.12;
+  letter-spacing: -0.04em;
+}
+
+.goal-starter-lead {
+  max-width: 540px;
+  margin: 18px 0 28px;
+  color: var(--color-body);
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.chat-composer {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-card);
+  box-shadow: 0 12px 36px rgb(23 21 43 / 3%);
+}
+
+.chat-composer .chat-composer-textarea {
+  display: block;
+  width: 100%;
+  min-height: 140px;
+  margin: 0;
+  padding: 20px;
+  border: 0;
+  border-radius: 0;
+  background: var(--color-card);
+  font-size: 16px;
+  resize: vertical;
+}
+
+.chat-composer-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.chat-composer-footer .chat-model-select {
+  width: auto;
+  min-width: 112px;
+  height: 32px;
+  margin: 0;
+  padding: 5px 30px 5px 10px;
+  border-color: transparent;
+  background-color: transparent;
+  font-size: 13px;
+}
+
+.goal-starter-create {
+  margin-left: auto;
+}
+
+.goal-starter-next {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 24px;
+  color: var(--color-muted-foreground);
+  font-size: 13px;
+}
+
+.goal-starter-next span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.goal-starter-next b {
+  color: var(--color-brand);
+  font: 12px var(--font-mono);
+}
+
+.project-health {
+  margin: 0 0 36px;
+  padding: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: linear-gradient(120deg, var(--color-card), var(--color-tint));
+}
+
+.project-health-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.project-health-heading > span {
+  color: var(--color-muted-foreground);
+  font-size: 12px;
+}
+
+.project-health-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  margin: 6px 0 20px;
+}
+
+.project-health .project-health-metric {
+  display: block;
+  padding: 8px 0;
+  min-width: 0;
+  text-align: left;
+  border: 0;
+  background: transparent;
+}
+
+.project-health .project-health-metric h3 {
+  font-size: 12px;
+  color: var(--color-muted-foreground);
+  font-weight: 500;
+  margin: 0 0 12px;
+}
+
+.project-health-metric strong {
+  display: block;
+  font-size: clamp(20px, 2.3vw, 30px);
+  letter-spacing: -0.035em;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.project-health-metric strong small {
+  font-size: 14px;
+  letter-spacing: normal;
+}
+
+.project-health-metric p {
+  font-size: 12px;
+  color: var(--color-muted-foreground);
+  margin-top: 9px;
+  line-height: 1.5;
+}
+
+.project-health-edit {
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.project-health-edit:hover h3,
+.project-health-assumptions button:hover {
+  color: var(--color-brand);
+}
+
+.project-health button:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 4px;
+}
+
+.project-health button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.project-health progress {
+  width: 100%;
+  height: 4px;
+  margin-top: 12px;
+  accent-color: var(--color-brand);
+  border: 0;
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.project-health progress::-webkit-progress-bar {
+  background: var(--color-border);
+}
+
+.project-health progress::-webkit-progress-value {
+  background: var(--color-brand);
+}
+
+.project-health-assumptions {
+  display: flex;
+  gap: 8px 24px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.project-health-assumptions button {
+  text-align: left;
+}
+
+.project-health-assumptions span {
+  color: var(--color-muted-foreground);
+  margin-left: 4px;
+}
+
+.project-health-insight {
+  font-size: 13px;
+  line-height: 1.7;
+  margin-top: 16px;
+}
+
+.project-health-insight > span {
+  color: var(--color-muted-foreground);
+}
+
+.project-health-method {
+  font-size: 12px;
+  color: var(--color-muted-foreground);
+  margin-top: 12px;
+  line-height: 1.6;
+}
+
+.project-health-method summary {
+  cursor: pointer;
+}
+
+.project-health-method p {
+  margin-top: 8px;
+}
+
+.project-health-late {
+  display: block;
+  color: var(--color-destructive);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.product-workspace h1 {
+  font-weight: 500;
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+}
+
+.product-workspace h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.product-workspace h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 18px 0 10px;
+}
+
+.product-workspace h4 {
+  font-weight: 600;
+}
+
+.product-muted,
+.project-refresh-date {
+  color: var(--color-muted-foreground);
+  font-size: 13px;
+}
+
+.product-workspace label:not(.product-choice) {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 12px 0 8px;
+}
+
+.product-workspace textarea,
+.product-workspace select {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font: inherit;
+  font-size: 14px;
+  margin-bottom: 14px;
+}
+
+.product-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.product-card {
+  padding: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  margin-bottom: 20px;
+  background: var(--color-card);
+}
+
+.project-secondary-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 36px 0 14px;
+}
+
+.project-secondary-heading h2 {
+  font-size: 15px;
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.project-activity-grid .product-card {
+  margin-bottom: 0;
+}
+
+.project-overview {
+  margin-bottom: 36px;
+  max-width: 850px;
+}
+
+.project-overview h2 {
+  font-size: 15px;
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.project-overview .product-markdown {
+  margin-top: 12px;
+  font-size: 15px;
+  color: var(--color-body);
+  line-height: 1.75;
+}
+
+.project-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  width: fit-content;
+  border-radius: 20px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.project-status-badge--satisfied {
+  color: #306447;
+  background: #edf4ee;
+}
+
+.project-status-badge--deviated {
+  color: var(--color-brand-dark);
+  background: var(--color-tint);
+}

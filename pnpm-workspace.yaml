@@ -1,0 +1,21 @@
+packages:
+  - apps/*
+  - packages/*
+nodeLinker: hoisted
+minimumReleaseAge: 20160
+minimumReleaseAgeStrict: true
+minimumReleaseAgeIgnoreMissingTime: false
+trustPolicy: no-downgrade
+trustLockfile: false
+blockExoticSubdeps: true
+strictDepBuilds: true
+verifyDepsBeforeRun: error
+allowBuilds:
+  esbuild@0.25.12: false
+  esbuild@0.28.2: false
+  electron-winstaller@5.4.0: false
+# Legacy semver branch: 2023-07-10 release; SHA-512 matches the pre-migration lock.
+# Required by Babel; no newer 6.x exists. See docs/dependency-security.md.
+trustPolicyExclude:
+  - semver@6.3.1
+  - semver@5.7.2

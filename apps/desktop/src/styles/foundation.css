@@ -1,0 +1,406 @@
+/* Opheleon tokens and type roles, aligned with prodgrade_ui/webapp/src/index.css.
+   Report patterns follow its product-workspace.css without a runtime dependency. */
+
+:root {
+  --font-sans: 'Instrument Sans Variable', 'Helvetica Neue', arial, sans-serif;
+  --font-serif: 'Instrument Serif', georgia, serif;
+  --font-mono: 'JetBrains Mono Variable', 'SF Mono', menlo, monospace;
+  --paper: #f6f4ee;
+  --paper2: #ece9e1;
+  --ink: #14131a;
+  --ink-hover: #2a2833;
+  --body: #4b4956;
+  --muted: oklch(53.57166% 0.0234223 294.76728deg);
+  --faint: #9c99a8;
+  --brand: #5747d9;
+  --brand-dark: #4736c0;
+  --tint: #ece9fb;
+  --border: oklch(87.31336% 0.0155413 90.24831deg);
+  --card: #fff;
+  --radius: 12px;
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-muted: var(--paper2);
+  --color-muted-foreground: var(--muted);
+  --color-primary: var(--ink);
+  --color-ring: var(--brand);
+  --color-brand: var(--brand);
+  --color-brand-dark: var(--brand-dark);
+  --color-tint: var(--tint);
+  --color-body: var(--body);
+  --color-paper2: var(--paper2);
+  --color-destructive: #a63d46;
+
+  font-family: var(--font-sans);
+  color: var(--ink);
+  background: var(--paper);
+  font-size: 14px;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizelegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  line-height: 1.55;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  background: none;
+  color: inherit;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+
+h1 {
+  font-size: 30px;
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+}
+
+h2 {
+  font-size: 18px;
+}
+
+h3 {
+  font-size: 15px;
+}
+
+h4 {
+  font-size: 13px;
+  margin: 16px 0 8px;
+}
+
+strong {
+  font-weight: 600;
+}
+
+p {
+  line-height: 1.7;
+}
+
+ul {
+  padding-left: 22px;
+  margin: 10px 0 0;
+  line-height: 1.8;
+}
+
+small {
+  font-size: 12px;
+}
+
+.serif {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.1em;
+  letter-spacing: 0;
+  color: var(--brand);
+}
+
+.app {
+  min-height: 100vh;
+}
+
+.app-header {
+  height: 44px;
+  position: fixed;
+  z-index: 5;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px 0 104px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.brand img {
+  width: 18px;
+  height: 18px;
+}
+
+.brand strong {
+  font-size: 14px;
+}
+
+.header-projects {
+  margin-left: 8px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.header-projects:hover,
+.header-projects.active {
+  color: var(--ink);
+}
+
+.header-projects.active {
+  background: var(--tint);
+  font-weight: 500;
+}
+
+.app-nav {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  font-size: 12px;
+}
+
+.header-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+.header-icon:hover,
+.header-icon.active {
+  color: var(--ink);
+  background: var(--tint);
+}
+
+.update-indicator {
+  position: relative;
+}
+
+.update-indicator > span {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  top: 5px;
+  right: 5px;
+  border-radius: 999px;
+  background: var(--brand);
+}
+
+.header-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: #17152b;
+  color: var(--paper);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.sidebar {
+  width: 240px;
+  position: fixed;
+  top: 44px;
+  bottom: 0;
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--paper2) 35%, var(--paper));
+  padding: 10px 6px 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.045em;
+  color: var(--muted);
+  margin: 0;
+}
+
+.sidebar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 6px;
+}
+
+.sidebar-add {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--muted);
+}
+
+.sidebar-add:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--paper2) 60%, transparent);
+}
+
+nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 16px;
+  overflow-y: auto;
+}
+
+.project-nav {
+  max-height: 42%;
+  min-height: 0;
+  margin-top: 0;
+  gap: 2px;
+}
+
+.project-nav button {
+  height: 24px;
+  min-height: 24px;
+  padding: 0 8px;
+  line-height: 1;
+  color: var(--muted);
+}
+
+.project-nav button.selected {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--paper2) 55%, transparent);
+  font-weight: 600;
+}
+
+.project-dot,
+.run-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px !important;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--muted) 45%, transparent);
+}
+
+.draft-section {
+  margin-top: 12px;
+  padding: 0 4px;
+}
+
+.draft-section .workspace-label {
+  padding: 0 6px 4px;
+}
+
+.draft-row,
+.workspace-overview {
+  width: 100%;
+  height: 28px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.draft-row.selected,
+.workspace-overview.selected {
+  border-color: color-mix(in srgb, var(--brand) 40%, transparent);
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+  color: var(--ink);
+}
+
+.workspace-nav {
+  min-height: 0;
+  flex: 1;
+  margin-top: 6px;
+  padding: 8px 4px 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+}
+
+.workspace-nav > .workspace-label {
+  padding: 0 6px 6px;
+}
+
+.workflow-history {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.workflow-history summary {
+  cursor: pointer;
+  padding: 8px 10px;
+}
+
+.workflow-history button {
+  width: 100%;
+  height: 24px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+nav button {
+  justify-content: flex-start;
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 13px;
+  border-radius: 6px;
+  min-height: 30px;
+  gap: 8px;
+}

@@ -1,0 +1,402 @@
+nav button > svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+nav button span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+nav button:hover:not(:disabled) {
+  background: var(--paper2);
+}
+
+nav button.selected {
+  background: var(--tint);
+  color: var(--brand-dark);
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+  padding: 8px 4px 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+}
+
+.local-indicator {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--body);
+}
+
+.local-indicator > span,
+.connection > span {
+  width: 6px;
+  height: 6px;
+  background: #306447;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.sidebar-bottom p {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 10px;
+  line-height: 1.8;
+}
+
+.sidebar-footer {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin-top: 18px;
+  font: 9px var(--font-mono);
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+}
+
+main {
+  margin-left: 240px;
+  padding-top: 44px;
+  min-width: 0;
+}
+
+.content {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 28px 48px 56px;
+  min-height: calc(100vh - 100px);
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 32px;
+}
+
+.breadcrumb strong {
+  font-weight: 400;
+  color: var(--body);
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.title-row > div {
+  min-width: 0;
+}
+
+.title-row h1 {
+  overflow-wrap: anywhere;
+}
+
+.setup-view h1 {
+  font-size: clamp(32px, 3.3vw, 44px);
+  max-width: 670px;
+  line-height: 1.12;
+  letter-spacing: -0.04em;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--body);
+  margin-top: 12px;
+  max-width: 660px;
+}
+
+.steps {
+  display: flex;
+  margin: 28px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 24px;
+}
+
+.steps button {
+  position: relative;
+  padding: 0 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.steps button > span {
+  font: 11px var(--font-mono);
+  min-width: 16px;
+  display: flex;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.steps button.current,
+.steps button.current > span {
+  color: var(--brand);
+}
+
+.steps button.current::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  background: var(--brand);
+  height: 2px;
+}
+
+.setup-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(290px, 1fr);
+  gap: 20px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+
+.card-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.card-heading > div:nth-child(2),
+.card-heading > h2 {
+  flex: 1;
+}
+
+.card-heading p {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.section-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand);
+  background: var(--tint);
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 18px 0 0;
+}
+
+input,
+textarea,
+select {
+  display: block;
+  width: 100%;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 90px;
+}
+
+select {
+  height: 40px;
+}
+
+.optional {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+.label-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  margin: 24px 0 12px;
+}
+
+.label-row > span:last-child {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.add-repo {
+  width: 100%;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 22px 10px;
+  font-size: 13px;
+  background: var(--paper);
+}
+
+.add-repo:hover {
+  background: var(--paper2);
+}
+
+.repo {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.repo-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--body);
+}
+
+.repo-heading > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.repo-heading strong {
+  font-size: 13px;
+  display: block;
+}
+
+.repo-heading small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font: 10px var(--font-mono);
+  margin-top: 5px;
+}
+
+.repo input {
+  font-size: 12px;
+  padding: 8px;
+}
+
+.inline-note {
+  display: flex;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 16px;
+  line-height: 1.65;
+}
+
+.inline-note svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.primary {
+  background: var(--ink);
+  color: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--ink-hover);
+}
+
+.secondary {
+  border: 1px solid var(--border);
+  background: transparent;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--paper2);
+}
+
+.full {
+  width: 100%;
+  margin-top: 14px;
+}
+
+.text-button {
+  font-size: 12px;
+  color: var(--brand);
+  padding: 8px 0;
+}
+
+.text-button:hover:not(:disabled) {
+  color: var(--brand-dark);
+  text-decoration: underline;
+}
+
+.next-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.next-row > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.provider-toggle {
+  display: flex;
+  gap: 4px;
+  border-radius: 8px;
+  padding: 4px;
+  background: var(--paper2);
+  margin: 20px 0;
+}
+
+.provider-toggle button {
+  width: 50%;
+  font-size: 13px;
+  padding: 7px;
+  border-radius: 6px;
+  color: var(--muted);
+}
+
+.provider-toggle button.active {
+  background: var(--card);
+  color: var(--ink);
+}

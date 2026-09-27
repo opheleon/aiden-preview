@@ -1,0 +1,408 @@
+.evidence-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.evidence-links button {
+  font: 11px var(--font-mono);
+  color: var(--brand-dark);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.evidence-links button:hover {
+  background: var(--tint);
+}
+
+.deviations-card {
+  margin-bottom: 20px;
+}
+
+.deviations-card li {
+  font-size: 13px;
+  color: var(--body);
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin: 20px 0;
+}
+
+.report-grid li,
+.limitations li {
+  font-size: 13px;
+  color: var(--body);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.limitations h3,
+.history h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.limitations {
+  background: var(--paper2);
+}
+
+.empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--brand);
+}
+
+.empty > svg {
+  margin-bottom: 20px;
+}
+
+.empty p {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 12px 0 24px;
+}
+
+.history {
+  margin-top: 24px;
+}
+
+.history > div {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.history > div > button {
+  margin-left: auto;
+}
+
+.history .muted {
+  margin: 0;
+}
+
+footer {
+  border-top: 1px solid var(--border);
+  padding: 16px 48px;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  font: 10px var(--font-mono);
+  color: var(--muted);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: #17152b66;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(3px);
+  z-index: 10;
+  padding: 32px;
+}
+
+.modal {
+  width: 560px;
+  max-height: 85vh;
+  overflow: auto;
+  box-shadow: 0 20px 100px #17152b22;
+}
+
+.modal textarea {
+  margin: 22px 0;
+  min-height: 120px;
+}
+
+.modal h2 {
+  line-height: 1.6;
+}
+
+.eyebrow {
+  font: 11px var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.evidence-modal {
+  width: 900px;
+}
+
+.evidence-modal pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--paper2);
+  padding: 20px;
+  font: 12px/1.8 var(--font-mono);
+  border-radius: 8px;
+  max-height: 50vh;
+  overflow: auto;
+}
+
+.evidence-modal > p {
+  font-size: 13px;
+  color: var(--body);
+  margin-bottom: 12px;
+}
+
+.sidebar-section {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 8px 10px;
+  margin-top: 8px;
+  border-radius: 7px;
+  color: var(--body);
+}
+
+.sidebar-section:hover,
+.sidebar-section.selected {
+  background: var(--paper2);
+  color: var(--ink);
+}
+
+.project-list-label {
+  margin-top: 22px;
+  margin-bottom: 0;
+}
+
+.sidebar-bottom .sidebar-section {
+  margin-bottom: 14px;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  padding-top: 14px;
+}
+
+.settings-view,
+.drafts-view {
+  max-width: 1040px;
+}
+
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin: 24px 0;
+}
+
+.settings-tabs button {
+  padding: 10px 16px;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.settings-tabs button.active {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+}
+
+.settings-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-panel,
+.integration-card,
+.custom-server,
+.integration-hero,
+.estimation-panel,
+.source-panel {
+  padding: 24px;
+}
+
+.integration-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  background: linear-gradient(115deg, #fff, var(--tint));
+}
+
+.integration-hero p {
+  color: var(--body);
+}
+
+.connection-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.connection-row p,
+.connection-row small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.connection-state {
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: var(--paper2);
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: capitalize;
+}
+
+.connection-state.ready {
+  color: #176442;
+  background: #e4f4eb;
+}
+
+.app-updates-card {
+  max-width: 680px;
+}
+
+.update-version-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 18px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.update-version-list p {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.update-version-list strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.update-version-list small,
+.update-preference small,
+.update-progress small {
+  color: var(--muted);
+}
+
+.update-preference {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin: 20px 0;
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.update-preference label {
+  display: grid;
+  gap: 3px;
+}
+
+.update-preference input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--brand);
+}
+
+.update-progress {
+  display: grid;
+  gap: 7px;
+  margin: 16px 0;
+}
+
+.update-progress > div {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--paper2);
+}
+
+.update-progress > div > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand);
+  transition: width 180ms ease;
+}
+
+.update-copy {
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.update-error {
+  margin-top: 14px;
+}
+
+.button-row,
+.estimate-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.comparison-editor {
+  grid-column: 1 / -1;
+  background: var(--paper);
+  border-radius: 8px;
+  padding: 9px 12px;
+}
+
+.comparison-editor summary {
+  cursor: pointer;
+  color: var(--brand);
+  font-size: 12px;
+}
+
+.comparison-editor > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 18px;
+  margin-top: 10px;
+}
+
+.comparison-editor label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  align-items: start;
+}
+
+.comparison-editor label small {
+  grid-column: 2;
+  color: var(--muted);
+}
+
+.comparison-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.comparison-option label {
+  flex: 1;
+}
+
+.button-row .danger {
+  margin-left: auto;
+  color: #9b2d35;
+}

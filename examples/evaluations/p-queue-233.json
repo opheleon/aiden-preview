@@ -1,0 +1,27 @@
+{
+  "id": "p-queue-233",
+  "repository": "sindresorhus/p-queue",
+  "source": "https://github.com/sindresorhus/p-queue/issues/177",
+  "pullRequest": "https://github.com/sindresorhus/p-queue/pull/233",
+  "base": "89a10bb7ade7928f484acab428c6e89fb144fedb",
+  "head": "ceeef018c826f5e758842f2d53c034c02c81ff00",
+  "product": {
+    "overview": "Allow users of PQueue to change its rate-limit configuration at runtime on an existing queue instance.",
+    "requirements": [
+      {
+        "id": "REQ-1",
+        "text": "An existing PQueue instance exposes a public writable intervalCap property. Setting it changes the cap used to schedule queued tasks without recreating the queue."
+      },
+      {
+        "id": "REQ-2",
+        "text": "An existing PQueue instance exposes a public writable interval property. Setting it changes the time interval used to schedule queued tasks without recreating the queue."
+      }
+    ],
+    "milestones": []
+  },
+  "expected": {
+    "base": { "REQ-1": "missing", "REQ-2": "missing" },
+    "head": { "REQ-1": "implemented", "REQ-2": "missing" }
+  },
+  "reviewNotes": "Requirements paraphrase issue #177. Expectations were independently reviewed from the base source and PR diff: the base has private readonly fields; the head adds intervalCap getter/setter and scheduling integration but no public interval setter. Expected statuses are evaluator data, never model input. PR status is not implementation evidence."
+}

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+release/
+.aiden/
+*.log
+.env
+.env.*
+test-results/
+playwright-report/
+coverage/
+.pnpm-store/

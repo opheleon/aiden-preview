@@ -1,0 +1,4 @@
+provider: github
+owner: opheleon
+repo: aiden-preview
+updaterCacheDirName: opheleon-desktop-app-updater
