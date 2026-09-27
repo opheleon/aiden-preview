@@ -6,6 +6,7 @@ import { _electron as electron, expect } from '@playwright/test';
 import { ReportSchema } from '../packages/contracts/src/index.js';
 import { Engine } from '../packages/core/src/engine.js';
 import { Store } from '../packages/core/src/storage.js';
+import { verifyPackagedRuntimes } from '../tests/desktop/native-runtime.js';
 import { providerLauncher } from '../tests/desktop/provider-launcher.js';
 import { updateFixture } from '../tests/desktop/update-fixture.js';
 import { FixtureRuntime } from '../tests/fixture-runtime.js';
@@ -68,7 +69,10 @@ try {
   await app.context().tracing.start({ screenshots: true, snapshots: true });
   tracing = true;
   const page = await app.firstWindow();
-  if (packagedApp) updates = await updateFixture(app);
+  if (packagedApp) {
+    await verifyPackagedRuntimes(app);
+    updates = await updateFixture(app);
+  }
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.getByRole('heading', { name: 'What project should Aiden track?' }).waitFor();
@@ -260,7 +264,11 @@ try {
         'desktop update status and preference bridge',
         'saved provider/auth/model survives connection refresh',
         'weekly schedule save, next-run display, and disable',
-        ...(packagedApp ? ['local update feed check, failure, and retry'] : []),
+        ...(packagedApp
+          ? [
+              'native keyring load, bundled Claude execution, local update feed check, failure, and retry',
+            ]
+          : []),
         'requirements review',
       ],
       fixtures: true,

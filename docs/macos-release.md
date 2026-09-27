@@ -18,7 +18,9 @@ Project data, reports, and update preferences remain in `~/.aiden`. The renamed 
 | `v1.2.3`        | GitHub Release, marked latest | Every install                               |
 | `v1.2.3-beta.1` | GitHub pre-release            | Beta builds and installs that opt into beta |
 
-The build job checks that the tag matches `package.json`, requires the aggregate quality workflow, then packages, signs, and notarizes on a GitHub-hosted macOS runner. It verifies the signature and stapled notarization ticket, then tests that packaged application. The publish job, which runs no project code, writes `SHA256SUMS.txt`, creates a build provenance attestation for every file, and publishes the release with notes generated from merged pull requests. electron-updater reads `latest-mac.yml` and the ZIP from the release; the DMG is for new installs.
+The build job checks that the tag matches `package.json`, requires the aggregate quality workflow, then packages, signs, and notarizes on a GitHub-hosted macOS runner. It verifies the signature and stapled notarization ticket, then tests that packaged application. Package tests cover a complete synthetic analysis, exports, restart, interruption, explicit resume, missing-provider recovery, native keyring loading, bundled Claude execution, and update-feed failures. No live provider credentials or model requests are needed.
+
+The publish job, which runs no project code, writes `SHA256SUMS.txt`, creates a build provenance attestation for every file, and publishes the release with notes generated from merged pull requests. It rejects existing releases for the tag, verifies local checksums and uploaded asset completeness, and publishes the exact draft ID it created. electron-updater reads `latest-mac.yml` and the ZIP from the release; the DMG is for new installs.
 
 Running the workflow manually from the Actions tab is a dry run: an unsigned build uploaded as a workflow artifact, with nothing published.
 
@@ -42,6 +44,8 @@ Create the Base64 values with `base64 -i file | pbcopy`. GitHub masks secrets in
 4. From the previous signed release, check **Settings → Desktop app → Check for updates**.
 
 A version must be higher than the installed version to be offered.
+
+If publishing fails, inspect the draft and its workflow artifacts before retrying. The workflow intentionally refuses a tag that already has a draft or published release. Never replace binaries under a published version or move its tag. Fixes to 1.1.0 belong in 1.1.1 or later. If an old workflow created both an empty published release and a populated draft for one tag, identify each by its numeric release ID before any manual recovery; resolving by tag is ambiguous.
 
 ## Legacy update feed
 
@@ -73,7 +77,7 @@ For `opheleon/aiden-preview`, require the aggregate `quality` check and resolved
 
 ## Beta readiness
 
-A configured check is not a passing result. Record the commit, artifact hash, environment, date, and evidence for each gate. Leave unavailable checks open; never replace live evidence with fixtures.
+A configured check is not a passing result. Use this checklist for each candidate. Record the commit, artifact hash, environment, date, and evidence for each gate. Leave unavailable checks open; never replace live evidence with fixtures.
 
 - [ ] Required quality checks pass on Linux and macOS with frozen pnpm installs.
 - [ ] Deterministic Electron full journey, restart, export, and recovery pass.
@@ -94,6 +98,20 @@ A configured check is not a passing result. Record the commit, artifact hash, en
 
 External account access, signing/notarization credentials, an older installed package, and an independent reviewer are required for their respective checks. No public beta readiness is claimed until the checklist is complete.
 
-Before public beta, finish startup/renderer recovery, historical saved-data compatibility fixtures, and consistent capability labels. Review the shipped authentication flow against the conditions in [third-party notices](../THIRD_PARTY_NOTICES.md). Validate the package through fresh authentication, offline startup, interrupted analysis, and relaunch. Activate Renovate and verify dependency review receives a nonempty pnpm dependency graph on the first PR.
+Review the shipped authentication flow against the conditions in [third-party notices](../THIRD_PARTY_NOTICES.md). Activate Renovate and verify dependency review receives a nonempty pnpm dependency graph on the first PR.
+
+### Evidence and remaining manual checks
+
+The [1.1.0 release run](https://github.com/opheleon/aiden-preview/actions/runs/36286939338) passed signing, notarization, Gatekeeper assessment, and its packaged smoke test on the macOS runner. It predates the Finder discovery and bundled Claude fixes. The [Finder fix quality run](https://github.com/opheleon/aiden-preview/actions/runs/36287860072) passed Linux/macOS quality and deterministic desktop checks for `ffbb913`. Neither result establishes a clean-user installation or an upgrade of the next candidate.
+
+Before sharing the next signed candidate:
+
+1. On a separate macOS user account, download the actual DMG, verify its checksum and attestation, and install through Finder. Keep quarantine enabled. Record the OS version and artifact hash.
+2. Launch before installing provider CLIs. Confirm the setup guidance, install the supported runtime, and complete fresh authentication for every mode advertised as verified. API-key and subscription tests are separate; never switch billing modes implicitly.
+3. Run a small, explicitly approved repository through requirements, assessment, evidence, and both exports. Relaunch and confirm the report is retained. Test offline startup and an interrupted run without automatic paid retries.
+4. In that isolated account, install the previous signed Opheleon app with synthetic saved data. Test update and manual replacement, stable/beta routing, interrupted downloads, and the legacy feed. Verify both stored data and application replacement, not just the bundle identifier.
+5. Confirm anonymous download access to every release asset, manifest URLs, checksums, and provenance. Recheck the final release commit's quality results and obtain the independent security review.
+
+The deterministic package tests use substitute providers. They verify the real desktop/worker boundary and native executable packaging, but cannot establish fresh provider authentication, provider permissions, or signed updater installation on an end-user Mac.
 
 The beta scope is Apple Silicon macOS. Windows/Linux installers, Intel macOS, hosted services, and VM isolation are later work. Track ongoing implementation in issues and user-facing changes in [CHANGELOG.md](../CHANGELOG.md).

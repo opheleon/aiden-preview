@@ -28,15 +28,23 @@ export async function desktopFixture() {
   delete env.ANTHROPIC_API_KEY;
   delete env.NODE_OPTIONS;
   let sequence = 0;
-  async function launch(info: TestInfo) {
+  async function launch(info: TestInfo, overrides: Record<string, string> = {}) {
+    const packagedApp = process.env.AIDEN_PACKAGED_APP;
     const app = await electron.launch({
       timeout: 30_000,
-      args: ['dist/apps/desktop/src/main.js'],
+      ...(packagedApp
+        ? { executablePath: packagedApp, args: [] }
+        : { args: ['dist/apps/desktop/src/main.js'] }),
       env: {
         ...env,
         AIDEN_HOME: path.join(f.root, 'desktop-data'),
         AIDEN_CODEX_BINARY: binary,
         AIDEN_CLAUDE_BINARY: claude,
+        PATH:
+          process.platform === 'darwin'
+            ? '/usr/bin:/bin:/usr/sbin:/sbin'
+            : (process.env.PATH ?? '/usr/bin:/bin'),
+        ...overrides,
       },
     });
     await app.context().tracing.start({ screenshots: true, snapshots: true });
@@ -65,6 +73,7 @@ export async function desktopFixture() {
     f,
     launch,
     control,
+    binary,
     calls: async () => (await readFile(calls, 'utf8')).trim().split('\n').filter(Boolean),
     root: await realpath(f.root),
   };

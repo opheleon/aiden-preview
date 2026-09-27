@@ -166,3 +166,34 @@ test('a failed credential submission keeps the editable key available for retry'
   expect(await screen.findByRole('alert')).toHaveTextContent('Credential store unavailable');
   expect(screen.getByLabelText('API key')).toHaveValue('synthetic-key');
 });
+
+test('missing Codex installation is explained in both billing modes and cannot start login', async () => {
+  const request = vi.fn();
+  const openExternal = vi.fn().mockResolvedValue(undefined);
+  const props = {
+    diagnostics: [
+      {
+        provider: 'codex' as const,
+        installed: false,
+        ready: false,
+        subscription: false,
+        apiKey: false,
+        message: 'Install the Codex CLI, then restart Aiden and check connection.',
+      },
+    ],
+    api: { request, openExternal } as unknown as DesktopBridge,
+    onChange: vi.fn(),
+    onRefresh: () => Promise.resolve(),
+  };
+  const view = render(
+    <RuntimeSettings {...props} runtime={{ provider: 'codex', auth: 'subscription' }} />,
+  );
+  expect(screen.getByText(/Install the Codex CLI/)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Sign in with Codex' }));
+  expect(request).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole('button', { name: 'Codex installation guide' }));
+  expect(openExternal).toHaveBeenCalledWith('https://learn.chatgpt.com/docs/codex/cli');
+  view.rerender(<RuntimeSettings {...props} runtime={{ provider: 'codex', auth: 'apiKey' }} />);
+  expect(screen.getByText(/Install the Codex CLI/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Check connection' })).toBeEnabled();
+});

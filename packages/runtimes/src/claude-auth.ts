@@ -34,22 +34,13 @@ export function claudeBinary(): string {
     // that signed executable and the SDK's separately bundled executable.
     if (process.env.HOME) candidates.push(path.join(process.env.HOME, '.local', 'bin', executable));
     candidates.push(
-      ...(process.env.PATH ?? '')
+      ...(cleanEnvironment().PATH ?? '')
         .split(path.delimiter)
         .filter((p) => path.isAbsolute(p))
         .map((p) => path.join(p, executable)),
     );
-    const header =
-      process.platform === 'linux'
-        ? (process.report?.getReport() as { header?: Record<string, unknown> }).header
-        : undefined;
-    const musl = header && !('glibcVersionRuntime' in header) ? '-musl' : '';
     try {
-      candidates.push(
-        require.resolve(
-          `@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}${musl}/${executable}`,
-        ),
-      );
+      candidates.push(bundledClaudeBinary());
     } catch {
       /* Optional native dependency may be absent. */
     }
@@ -67,6 +58,21 @@ export function claudeBinary(): string {
     'unavailable',
     'Claude runtime unavailable. Install Claude Code or restore the SDK native dependency, then check connection. AIDEN_CLAUDE_BINARY must be an absolute executable path.',
   );
+}
+
+/** Resolve the SDK's native executable outside ASAR, because child-process spawn cannot execute archive entries. */
+export function bundledClaudeBinary(): string {
+  const executable = process.platform === 'win32' ? 'claude.exe' : 'claude';
+  const header =
+    process.platform === 'linux'
+      ? (process.report?.getReport() as { header?: Record<string, unknown> }).header
+      : undefined;
+  const musl = header && !('glibcVersionRuntime' in header) ? '-musl' : '';
+  return require
+    .resolve(
+      `@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}${musl}/${executable}`,
+    )
+    .replace(/\.asar([\\/])/g, '.asar.unpacked$1');
 }
 
 /** Isolate API credentials from subscription sessions while retaining the user-selected subscription profile. */

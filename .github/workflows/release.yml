@@ -98,7 +98,9 @@ jobs:
         if: failure()
         with:
           name: packaged-app-failure
-          path: test-results/desktop-smoke/
+          path: |
+            test-results/
+            playwright-report/
           retention-days: 7
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -142,15 +144,46 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # gh uploads every file to a draft and publishes it last, so updaters never see a partial release.
-          prerelease=()
-          if [[ "$GITHUB_REF_NAME" == *-* ]]; then prerelease=(--prerelease); fi
-          gh release create \
-            --repo "$GITHUB_REPOSITORY" \
-            --verify-tag \
-            --draft \
-            --title "$GITHUB_REF_NAME" \
-            --generate-notes \
-            "${prerelease[@]}" \
-            "$GITHUB_REF_NAME" *
-          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false
+          set -euo pipefail
+          endpoint="repos/$GITHUB_REPOSITORY/releases"
+          version="${GITHUB_REF_NAME#v}"
+          prerelease=false
+          manifest=latest-mac.yml
+          if [[ "$version" == *-* ]]; then
+            prerelease=true
+            manifest=beta-mac.yml
+          fi
+          expected=$(printf '%s\n' "Aiden-$version-arm64.dmg" "Aiden-$version-arm64.dmg.blockmap" \
+            "Aiden-$version-arm64.zip" "Aiden-$version-arm64.zip.blockmap" \
+            "$manifest" SHA256SUMS.txt | jq -R . | jq -s sort)
+          actual=$(printf '%s\n' * | jq -R . | jq -s sort)
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::Release artifact set is incomplete or contains unexpected files."
+            exit 1
+          fi
+          sha256sum --check SHA256SUMS.txt
+          # Refuse duplicates and leave prior drafts untouched for explicit recovery.
+          existing=$(gh api "$endpoint?per_page=100" --paginate --slurp | \
+            jq --arg tag "$GITHUB_REF_NAME" '[.[][] | select(.tag_name == $tag)] | length')
+          if [[ "$existing" != 0 ]]; then
+            echo "::error::This tag already has a release. Inspect it before retrying; use a new version for changed binaries."
+            exit 1
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME" > /dev/null
+          # Capture the created ID: resolving by tag can select a different release.
+          release_id=$(gh api --method POST "$endpoint" \
+            -f tag_name="$GITHUB_REF_NAME" -f name="$GITHUB_REF_NAME" \
+            -F draft=true -F prerelease="$prerelease" -F generate_release_notes=true --jq .id)
+          [[ "$release_id" =~ ^[0-9]+$ ]]
+          for asset in *; do
+            gh api --method POST \
+              "https://uploads.github.com/$endpoint/$release_id/assets?name=$asset" \
+              -H 'Content-Type: application/octet-stream' --input "$asset" --jq .name
+          done
+          uploaded=$(gh api "$endpoint/$release_id/assets?per_page=100" --paginate --slurp | \
+            jq '[.[][] | select(.state == "uploaded" and .size > 0) | .name] | sort')
+          if [[ "$uploaded" != "$expected" ]]; then
+            echo "::error::Uploaded assets are incomplete. The release remains a draft."
+            exit 1
+          fi
+          gh api --method PATCH "$endpoint/$release_id" -F draft=false --jq .html_url
