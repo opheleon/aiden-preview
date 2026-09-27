@@ -1,7 +1,23 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { ArtifactFormatError, parseJson } from '../packages/runtimes/src/environment.js';
 import { cleanEnvironment, publicError, Runtimes } from '../packages/runtimes/src/index.js';
+
+void test('structured output accepts JSON fences and rejects malformed whitespace-heavy output', () => {
+  for (const value of ['{"ok":true}', '```json\n{"ok":true}\n```', '```\n{"ok":true}\n```']) {
+    assert.deepEqual(parseJson(` \n${value}\n `), { ok: true });
+  }
+  assert.equal(parseJson('"literal ```"'), 'literal ```');
+  for (const value of [
+    '```json\n{}',
+    '{}\n```',
+    '```javascript\n{}\n```',
+    `{}${' '.repeat(100000)}!`,
+  ]) {
+    assert.throws(() => parseJson(value), ArtifactFormatError);
+  }
+});
 void test('environment and error filtering do not leak inherited unrelated credentials', () => {
   process.env.AIDEN_TEST_SECRET = 'never-propagate';
   assert.equal(cleanEnvironment().AIDEN_TEST_SECRET, undefined);

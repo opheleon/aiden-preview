@@ -82,6 +82,22 @@ void test('snapshot reads refuse symlinks and synchronization does not run merge
   await writeFile(path.join(r.path, '.git/hooks/post-merge'), `#!/bin/sh\ntouch '${marker}'\n`, {
     mode: 0o755,
   });
-  await syncRepository(r);
+  assert.deepEqual(await syncRepository(r), []);
+  assert.equal(await readFile(path.join(r.path, 'new'), 'utf8'), 'new');
   await assert.rejects(readFile(marker), /ENOENT/);
+});
+
+void test('production synchronization still refuses inherited executable filters', async () => {
+  const f = await fixture();
+  const r = required(f.project.repositories[0]);
+  const config = path.join(f.root, 'global.gitconfig');
+  await writeFile(config, '[filter "danger"]\n\tsmudge = never-execute\n');
+  const previous = process.env.GIT_CONFIG_GLOBAL;
+  try {
+    process.env.GIT_CONFIG_GLOBAL = config;
+    assert.match((await syncRepository(r)).join(), /Executable checkout filters/);
+  } finally {
+    if (previous === undefined) delete process.env.GIT_CONFIG_GLOBAL;
+    else process.env.GIT_CONFIG_GLOBAL = previous;
+  }
 });

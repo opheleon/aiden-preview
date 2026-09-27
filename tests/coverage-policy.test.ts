@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -15,6 +15,11 @@ void test('unimported runtime source lowers measured coverage and fails the conf
   );
   const command = path.resolve('node_modules/c8/bin/c8.js');
   const exec = promisify(execFile);
+  // A nested c8 invocation otherwise inherits and clears the outer run's coverage directory.
+  const parentCoverage = path.join(root, 'parent-coverage');
+  await mkdir(parentCoverage);
+  const sentinel = path.join(parentCoverage, 'existing-coverage.json');
+  await writeFile(sentinel, '{"result":[]}');
   await assert.rejects(
     exec(
       process.execPath,
@@ -28,19 +33,22 @@ void test('unimported runtime source lowers measured coverage and fails the conf
         '--reporter=json-summary',
         '--reports-dir',
         path.join(root, 'coverage'),
+        '--temp-directory',
+        path.join(root, 'coverage', 'tmp'),
         '--check-coverage',
         '--lines',
         '80',
         process.execPath,
         path.join(root, 'covered.cjs'),
       ],
-      { cwd: root },
+      { cwd: root, env: { ...process.env, NODE_V8_COVERAGE: parentCoverage } },
     ),
     (error) => {
       assert.match(String(error), /coverage|Coverage/);
       return true;
     },
   );
+  assert.equal(await readFile(sentinel, 'utf8'), '{"result":[]}');
   const summary = JSON.parse(
     await readFile(path.join(root, 'coverage', 'coverage-summary.json'), 'utf8'),
   );

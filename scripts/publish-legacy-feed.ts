@@ -72,7 +72,7 @@ try {
 
   const original = await readFile(manifestPath, 'utf8');
   const expectedVersion = tag.slice(1);
-  if (!new RegExp(`^version: ${expectedVersion.replaceAll('.', '\\.')}$`, 'm').test(original)) {
+  if (!original.split(/\r?\n/).includes(`version: ${expectedVersion}`)) {
     throw new Error(`latest-mac.yml in ${tag} does not describe version ${expectedVersion}.`);
   }
   // Only file names change; versions, sizes, and SHA-512 digests stay exactly as released.

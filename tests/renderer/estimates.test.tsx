@@ -90,6 +90,71 @@ test('forecast write failures remain visible and cancellation does not save', as
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 
+test('manual size and duration can reset independently without discarding other overrides', async () => {
+  const p = props();
+  Object.assign(p.estimation.requirements[0]!, {
+    points: 5,
+    pointsOverridden: true,
+    durationDays: 1,
+    durationOverridden: true,
+  });
+  p.overrides.requirementPoints = { 'REQ-1': 5 };
+  p.overrides.durations = { 'REQ-1': 1 };
+  render(<RequirementEstimates {...p} />);
+  expect(screen.getByRole('button', { name: 'Edit duration REQ-1' })).toHaveTextContent('1 day');
+  await userEvent.click(screen.getByRole('button', { name: 'Edit complexity REQ-1' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Reset size to suggested' }));
+  expect(p.onSave).toHaveBeenLastCalledWith({ ...p.overrides, requirementPoints: {} });
+  await userEvent.click(screen.getByRole('button', { name: 'Edit duration REQ-1' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Reset duration to predicted' }));
+  expect(p.onSave).toHaveBeenLastCalledWith({ ...p.overrides, durations: {} });
+  await userEvent.click(screen.getByRole('button', { name: 'Edit duration REQ-1' }));
+  await userEvent.click(
+    within(screen.getByRole('dialog')).getByRole('button', { name: 'Configure history' }),
+  );
+  expect(p.onConfigureHistory).toHaveBeenCalledOnce();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('historical duration shows only saved comparison links and flags truncated history', async () => {
+  const p = props();
+  p.estimation.historyTruncated = true;
+  p.estimation.history = [1, 2, 3].map((i) => ({
+    connectionId: 'fixture',
+    sourceId: 'team',
+    id: `issue-${i}`,
+    identifier: `TEAM-${i}`,
+    title: 'Synthetic work',
+    description: '',
+    url: i === 1 ? 'https://example.invalid/1' : undefined,
+    startedAt: null,
+    completedAt: null,
+    observedCalendarDays: i === 3 ? null : i,
+    size: null,
+    points: null,
+    workType: 'unknown',
+    scopeShape: 'unknown',
+  }));
+  Object.assign(p.estimation.requirements[0]!, {
+    suggestedDurationDays: 2,
+    durationDays: 2,
+    comparisons: ['issue-1', 'issue-2', 'issue-3', 'unavailable'],
+  });
+  render(<RequirementEstimates {...p} />);
+  expect(screen.getByText('History reached its configured collection limit.')).toBeVisible();
+  await userEvent.click(screen.getByRole('button', { name: 'Edit duration REQ-1' }));
+  const dialog = within(screen.getByRole('dialog'));
+  expect(dialog.queryByRole('button', { name: 'Configure history' })).not.toBeInTheDocument();
+  await userEvent.click(dialog.getByText('4 similar completed issues'));
+  await userEvent.click(dialog.getByRole('button', { name: 'TEAM-1 · Synthetic work' }));
+  expect(p.onOpenExternal).toHaveBeenCalledWith('https://example.invalid/1');
+  await userEvent.click(dialog.getByRole('button', { name: 'TEAM-2 · Synthetic work' }));
+  expect(p.onOpenExternal).toHaveBeenCalledOnce();
+  expect(dialog.queryByText('unavailable')).not.toBeInTheDocument();
+  await userEvent.click(dialog.getByRole('button', { name: 'Close' }));
+  expect(p.onSave).not.toHaveBeenCalled();
+});
+
 test('historical calibration links, adjustments, resets, and cancellation stay local to the project', async () => {
   const p = props();
   p.estimation.history = [

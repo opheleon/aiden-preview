@@ -27,12 +27,12 @@ export class ArtifactFormatError extends Error {}
 /** Accept plain JSON or one fenced JSON block; invalid output never becomes an accepted report. */
 export function parseJson(text: string): unknown {
   try {
-    return JSON.parse(
-      text
-        .trim()
-        .replace(/^```(?:json)?\s*/, '')
-        .replace(/\s*```$/, ''),
-    );
+    let content = text.trim();
+    if (content.startsWith('```') && content.endsWith('```')) {
+      const prefixLength = content.startsWith('```json') ? 7 : 3;
+      content = content.slice(prefixLength, -3).trim();
+    }
+    return JSON.parse(content);
   } catch (cause) {
     throw new ArtifactFormatError('The output must be a single valid JSON object.', { cause });
   }
