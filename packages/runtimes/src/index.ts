@@ -102,11 +102,14 @@ export class Runtimes implements AgentRuntime {
         const a = accountSchema.parse(await c.request('account/read', { refreshToken: false }));
         codex.subscription = a.account?.type === 'chatgpt';
         codex.ready = codex.subscription || codex.apiKey;
+        if (!codex.subscription) codex.message = 'Sign in with Codex, then check connection.';
       } finally {
         c.close();
       }
     } catch {
-      codex.message = 'Install Codex, then sign in from Aiden or run codex login.';
+      codex.message = codex.installed
+        ? 'Codex is installed but its connection check failed. Check your connection, then retry.'
+        : 'Install the Codex CLI, then restart Aiden and check connection. The Codex desktop app alone is not sufficient.';
     }
     return [codex, await claudeDiagnostics(this.home, this.key('claude'), claudeVersion)];
   }

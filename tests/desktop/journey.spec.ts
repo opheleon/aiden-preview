@@ -134,3 +134,36 @@ test('quitting during analysis preserves the accepted report and requires an exp
     await desktop.close();
   }
 });
+
+test('first launch with missing providers explains recovery and reconnects after CLI installation', async ({
+  browserName,
+}, info) => {
+  info.annotations.push({ type: 'browser engine', description: browserName });
+  const fixture = await desktopFixture();
+  const missing = path.join(fixture.root, 'new-codex-installation');
+  const desktop = await fixture.launch(info, {
+    AIDEN_CODEX_BINARY: missing,
+    AIDEN_CLAUDE_BINARY: path.join(fixture.root, 'missing-claude'),
+  });
+  try {
+    const { page } = desktop;
+    await page.getByLabel('Project description').fill('Synthetic first-install recovery');
+    await page.locator('.goal-starter-create').click();
+    await expect(page.getByText(/Install the Codex CLI/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in with Codex' })).toBeDisabled();
+    await page.getByRole('button', { name: 'Claude', exact: true }).click();
+    await expect(page.getByTestId('claude-connection')).toContainText('runtime unavailable');
+    await page.getByRole('button', { name: 'Codex', exact: true }).click();
+    await writeFile(missing, await readFile(fixture.binary), { mode: 0o755 });
+    await page.getByRole('button', { name: 'Check connection', exact: true }).click();
+    await expect(
+      page.getByText('Subscription credentials available', { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in with Codex' })).toBeEnabled();
+    await expect(page.getByText(/Install the Codex CLI/)).toHaveCount(0);
+    expect(await fixture.calls()).toEqual([]);
+    expect(desktop.errors).toEqual([]);
+  } finally {
+    await desktop.close();
+  }
+});

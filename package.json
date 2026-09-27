@@ -21,7 +21,7 @@
     "worker": "node --import tsx packages/core/src/worker.ts",
     "smoke": "node --import tsx scripts/live-smoke.ts",
     "test:desktop": "pnpm run build && pnpm test:desktop:journeys && node --import tsx scripts/desktop-smoke.ts",
-    "test:package:mac": "AIDEN_PACKAGED_APP=release/mac/mac-arm64/Aiden.app/Contents/MacOS/Aiden node --import tsx scripts/desktop-smoke.ts",
+    "test:package:mac": "AIDEN_PACKAGED_APP=release/mac/mac-arm64/Aiden.app/Contents/MacOS/Aiden pnpm test:desktop:journeys && AIDEN_PACKAGED_APP=release/mac/mac-arm64/Aiden.app/Contents/MacOS/Aiden node --import tsx scripts/desktop-smoke.ts",
     "package:mac": "pnpm check && pnpm exec electron-builder --mac --arm64",
     "release:legacy-feed": "node --import tsx scripts/publish-legacy-feed.ts",
     "format": "prettier --write .",

@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-- Find Homebrew-installed Codex and Node when Aiden is launched from Finder.
+- Find Homebrew-installed Codex, Claude, and Node when Aiden is launched from Finder.
+- Resolve bundled Claude to its unpacked executable so it can start inside a packaged app.
+- Explain missing Codex CLI installation during setup and prevent unavailable sign-in attempts.
+- Run complete analysis, export, restart, cancellation, and missing-provider recovery journeys against release packages.
+- Publish releases by their created ID after verifying every asset; reject duplicate tags and incomplete uploads.
 - Prepare Apache-2.0 source distribution and contributor documentation.
 - Introduce pnpm dependency policy with a 14-day release cooldown and reviewed install scripts.
 - Convert preload and release tooling to TypeScript.

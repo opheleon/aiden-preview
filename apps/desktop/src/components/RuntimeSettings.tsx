@@ -100,6 +100,7 @@ function RuntimeProfile({
           <p>Provider, authentication, and model for this project.</p>
         </div>
       </div>
+      <CodexInstallation provider={provider} status={status} api={api} action={action} />
       <AuthenticationControls
         runtime={runtime}
         onChange={onChange}
@@ -258,6 +259,7 @@ function AuthenticationControls({
       ) : (
         <button
           className="secondary"
+          disabled={!api || status?.installed === false}
           onClick={() =>
             void action(async () => {
               await api?.request('login', { provider: 'codex' });
@@ -324,5 +326,38 @@ function ModelSelector({
         </label>
       </details>
     </>
+  );
+}
+
+/** Explain missing CLI prerequisites before sign-in and open only the fixed official setup guide. */
+function CodexInstallation({
+  provider,
+  status,
+  api,
+  action,
+}: {
+  provider: RuntimeConfig['provider'];
+  status: RuntimeDiagnostic | undefined;
+  api: DesktopBridge | undefined;
+  action: (fn: () => Promise<void>) => Promise<void>;
+}): JSX.Element | null {
+  if (provider !== 'codex' || !status?.message) return null;
+  return (
+    <div aria-live="polite">
+      <p>{status.message}</p>
+      {!status.installed && (
+        <button
+          className="text-button"
+          disabled={!api}
+          onClick={() =>
+            void action(async () => {
+              await api?.openExternal('https://learn.chatgpt.com/docs/codex/cli');
+            })
+          }
+        >
+          Codex installation guide
+        </button>
+      )}
+    </div>
   );
 }
