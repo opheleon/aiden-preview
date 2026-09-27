@@ -164,7 +164,16 @@ export class UpdateService {
       return this.snapshot();
     this.setStatus({ state: 'checking', error: null, message: null });
     try {
-      await this.options.backend.checkForUpdates();
+      const result = await this.options.backend.checkForUpdates();
+      // Automatic downloads finish after the check returns. Observe their rejection without
+      // blocking the renderer's check request for the duration of a large download.
+      if (
+        result &&
+        typeof result === 'object' &&
+        'downloadPromise' in result &&
+        result.downloadPromise instanceof Promise
+      )
+        void result.downloadPromise.catch(() => this.fail());
     } catch {
       this.fail();
     }

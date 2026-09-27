@@ -27,7 +27,7 @@ shasum -a 256 -c SHA256SUMS.txt --ignore-missing
 gh attestation verify Aiden-VERSION-arm64.dmg --repo opheleon/aiden-preview
 ```
 
-Installed builds check GitHub Releases for updates. Stable builds follow stable releases; beta builds and users who opt in under **Settings → Desktop app** can receive betas. Aiden retains the Opheleon bundle identity; avoid running both copies simultaneously. Maintainers: see the [release runbook](docs/macos-release.md) for signing, notarization, compatibility, and release gates.
+Installed builds check GitHub Releases 30 seconds after launch and every 12 hours while open. Updates download automatically by default; this can be disabled under **Settings → Desktop app**. Restart explicitly to apply a downloaded update; ordinary quitting does not install it. Stable builds follow stable releases; beta builds and users who opt in under **Settings → Desktop app** can receive betas. Aiden retains the Opheleon bundle identity; avoid running both copies simultaneously. Maintainers: see the [release runbook](docs/macos-release.md) for signing, notarization, compatibility, and release gates.
 
 To uninstall, quit and remove the app. Projects and reports remain in `~/.aiden` (or `AIDEN_HOME`); back it up before deleting it. Provider sign-in and OS credential-store entries are managed separately. Disconnect integrations before uninstalling to remove their credentials.
 

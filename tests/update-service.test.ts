@@ -17,10 +17,11 @@ class Backend extends EventEmitter {
   downloads = 0;
   installs = 0;
   failure = false;
+  backgroundDownload: Promise<unknown> | undefined;
   checkForUpdates() {
     this.checks++;
     if (this.failure) return Promise.reject(new Error('/private/path?token=secret'));
-    return Promise.resolve();
+    return Promise.resolve({ downloadPromise: this.backgroundDownload });
   }
   downloadUpdate() {
     this.downloads++;
@@ -70,6 +71,24 @@ void test('development updates are disabled and closed services do not restart',
     f.service.setPreferences({ autoDownload: false, channel: 'beta' }),
     /closed/,
   );
+});
+
+void test('automatic download rejection is handled after the check returns without blocking the renderer', async () => {
+  const f = await fixture();
+  let rejectDownload!: (error: Error) => void;
+  f.backend.backgroundDownload = new Promise((_, reject) => {
+    rejectDownload = reject;
+  });
+  try {
+    await f.service.start();
+    await f.service.check();
+    rejectDownload(new Error('/private/path?token=secret'));
+    await nextTick();
+    assert.equal(f.service.snapshot().state, 'error');
+    assert.doesNotMatch(JSON.stringify(f.publications), /private|secret/);
+  } finally {
+    f.service.dispose();
+  }
 });
 
 void test('corrupt preferences recover offline and beta builds persist their update route', async () => {
