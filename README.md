@@ -59,6 +59,8 @@ Model judgments can be wrong. Validation checks report structure and inspected e
 
 Install provider CLIs separately and use their official authentication instructions. Select the intended authentication method, then use **Check connection**. If it fails, check runtime availability and account sign-in. Aiden uses that selected billing mode; provider usage limits and charges apply, and Aiden includes no model credits. API keys entered in the app are session-only and must be supplied again after restart.
 
+On macOS, Aiden searches the inherited PATH plus `/opt/homebrew/bin` and `/usr/local/bin`, including when opened from Finder. For a custom Codex installation, set `AIDEN_CODEX_BINARY` to its executable path in Aiden's launch environment; npm-based installations also need Node available on PATH.
+
 ## Privacy
 
 - Project metadata, requirements, snapshots, checkpoints, and reports stay under `~/.aiden`, or `AIDEN_HOME`.

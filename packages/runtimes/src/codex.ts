@@ -12,7 +12,7 @@ import {
   threadSchema,
   turnSchema,
 } from './codex-schemas.js';
-import { parseJson, publicError } from './environment.js';
+import { cleanEnvironment, parseJson, publicError } from './environment.js';
 import type { RpcClient, RpcMessage } from './rpc.js';
 import type { RuntimeRequest, RuntimeResult } from './types.js';
 
@@ -207,7 +207,10 @@ export async function runCodex(
     });
     const value = await completed;
     const version = (
-      await exec(process.env.AIDEN_CODEX_BINARY || 'codex', ['--version'], { timeout: 10000 })
+      await exec(process.env.AIDEN_CODEX_BINARY || 'codex', ['--version'], {
+        timeout: 10000,
+        env: cleanEnvironment(),
+      })
     ).stdout.trim();
     return { value, model, version };
   } finally {

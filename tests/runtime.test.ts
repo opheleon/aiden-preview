@@ -4,6 +4,29 @@ import test from 'node:test';
 import { ArtifactFormatError, parseJson } from '../packages/runtimes/src/environment.js';
 import { cleanEnvironment, publicError, Runtimes } from '../packages/runtimes/src/index.js';
 
+void test('Finder provider discovery includes Homebrew without leaking credentials or running shell profiles', () => {
+  const source = {
+    PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
+    HOME: '/synthetic/home',
+    OPENAI_API_KEY: 'unrelated-key',
+    NODE_OPTIONS: '--require=/untrusted/file',
+  };
+  assert.deepEqual(cleanEnvironment(source, 'darwin'), {
+    PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin',
+    HOME: '/synthetic/home',
+  });
+  assert.deepEqual(cleanEnvironment(source, 'linux'), { PATH: source.PATH, HOME: source.HOME });
+  assert.equal(
+    cleanEnvironment({}, 'darwin').PATH,
+    '/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin',
+  );
+  assert.equal(
+    cleanEnvironment({ PATH: '/custom/bin:/opt/homebrew/bin::/usr/local/bin' }, 'darwin').PATH,
+    '/custom/bin:/opt/homebrew/bin:/usr/local/bin',
+  );
+  assert.equal(source.PATH, '/usr/bin:/bin:/usr/sbin:/sbin');
+});
+
 void test('structured output accepts JSON fences and rejects malformed whitespace-heavy output', () => {
   for (const value of ['{"ok":true}', '```json\n{"ok":true}\n```', '```\n{"ok":true}\n```']) {
     assert.deepEqual(parseJson(` \n${value}\n `), { ok: true });

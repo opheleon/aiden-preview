@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Find Homebrew-installed Codex and Node when Aiden is launched from Finder.
 - Prepare Apache-2.0 source distribution and contributor documentation.
 - Introduce pnpm dependency policy with a 14-day release cooldown and reviewed install scripts.
 - Convert preload and release tooling to TypeScript.

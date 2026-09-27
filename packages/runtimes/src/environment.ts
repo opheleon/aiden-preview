@@ -1,6 +1,13 @@
-/** Pass only process prerequisites and network trust settings, excluding unrelated credentials. */
-export function cleanEnvironment(): NodeJS.ProcessEnv {
-  return Object.fromEntries(
+/**
+ * Pass only process prerequisites and network trust settings, excluding unrelated credentials.
+ * Finder does not inherit shell setup. Append standard macOS CLI locations without evaluating
+ * shell profiles, preserving explicitly configured PATH precedence for providers and Node wrappers.
+ */
+export function cleanEnvironment(
+  source: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = Object.fromEntries(
     [
       'PATH',
       'HOME',
@@ -12,8 +19,13 @@ export function cleanEnvironment(): NodeJS.ProcessEnv {
       'HTTPS_PROXY',
       'HTTP_PROXY',
       'NO_PROXY',
-    ].flatMap((k) => (process.env[k] ? [[k, process.env[k]]] : [])),
+    ].flatMap((k) => (source[k] ? [[k, source[k]]] : [])),
   );
+  if (platform === 'darwin') {
+    const inherited = (env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin').split(':').filter(Boolean);
+    env.PATH = [...new Set([...inherited, '/opt/homebrew/bin', '/usr/local/bin'])].join(':');
+  }
+  return env;
 }
 /** Bound user-facing failure text and redact common API-key and bearer-token forms. */
 export function publicError(e: unknown): string {

@@ -93,6 +93,7 @@ export class Runtimes implements AgentRuntime {
     try {
       const v = await exec(process.env.AIDEN_CODEX_BINARY || 'codex', ['--version'], {
         timeout: 10000,
+        env: cleanEnvironment(),
       });
       codex.installed = true;
       codex.version = v.stdout.trim();

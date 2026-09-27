@@ -16,6 +16,7 @@ async function codexFixture(mode = 'success') {
   await writeFile(
     binary,
     `#!/usr/bin/env node
+if (process.env.AIDEN_TEST_SECRET) process.exit(9);
 const fs = require('node:fs');
 const mode = ${JSON.stringify(mode)};
 const calls = ${JSON.stringify(calls)};
@@ -55,7 +56,9 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', li
     { mode: 0o755 },
   );
   const previous = process.env.AIDEN_CODEX_BINARY;
+  const previousSecret = process.env.AIDEN_TEST_SECRET;
   process.env.AIDEN_CODEX_BINARY = binary;
+  process.env.AIDEN_TEST_SECRET = 'must-not-reach-provider-or-version-probe';
   const runtime = new Runtimes(root);
   const request: RuntimeRequest = {
     config: { provider: 'codex', auth: 'subscription' },
@@ -75,6 +78,8 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', li
       runtime.dispose();
       if (previous === undefined) delete process.env.AIDEN_CODEX_BINARY;
       else process.env.AIDEN_CODEX_BINARY = previous;
+      if (previousSecret === undefined) delete process.env.AIDEN_TEST_SECRET;
+      else process.env.AIDEN_TEST_SECRET = previousSecret;
       await rm(root, { recursive: true, force: true });
     },
   };
