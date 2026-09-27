@@ -7,6 +7,7 @@ import { ReportSchema } from '../packages/contracts/src/index.js';
 import { Engine } from '../packages/core/src/engine.js';
 import { Store } from '../packages/core/src/storage.js';
 import { providerLauncher } from '../tests/desktop/provider-launcher.js';
+import { updateFixture } from '../tests/desktop/update-fixture.js';
 import { FixtureRuntime } from '../tests/fixture-runtime.js';
 import { fixture } from '../tests/helpers.js';
 const f = await fixture();
@@ -61,8 +62,13 @@ const app = await electron.launch({
     AIDEN_CLAUDE_BINARY: claudeFixture,
   },
 });
+let updates: Awaited<ReturnType<typeof updateFixture>> | undefined;
+let tracing = false;
 try {
+  await app.context().tracing.start({ screenshots: true, snapshots: true });
+  tracing = true;
   const page = await app.firstWindow();
+  if (packagedApp) updates = await updateFixture(app);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.getByRole('heading', { name: 'What project should Aiden track?' }).waitFor();
@@ -208,10 +214,19 @@ try {
   await page.getByText('Schedule off.', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Desktop app', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'App updates' })).toBeVisible();
-  if (packagedApp) {
-    await expect(page.getByText('1.1.0', { exact: true })).toBeVisible();
+  if (updates) {
+    await expect(page.getByText(updates.version, { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Check for updates' }).click();
     await expect(page.getByText('You are on the latest version.')).toBeVisible({ timeout: 20000 });
+    expect(updates.requests.some((url) => url.split('?')[0]?.endsWith('-mac.yml'))).toBe(true);
+    updates.setUnavailable(true);
+    await page.getByRole('button', { name: 'Check for updates' }).click();
+    await expect(
+      page.getByText('The update could not be completed. Check your connection and retry.'),
+    ).toBeVisible();
+    updates.setUnavailable(false);
+    await page.getByRole('button', { name: 'Check for updates' }).click();
+    await expect(page.getByText('You are on the latest version.')).toBeVisible();
   } else {
     await expect(
       page.getByText('Automatic updates are available in the installed desktop app.'),
@@ -245,7 +260,7 @@ try {
         'desktop update status and preference bridge',
         'saved provider/auth/model survives connection refresh',
         'weekly schedule save, next-run display, and disable',
-        ...(packagedApp ? ['live CloudFront update check'] : []),
+        ...(packagedApp ? ['local update feed check, failure, and retry'] : []),
         'requirements review',
       ],
       fixtures: true,
@@ -253,5 +268,10 @@ try {
     }),
   );
 } finally {
-  await app.close();
+  try {
+    if (tracing) await app.context().tracing.stop({ path: 'test-results/desktop-smoke/trace.zip' });
+  } finally {
+    await app.close();
+    await updates?.close();
+  }
 }
