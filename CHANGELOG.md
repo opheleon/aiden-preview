@@ -1,12 +1,17 @@
 # Changelog
 
-## Unreleased
+## 1.1.1
 
-- Find Homebrew-installed Codex, Claude, and Node when Aiden is launched from Finder.
+- Handle automatic update download failures without unhandled promise rejections, with packaged regression checks for background downloads, checksum rejection, retry, and opt-out.
+
+- Find Homebrew and user-local Codex, Claude, and Node installations when Aiden is launched from Finder.
 - Resolve bundled Claude to its unpacked executable so it can start inside a packaged app.
 - Explain missing Codex CLI installation during setup and prevent unavailable sign-in attempts.
 - Run complete analysis, export, restart, cancellation, and missing-provider recovery journeys against release packages.
 - Publish releases by their created ID after verifying every asset; reject duplicate tags and incomplete uploads.
+
+## 1.1.0
+
 - Prepare Apache-2.0 source distribution and contributor documentation.
 - Introduce pnpm dependency policy with a 14-day release cooldown and reviewed install scripts.
 - Convert preload and release tooling to TypeScript.
@@ -16,4 +21,4 @@
 - Persist evidence receipts before making them available for validation, preserving concurrent reads and rejecting failed writes.
 - Bound estimation history pagination, reject corrupt source checkpoints, and preserve completeness limitations across resume.
 
-This section describes development work, not a published or verified beta. See the [release gates](docs/macos-release.md#beta-readiness) for outstanding work.
+See the [release gates](docs/macos-release.md#beta-readiness) for verification evidence and outstanding beta-readiness work.
