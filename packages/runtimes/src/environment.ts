@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 /**
  * Pass only process prerequisites and network trust settings, excluding unrelated credentials.
  * Finder does not inherit shell setup. Append standard macOS CLI locations without evaluating
@@ -23,7 +25,13 @@ export function cleanEnvironment(
   );
   if (platform === 'darwin') {
     const inherited = (env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin').split(':').filter(Boolean);
-    env.PATH = [...new Set([...inherited, '/opt/homebrew/bin', '/usr/local/bin'])].join(':');
+    const userBin =
+      env.HOME && path.isAbsolute(env.HOME) && !env.HOME.includes(':')
+        ? [path.join(env.HOME, '.local', 'bin')]
+        : [];
+    env.PATH = [...new Set([...inherited, '/opt/homebrew/bin', '/usr/local/bin', ...userBin])].join(
+      ':',
+    );
   }
   return env;
 }

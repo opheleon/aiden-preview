@@ -12,7 +12,7 @@ void test('Finder provider discovery includes Homebrew without leaking credentia
     NODE_OPTIONS: '--require=/untrusted/file',
   };
   assert.deepEqual(cleanEnvironment(source, 'darwin'), {
-    PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin',
+    PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin:/synthetic/home/.local/bin',
     HOME: '/synthetic/home',
   });
   assert.deepEqual(cleanEnvironment(source, 'linux'), { PATH: source.PATH, HOME: source.HOME });
@@ -25,6 +25,16 @@ void test('Finder provider discovery includes Homebrew without leaking credentia
     '/custom/bin:/opt/homebrew/bin:/usr/local/bin',
   );
   assert.equal(source.PATH, '/usr/bin:/bin:/usr/sbin:/sbin');
+  for (const HOME of ['relative/home', '/invalid:home']) {
+    assert.equal(cleanEnvironment({ HOME }, 'darwin').PATH, cleanEnvironment({}, 'darwin').PATH);
+  }
+  assert.equal(
+    cleanEnvironment(
+      { HOME: '/synthetic/home', PATH: '/synthetic/home/.local/bin:/usr/bin' },
+      'darwin',
+    ).PATH,
+    '/synthetic/home/.local/bin:/usr/bin:/opt/homebrew/bin:/usr/local/bin',
+  );
 });
 
 void test('structured output accepts JSON fences and rejects malformed whitespace-heavy output', () => {

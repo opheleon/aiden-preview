@@ -61,7 +61,7 @@ Codex requires a separate [Codex CLI installation](https://learn.chatgpt.com/doc
 
 For Claude subscription mode, install Claude Code separately and run `claude auth login --claudeai`. Aiden prefers that installation so its existing sign-in can be reused; the packaged SDK also includes a native Claude runtime. Select the intended authentication method, then use **Check connection**. If it fails, check runtime availability and account sign-in. Aiden uses that selected billing mode; provider usage limits and charges apply, and Aiden includes no model credits. API keys entered in the app are session-only and must be supplied again after restart.
 
-On macOS, Aiden searches the inherited PATH plus `/opt/homebrew/bin` and `/usr/local/bin`, including when opened from Finder. For a custom Codex installation, set `AIDEN_CODEX_BINARY` to its executable path in Aiden's launch environment; npm-based installations also need Node available on PATH.
+On macOS, Aiden searches the inherited PATH plus `/opt/homebrew/bin`, `/usr/local/bin`, and `~/.local/bin`, including when opened from Finder. For a custom Codex installation, set `AIDEN_CODEX_BINARY` to its executable path in Aiden's launch environment; npm-based installations also need Node available on PATH.
 
 ## Privacy
 
