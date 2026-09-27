@@ -1,0 +1,403 @@
+.connection {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: #856325;
+  padding: 8px 0;
+}
+
+.connection > span {
+  background: #a4813c;
+}
+
+.connection.ready {
+  color: #306447;
+}
+
+.connection.ready > span {
+  background: #306447;
+}
+
+.fine-print {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.7;
+  margin-top: 18px;
+}
+
+.context-card .card-heading button {
+  margin-left: auto;
+}
+
+.context {
+  min-height: 320px;
+  font-size: 15px;
+  line-height: 1.8;
+  padding: 20px;
+}
+
+.icon-button {
+  padding: 5px;
+  color: var(--muted);
+  flex-shrink: 0;
+  border-radius: 6px;
+}
+
+.icon-button:hover {
+  background: var(--paper2);
+}
+
+.callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--tint);
+  border: 1px solid #d5cff2;
+  border-radius: 8px;
+  color: var(--brand-dark);
+  font-size: 13px;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.callout > div {
+  flex: 1;
+}
+
+.callout > button {
+  margin-left: auto;
+}
+
+.callout.warning {
+  background: #f7f1e6;
+  color: #856325;
+  border-color: #e6d9bd;
+}
+
+.callout.error {
+  background: #fbefeb;
+  border-color: #ebc9c1;
+  color: #a53c30;
+}
+
+.callout svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.requirements {
+  margin: 22px 0;
+}
+
+.requirement {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  padding: 15px 0;
+  border-top: 1px solid var(--border);
+}
+
+.requirement > span,
+.req-id {
+  font: 11px var(--font-mono);
+  color: var(--muted);
+  white-space: nowrap;
+  margin-top: 11px;
+}
+
+.requirement textarea {
+  margin: 0;
+  min-height: 66px;
+}
+
+.count {
+  background: var(--paper2);
+  border-radius: 20px;
+  padding: 4px 8px;
+  font: 11px var(--font-mono);
+  color: var(--muted);
+}
+
+.spinner {
+  width: 25px;
+  height: 25px;
+  border: 2px solid var(--tint);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.progress {
+  margin-top: 22px;
+}
+
+.log {
+  font: 11px/2.2 var(--font-mono);
+  color: var(--muted);
+}
+
+.log div {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+
+.log span {
+  width: 4px;
+  height: 4px;
+  background: var(--brand);
+  border-radius: 50%;
+}
+
+.report-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.report-label {
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 10px var(--font-mono);
+  letter-spacing: 0.03em;
+}
+
+.report-top > div {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.summary {
+  background: linear-gradient(120deg, var(--card), var(--tint));
+  margin-bottom: 18px;
+}
+
+.health-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.health-heading h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.health-heading > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.health-insight {
+  font-size: 13px;
+  color: var(--body);
+  padding-top: 16px;
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 22px;
+}
+
+.metrics strong {
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  display: block;
+  line-height: 1.2;
+}
+
+.metrics span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: capitalize;
+  margin-top: 9px;
+}
+
+.metrics i {
+  width: 5px;
+  height: 5px;
+  display: inline-block;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.metrics .implemented {
+  background: #306447;
+}
+
+.metrics .partial,
+.metrics .missing {
+  background: #856325;
+}
+
+.snapshot-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-bottom: 32px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.snapshot-list > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.snapshot-list code {
+  font: 11px var(--font-mono);
+}
+
+.snapshot-branch {
+  color: var(--brand);
+}
+
+.requirements-report {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  margin-bottom: 32px;
+}
+
+.requirements-report .card-heading {
+  margin-bottom: 10px;
+}
+
+.requirements-report h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.snapshot-note {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.requirement-columns {
+  display: grid;
+  grid-template-columns: 1fr 175px;
+  gap: 16px;
+  padding: 12px 22px 12px 42px;
+  font: 11px var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.065em;
+  color: var(--muted);
+}
+
+.requirement-rows {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card);
+}
+
+.assessment + .assessment {
+  border-top: 1px solid var(--border);
+}
+
+.assessment summary {
+  display: grid;
+  grid-template-columns: 16px 1fr 175px;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 22px 18px 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.assessment summary::-webkit-details-marker {
+  display: none;
+}
+
+.assessment summary:hover {
+  background: color-mix(in srgb, var(--paper2) 45%, transparent);
+}
+
+.assessment-chevron {
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+
+.assessment[open] .assessment-chevron {
+  transform: rotate(90deg);
+}
+
+.assessment summary strong {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.assessment .req-id {
+  display: block;
+  margin: 0 0 4px;
+}
+
+.assessment-status {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.status {
+  font: 11px/1.4 var(--font-mono);
+  padding: 4px 9px;
+  background: var(--paper2);
+  color: var(--muted);
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.status.implemented {
+  background: #edf4ee;
+  color: #306447;
+}
+
+.status.partial,
+.status.missing {
+  background: #f7f1e6;
+  color: #856325;
+}
+
+.status.deviation {
+  background: var(--tint);
+  color: var(--brand-dark);
+}
+
+.assessment-body {
+  padding: 16px 24px 20px 42px;
+  font-size: 13px;
+  color: var(--body);
+  line-height: 1.7;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--paper2) 25%, var(--card));
+}

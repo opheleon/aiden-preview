@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": ".",
+    "resolveJsonModule": true,
+    "types": ["node"],
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "sourceMap": true
+  },
+  "include": [
+    "packages/**/*.ts",
+    "apps/cli/**/*.ts",
+    "apps/desktop/src/main.ts",
+    "apps/desktop/src/updater.ts",
+    "apps/desktop/src/bridge.d.ts",
+    "apps/desktop/src/preload.cts"
+  ],
+  "exclude": ["node_modules", "dist"]
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/**/*.ts",
+        "tests/**/*.test.ts",
+        "tests/renderer/**/*.test.tsx",
+        "tests/e2e/**/*.spec.ts",
+        "*.config.ts",
+        "tests/desktop/**/*.spec.ts",
+        "tests/desktop/provider-fixture.ts"
+      ],
+      "project": ["scripts/**/*.ts", "tests/**/*.{ts,tsx}", "*.config.ts"]
+    },
+    "apps/desktop": {
+      "entry": [
+        "src/main.ts",
+        "src/preload.cts",
+        "src/entry.tsx",
+        "src/updater.ts",
+        "vite.config.ts"
+      ],
+      "project": ["src/**/*.{ts,tsx,cts}", "vite.config.ts"]
+    },
+    "apps/cli": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/*": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/core": {
+      "entry": ["src/worker.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/runtimes": {
+      "entry": ["src/index.ts", "src/claude.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/tools": {
+      "entry": ["src/discovery.ts"],
+      "project": ["src/**/*.ts"]
+    }
+  },
+  "ignoreExportsUsedInFile": true
+}

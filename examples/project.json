@@ -1,0 +1,18 @@
+{
+  "id": "my-project",
+  "name": "Customer portal",
+  "context": "Customers can view and edit their profile. Profile changes must be saved by the backend. Launch milestone: private beta.",
+  "repositories": [
+    {
+      "id": "frontend",
+      "path": "/absolute/path/to/frontend",
+      "notes": "main is the default branch; develop contains upcoming work"
+    },
+    {
+      "id": "backend",
+      "path": "/absolute/path/to/backend",
+      "notes": "Check the profile API contract against the frontend"
+    }
+  ],
+  "runtime": { "provider": "codex", "auth": "subscription" }
+}

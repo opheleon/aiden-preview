@@ -1,0 +1,22 @@
+name: Bug report
+description: Report reproducible behavior without sharing private source or credentials.
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Aiden version and macOS version
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Use a minimal synthetic example. Send vulnerabilities privately using .github/SECURITY.md.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true

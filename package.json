@@ -1,0 +1,139 @@
+{
+  "name": "opheleon-desktop-app",
+  "private": true,
+  "version": "1.1.0",
+  "description": "Opheleon Aiden desktop workspace",
+  "main": "dist/apps/desktop/src/main.js",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && vite build --config apps/desktop/vite.config.ts && node --import tsx scripts/copy-assets.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/desktop/tsconfig.json --noEmit && tsc -p tsconfig.verification.json",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "dev": "pnpm run build && electron dist/apps/desktop/src/main.js",
+    "cli": "node --import tsx apps/cli/src/index.ts",
+    "worker": "node --import tsx packages/core/src/worker.ts",
+    "smoke": "node --import tsx scripts/live-smoke.ts",
+    "test:desktop": "pnpm run build && pnpm test:desktop:journeys && node --import tsx scripts/desktop-smoke.ts",
+    "test:package:mac": "AIDEN_PACKAGED_APP=release/mac/mac-arm64/Aiden.app/Contents/MacOS/Aiden node --import tsx scripts/desktop-smoke.ts",
+    "package:mac": "pnpm check && pnpm exec electron-builder --mac --arm64",
+    "release:legacy-feed": "node --import tsx scripts/publish-legacy-feed.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:e2e": "pnpm run build && playwright test",
+    "lint": "eslint . --max-warnings 0 && stylelint \"apps/**/*.css\" --max-warnings 0",
+    "check:source": "node --import tsx scripts/quality/check-source.ts",
+    "check:docs": "node --import tsx scripts/quality/check-docs.ts",
+    "check:dependencies": "knip && node --import tsx scripts/quality/check-boundaries.ts",
+    "check": "pnpm format:check && pnpm lint && pnpm check:source && pnpm check:docs && pnpm typecheck && pnpm check:dependencies && pnpm test:coverage && pnpm test:renderer && pnpm build",
+    "test:coverage": "c8 node --import tsx --test tests/*.test.ts && node --import tsx scripts/quality/check-critical-coverage.ts",
+    "test:renderer": "vitest run --coverage",
+    "test:desktop:journeys": "playwright test --config playwright.desktop.config.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.269",
+    "@fontsource-variable/instrument-sans": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@napi-rs/keyring": "^1.3.0",
+    "electron-updater": "^6.8.9",
+    "lucide-react": "^0.548.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^4.0.0",
+    "zod-to-json-schema": "^3.25.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.55.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/eslint-plugin-jsx-a11y": "^6.10.1",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.4.1",
+    "@vitest/coverage-v8": "^3.2.7",
+    "c8": "^12.0.0",
+    "dependency-cruiser": "^16.10.4",
+    "electron": "44.3.0",
+    "electron-builder": "^26.15.3",
+    "eslint": "^10.10.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsdoc": "^64.3.10",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-simple-import-sort": "^14.0.0",
+    "jsdom": "^26.1.0",
+    "knip": "^6.35.1",
+    "prettier": "3.9.6",
+    "stylelint": "^16.26.1",
+    "stylelint-config-standard": "^39.0.1",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.70.0",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.7",
+    "yaml": "^2.9.1"
+  },
+  "license": "Apache-2.0",
+  "build": {
+    "appId": "ai.opheleon.desktop",
+    "productName": "Aiden",
+    "artifactName": "Aiden-${version}-${arch}.${ext}",
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/@napi-rs/**/*",
+      "node_modules/@anthropic-ai/claude-agent-sdk-*/**/*"
+    ],
+    "directories": {
+      "output": "release/mac",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "workflows/**/*",
+      "package.json"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "opheleon",
+        "repo": "aiden-preview"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "build/app-icon.png",
+      "hardenedRuntime": true,
+      "target": [
+        "zip",
+        "dmg"
+      ],
+      "extendInfo": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLName": "Opheleon OAuth",
+            "CFBundleURLSchemes": [
+              "opheleon",
+              "opheleon-beta",
+              "opheleon-dev"
+            ]
+          }
+        ]
+      }
+    },
+    "dmg": {
+      "sign": false
+    }
+  },
+  "packageManager": "pnpm@11.19.0"
+}
