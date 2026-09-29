@@ -37,6 +37,10 @@ const methods = new Set([
   'estimate',
   'estimation',
   'estimateOverrides',
+  'verify',
+  'verification',
+  'verificationSettings',
+  'updateVerificationSettings',
 ]);
 
 /** Open only approved provider login destinations or HTTPS integration authorization pages. */

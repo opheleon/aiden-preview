@@ -18,6 +18,7 @@ import {
   type Report,
   type RunEvent,
   type RunManifest,
+  type Stage,
   validateReport,
 } from '../../contracts/src/index.js';
 import { ConnectionManager } from '../../integrations/src/index.js';
@@ -28,7 +29,16 @@ import { readSnapshot } from '../../tools/src/git.js';
 import { applyOverrides } from './estimate-overrides.js';
 import { execute } from './report-workflow.js';
 import { atomic, hash, json, optionalJson, Store, uid } from './storage.js';
+import { resolveVerifyUrl } from './verification-workflow.js';
 import type { WorkflowContext } from './workflow-context.js';
+
+/** Stage recorded before each kind of run starts working. */
+const firstStage: Record<RunManifest['kind'], Stage> = {
+  prepare: 'understand',
+  report: 'sync',
+  estimate: 'estimate',
+  verify: 'verify',
+};
 
 /** Own project locks and explicit run lifecycles while keeping accepted artifacts separate from in-flight work. */
 export class Engine {
@@ -191,12 +201,20 @@ export class Engine {
       refreshHistory,
     });
   }
+  /** Check approved requirements against a running app at the given or saved URL; no repository code runs. */
+  async verify(projectId: string, url?: string): Promise<{ runId: string }> {
+    const folder = this.store.project(projectId);
+    const project = ProjectSchema.parse(await json(path.join(folder, 'project.json')));
+    const baseline = await json<Baseline>(path.join(folder, 'baseline.json'));
+    const verifyUrl = await resolveVerifyUrl(folder, url);
+    return this.start(project, 'verify', baseline, { verifyUrl });
+  }
   /** Persist initial run identity before launching work; failed setup always releases its project lock. */
   private async start(
     project: Project,
     kind: RunManifest['kind'],
     baseline?: Baseline,
-    extra: { estimateReportId?: string; refreshHistory?: boolean } = {},
+    extra: { estimateReportId?: string; refreshHistory?: boolean; verifyUrl?: string } = {},
   ): Promise<{ runId: string }> {
     const release = await this.lock(project.id);
     try {
@@ -205,7 +223,7 @@ export class Engine {
         projectId: project.id,
         kind,
         status: 'running',
-        stage: kind === 'prepare' ? 'understand' : kind === 'estimate' ? 'estimate' : 'sync',
+        stage: firstStage[kind],
         project,
         ...(baseline ? { baseline } : {}),
         createdAt: new Date().toISOString(),
@@ -249,6 +267,10 @@ export class Engine {
   /** Await active work without starting or retrying it; an inactive run has nothing to wait for. */
   async wait(runId: string): Promise<void> {
     await this.active.get(runId)?.done;
+  }
+  /** Whether this worker is executing the run; saved manifests can still say running after a crash. */
+  isActive(runId: string): boolean {
+    return this.active.has(runId);
   }
   /** Signal cancellation for active work; accepted report pointers remain owned by workflow commit guards. */
   cancel(runId: string): { cancelled: boolean } {

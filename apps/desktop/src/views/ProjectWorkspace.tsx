@@ -36,7 +36,8 @@ export function ProjectWorkspace({
           <RequirementReview {...workspace} product={product} baseline={baseline} />
         )}
         {busy && <RunProgress {...workspace} />}
-        {step === 3 && !busy && report && <AcceptedReport workspace={workspace} report={report} />}
+        {/* The last accepted report stays readable while a new run is in progress. */}
+        {step === 3 && report && <AcceptedReport workspace={workspace} report={report} />}
         <EmptyReport workspace={workspace} />
         {(step === 3 || !baseline) && terminalRuns.length > 0 && (
           <RunHistory {...workspace} terminalRuns={terminalRuns} />

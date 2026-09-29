@@ -34,7 +34,6 @@ export function RunHistory(props: RunHistoryProps): React.JSX.Element {
           {r.status === 'completed' ? (
             <button
               className="text-button"
-              disabled={busy}
               onClick={() =>
                 void action(async () =>
                   setReport(await call('result', { projectId: project.id, runId: r.id })),

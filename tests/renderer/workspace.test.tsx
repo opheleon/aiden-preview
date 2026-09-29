@@ -17,7 +17,8 @@ function desktop() {
   const unsubscribe = vi.fn();
   const request = vi.fn((method: string) => {
     if (['diagnostics', 'projects', 'integrations'].includes(method)) return Promise.resolve([]);
-    if (method === 'state') return Promise.resolve({ project, baseline: null, runs: [] });
+    if (method === 'state')
+      return Promise.resolve({ project, baseline: null, runs: [], activeRunIds: [] });
     if (method === 'estimation') return Promise.resolve(null);
     if (method === 'discoverRepositories')
       return Promise.resolve({
@@ -98,7 +99,7 @@ test('changed source inputs block analysis until another requirements review', a
     projectId: project.id,
     runtime: project.runtime,
   });
-  expect(f.request).toHaveBeenCalledWith('report', { projectId: project.id });
+  expect(f.request).toHaveBeenCalledWith('report', { projectId: project.id, browserCheck: true });
 });
 
 test('worker progress, clarification, review, cancellation, and background outcomes update only their intended state', async () => {
@@ -160,7 +161,7 @@ test('update persistence errors surface and subscriptions clean up', async () =>
   expect(f.unsubscribe).toHaveBeenCalled();
 });
 
-test('pending estimate continuations are cancelled when the renderer unmounts', async () => {
+test('a completed code assessment never starts an estimate on its own', async () => {
   const f = desktop();
   const { result, unmount } = renderHook(() => useWorkspace());
   act(() => result.current.setProject(project));
@@ -175,7 +176,20 @@ test('pending estimate continuations are cancelled when the renderer unmounts', 
     });
     await Promise.resolve();
   });
-  unmount();
   await vi.advanceTimersByTimeAsync(300);
+  expect(result.current.busy).toBe(false);
   expect(f.request).not.toHaveBeenCalledWith('estimate', expect.anything());
+  unmount();
+});
+
+test('progress from another project never holds this project as busy', async () => {
+  const f = desktop();
+  const { result } = renderHook(() => useWorkspace());
+  act(() => result.current.setProject(project));
+  await waitFor(() => expect(f.api.onEvent).toHaveBeenCalled());
+  act(() =>
+    f.emit({ type: 'progress', projectId: 'other', runId: 'other-run', message: 'Elsewhere' }),
+  );
+  expect(result.current.busy).toBe(false);
+  expect(result.current.log).not.toContain('Elsewhere');
 });

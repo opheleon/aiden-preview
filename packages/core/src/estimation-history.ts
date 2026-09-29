@@ -139,9 +139,7 @@ async function sourceForRun(
 ): Promise<Source | null> {
   const selection = run.project.sources?.history;
   if (!selection) {
-    limitations.push(
-      'No estimation history source is selected. Add a manual weekly rate or connect a team/workspace.',
-    );
+    limitations.push('Connect a ticket source to estimate time from recent completed work.');
     return null;
   }
   const saved = await optionalJson<unknown>(path.join(dir, 'history-source.json'));
@@ -168,7 +166,7 @@ async function sourceForRun(
         cause: error,
       });
     limitations.push(
-      `History is unavailable: ${publicError(error)} Add manual durations or a weekly rate.`,
+      `History is unavailable: ${publicError(error)} Reconnect the ticket source and re-estimate to obtain time estimates.`,
     );
     return null;
   }
@@ -219,7 +217,12 @@ export async function collectEstimationHistory(
     );
   historyLimitations.push(...normalized.limitations);
   return {
-    rows: normalized.rows.filter((row) => !!row.completedAt && row.completedAt >= cutoff),
+    rows: normalized.rows.filter(
+      (row) =>
+        !!row.completedAt &&
+        row.completedAt >= cutoff &&
+        row.completedAt <= new Date().toISOString(),
+    ),
     receipts: source.reads.map((read) => read.receipt),
     historyComplete: source.historyComplete,
     historyTruncated: source.historyTruncated,

@@ -1,34 +1,20 @@
 import type { JSX } from 'react';
 
-import type { Report, RequirementEstimate } from '../../../../packages/contracts/src/index';
-import { durationText, sizes } from '../renderer/estimate-format';
+import type { RequirementEstimate } from '../../../../packages/contracts/src/index';
+import { comparisonSummary, durationText, sizes } from '../renderer/estimate-format';
 import type { EstimateEditing, RequirementEstimatesProps } from './estimate-types';
-const statusBadges: Record<
-  Report['assessments'][number]['status'],
-  { label: string; tone: string }
-> = {
-  implemented: { label: 'Implemented', tone: 'satisfied' },
-  partial: { label: 'Partially implemented', tone: 'partial' },
-  missing: { label: 'Not implemented', tone: 'incomplete' },
-  unknown: { label: 'Not assessed', tone: 'neutral' },
-};
-/** Pair a requirement's status with editable size/duration and recorded evidence links. */
+
+/** Pair a requirement with its editable change size, history-based time, and remaining work. */
 export function EstimateRow({
   item,
   report,
   busy,
   setEditing,
-  setDays,
-  onOpenEvidence,
-}: Pick<RequirementEstimatesProps, 'report' | 'busy' | 'onOpenEvidence'> & {
+  estimation,
+}: Pick<RequirementEstimatesProps, 'report' | 'busy' | 'estimation'> & {
   item: RequirementEstimate;
   setEditing: (value: EstimateEditing) => void;
-  setDays: (value: string) => void;
 }): JSX.Element {
-  const assessmentIndex = report.assessments.findIndex(
-    (value) => value.requirementId === item.requirementId,
-  );
-  const status = assessmentIndex >= 0 ? report.assessments[assessmentIndex] : undefined;
   const text = report.baseline.requirements.find((value) => value.id === item.requirementId)?.text;
   return (
     <article className="estimate-row" key={item.requirementId}>
@@ -36,50 +22,53 @@ export function EstimateRow({
         <span className="project-requirement-id">{item.requirementId}</span>
         <p>{text}</p>
       </div>
-      <div className="estimate-controls">
-        <div className="estimate-status">
-          <span
-            className={`project-status-badge project-status-badge--${statusBadges[status?.status ?? 'missing'].tone}`}
-          >
-            {statusBadges[status?.status ?? 'missing'].label}
-          </span>
-          {status?.deviation && (
-            <span className="project-status-badge project-status-badge--deviated">Deviated</span>
-          )}
-        </div>
-        <button
-          className="estimate-value estimate-size"
-          aria-label={`Edit complexity ${item.requirementId}`}
-          disabled={busy}
-          onClick={() => setEditing({ id: item.requirementId, kind: 'size' })}
-        >
-          {sizes.find((size) => size.points === item.points)?.label ?? item.original.size}
-          {item.pointsOverridden && <sup title="Manual override">*</sup>}
-        </button>
-        <button
-          className={`estimate-value estimate-time ${item.durationDays === null ? 'is-unknown' : ''}`}
-          aria-label={`Edit duration ${item.requirementId}`}
-          disabled={busy}
-          onClick={() => {
-            setDays(String(item.durationDays ?? ''));
-            setEditing({ id: item.requirementId, kind: 'duration' });
-          }}
-        >
-          {durationText(item.durationDays)}
-          {item.durationOverridden && <sup title="Manual override">*</sup>}
-        </button>
-      </div>
-      {status && (
-        <AssessmentEvidence
-          status={status}
-          assessmentIndex={assessmentIndex}
-          onOpenEvidence={onOpenEvidence}
-        />
-      )}
+      <EstimateControls item={item} busy={busy} estimation={estimation} setEditing={setEditing} />
       <RemainingWork item={item} />
     </article>
   );
 }
+/** Keep change size and history-derived time together while disabling edits for complete or unknown work. */
+function EstimateControls({
+  item,
+  busy,
+  estimation,
+  setEditing,
+}: Pick<RequirementEstimatesProps, 'busy' | 'estimation'> & {
+  item: RequirementEstimate;
+  setEditing: (value: EstimateEditing) => void;
+}): JSX.Element {
+  const summary = comparisonSummary(item, estimation);
+  return (
+    <div className="estimate-controls">
+      <button
+        className="estimate-value estimate-size"
+        aria-label={`Edit complexity ${item.requirementId}`}
+        disabled={busy || item.remainingPoints === null || item.remainingPoints === 0}
+        onClick={() => setEditing({ id: item.requirementId, kind: 'size' })}
+      >
+        {item.remainingPoints === 0
+          ? 'Done'
+          : (sizes.find((size) => size.points === item.remainingPoints)?.label ?? 'Unknown')}
+        {item.remainingPointsOverridden && <sup title="Manual override">*</sup>}
+      </button>
+      <button
+        className={`estimate-value estimate-time ${!summary ? 'is-unknown' : ''}`}
+        aria-label={`Explain duration ${item.requirementId}`}
+        disabled={busy}
+        onClick={() => {
+          setEditing({ id: item.requirementId, kind: 'duration' });
+        }}
+      >
+        {item.remainingPoints === 0
+          ? 'No work left'
+          : summary
+            ? `${summary.p10}–${durationText(summary.p90)}`
+            : 'Unavailable'}
+      </button>
+    </div>
+  );
+}
+
 /** Show remaining scope and unanswered questions independently of the original scope estimate. */
 function RemainingWork({ item }: { item: RequirementEstimate }): JSX.Element {
   return (
@@ -109,43 +98,6 @@ function RemainingWork({ item }: { item: RequirementEstimate }): JSX.Element {
           </ul>
         </>
       ) : null}
-    </details>
-  );
-}
-
-/** Link each implementation claim to its recorded source evidence and deviation explanation. */
-function AssessmentEvidence({
-  status,
-  assessmentIndex,
-  onOpenEvidence,
-}: {
-  status: Report['assessments'][number];
-  assessmentIndex: number;
-  onOpenEvidence: RequirementEstimatesProps['onOpenEvidence'];
-}): JSX.Element {
-  return (
-    <details className="estimate-evidence">
-      <summary>Code evidence</summary>
-      <h3>Implementation</h3>
-      <p>{status.explanation}</p>
-      {status.evidence.length > 0 && (
-        <div className="estimate-evidence-links">
-          {status.evidence.map((item, evidenceIndex) => (
-            <button
-              key={`${item.repositoryId}:${item.path}:${item.startLine}`}
-              onClick={() => onOpenEvidence(assessmentIndex, evidenceIndex)}
-            >
-              {item.repositoryId} · {item.path}:{item.startLine}
-            </button>
-          ))}
-        </div>
-      )}
-      <h3>Deviation · {status.deviation ? 'Yes' : 'No deviation found'}</h3>
-      <p>
-        {status.deviation
-          ? status.explanation
-          : 'No contradictory behavior was established in the inspected snapshots.'}
-      </p>
     </details>
   );
 }

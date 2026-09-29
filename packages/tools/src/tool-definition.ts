@@ -5,6 +5,8 @@ export interface ToolDefinition {
   name: string;
   description: string;
   schema: z.ZodType<unknown>;
+  /** Overrides the MCP read-only hint; omitted for repository tools, which derive it from their name. */
+  readOnly?: boolean;
   run(input: unknown): unknown;
 }
 
@@ -13,6 +15,7 @@ export function defineTool<Input>(definition: {
   name: string;
   description: string;
   schema: z.ZodType<Input, z.ZodTypeDef, unknown>;
+  readOnly?: boolean;
   run(input: Input): unknown;
 }): ToolDefinition {
   return {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile, writeFile } from 'node:fs/promises';
+import { cp, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
@@ -32,6 +32,7 @@ const { positionals, values } = parseArgs({
     sourceArgument: { type: 'string' },
     includeEstimates: { type: 'boolean', default: false },
     refreshHistory: { type: 'boolean', default: false },
+    clear: { type: 'boolean', default: false },
   },
 });
 const format = z.enum(['json', 'markdown']).parse(values.format);
@@ -279,9 +280,38 @@ try {
         2,
       ),
     );
+  } else if (command === 'verify-url') {
+    if (!values.project) throw new Error('Use verify-url --project ID [--url URL | --clear].');
+    const settings =
+      values.url || values.clear
+        ? await client.request('updateVerificationSettings', {
+            projectId: values.project,
+            url: values.clear ? null : (values.url ?? null),
+          })
+        : await client.request('verificationSettings', { projectId: values.project });
+    process.stdout.write(`App URL: ${settings.url ?? 'not set'}\n`);
+  } else if (command === 'verify') {
+    if (!values.project) throw new Error('Use verify --project ID [--url http://localhost:3000].');
+    const r = await client.request('verify', {
+      projectId: values.project,
+      ...(values.url ? { url: values.url } : {}),
+    });
+    await wait(r.runId);
+    const saved = await client.request('verification', {
+      projectId: values.project,
+      runId: r.runId,
+    });
+    if (!saved) throw new Error('The verification result was not saved.');
+    let reportPath = saved.reportPath;
+    if (values.out) {
+      // The report links its videos and screenshots by relative path, so copy the whole folder.
+      await cp(path.dirname(saved.reportPath), path.resolve(values.out), { recursive: true });
+      reportPath = path.join(path.resolve(values.out), 'report.html');
+    }
+    process.stdout.write(`${saved.result.summary.line}\nReport: ${reportPath}\n`);
   } else
     process.stdout.write(
-      'Aiden\n\n  doctor\n  discover --root /path/to/project\n  login\n  report --config project.json [--format json|markdown] [--out file]\n  report --project ID\n  resume --project ID --run ID\n  validate --project ID --run ID\n  export --project ID --run ID --format markdown [--includeEstimates] --out report.md\n  integrations list\n  integrations add-linear\n  integrations add --name NAME --url URL --auth oauth|bearer|none\n  integrations connect|tools|approve|disconnect|remove --connection ID [--tools a,b]\n  sources --project ID --connection ID --source ID --historyTool TOOL --sourceArgument ARG [--label NAME]\n  estimate --project ID [--run REPORT_ID] [--refreshHistory]\n  estimation --project ID\n  estimate-overrides --project ID --config overrides.json\n',
+      'Aiden\n\n  doctor\n  discover --root /path/to/project\n  login\n  report --config project.json [--format json|markdown] [--out file]\n  report --project ID\n  resume --project ID --run ID\n  validate --project ID --run ID\n  export --project ID --run ID --format markdown [--includeEstimates] --out report.md\n  integrations list\n  integrations add-linear\n  integrations add --name NAME --url URL --auth oauth|bearer|none\n  integrations connect|tools|approve|disconnect|remove --connection ID [--tools a,b]\n  sources --project ID --connection ID --source ID --historyTool TOOL --sourceArgument ARG [--label NAME]\n  estimate --project ID [--run REPORT_ID] [--refreshHistory]\n  estimation --project ID\n  estimate-overrides --project ID --config overrides.json\n  verify-url --project ID [--url URL | --clear]\n  verify --project ID [--url URL] [--out DIR]\n',
     );
 } catch (e) {
   process.stderr.write((e instanceof Error ? e.message : 'Command failed.') + '\n');

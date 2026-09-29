@@ -29,7 +29,7 @@
 
 .project-coverage-warning,
 .project-inspected-code {
-  font-size: 13px;
+  font-size: 14px;
   color: #68636e;
   margin: 14px 0;
 }
@@ -64,7 +64,7 @@
 .estimate-heading p,
 .estimate-footnote {
   color: var(--color-muted-foreground);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.6;
 }
 
@@ -119,7 +119,7 @@
   border: 0;
   background: transparent;
   color: inherit;
-  font-size: 13px;
+  font-size: 14px;
   border-radius: 7px;
   padding: 7px 4px;
   cursor: pointer;
@@ -141,7 +141,7 @@
 }
 
 .estimate-value.is-unknown {
-  color: #93909e;
+  color: var(--color-muted-foreground);
 }
 
 .estimate-value sup {
@@ -151,7 +151,7 @@
 
 .estimate-evidence {
   grid-column: 1 / -1;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.7;
 }
 
@@ -161,7 +161,7 @@
   width: fit-content;
   cursor: pointer;
   color: var(--color-muted-foreground);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .estimate-evidence[open] {
@@ -198,7 +198,7 @@
 
 .product-workspace.estimate-dialog {
   width: calc(100vw - 32px);
-  max-width: 480px;
+  max-width: 640px;
   height: auto;
   max-height: calc(100vh - 48px);
   min-height: 0;
@@ -213,7 +213,7 @@
 
 .estimate-dialog header p {
   color: var(--color-muted-foreground);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .estimate-size-options {
@@ -250,7 +250,7 @@
   padding: 16px;
   border: 1px solid rgb(128 128 128 / 20%);
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .estimate-connect-panel p {
@@ -268,18 +268,18 @@
 }
 
 .estimate-duration-form .product-muted {
-  font-size: 12px;
+  font-size: 14px;
   margin: 12px 0 18px;
 }
 
 .estimate-comparisons {
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.8;
 }
 
 .estimate-history {
   margin-top: 20px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .estimate-history-row {
@@ -364,4 +364,13 @@
     display: block;
     margin-bottom: 16px;
   }
+}
+
+.estimate-evidence,
+.estimate-reason,
+.estimate-comparisons {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--color-body);
+  overflow-wrap: anywhere;
 }

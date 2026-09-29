@@ -54,7 +54,17 @@ void test('worker transport correlates replies and forwards validated events', a
     assert.deepEqual(await first, ['first']);
     assert.deepEqual(await second, ['second']);
     t.reply({ event: { type: 'progress', runId: 'run', message: 'Working' } });
-    assert.equal(events.length, 1);
+    t.reply({ event: { type: 'progress', runId: 'run', stage: 'verify', message: 'REQ-1: pass' } });
+    const line = "1 of 1 criteria verified. 0 failed. 0 couldn't be verified.";
+    t.reply({
+      event: {
+        type: 'completed',
+        runId: 'run',
+        stage: 'complete',
+        verification: { total: 1, verified: 1, failed: 0, unverified: 0, line },
+      },
+    });
+    assert.equal(events.length, 3);
     const failed = t.client.request('projects');
     t.reply({ id: required(t.requests[2]).id, error: { message: 'Unavailable' } });
     await assert.rejects(failed, /Unavailable/);

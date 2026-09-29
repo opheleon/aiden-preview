@@ -84,6 +84,7 @@ export async function remainingEstimates(
   report: Report | null,
   context: Pick<WorkflowContext, 'emit'>,
   run: RunManifest,
+  history: HistoryIssue[] = [],
 ): Promise<Map<string, RemainingEstimate>> {
   let remaining = new Map<string, RemainingEstimate>();
   if (report) {
@@ -97,7 +98,25 @@ export async function remainingEstimates(
     const result = await stage(
       'estimate-remaining',
       RemainingOutputSchema,
-      { baseline: baseline.product, report },
+      {
+        baseline: baseline.product,
+        report,
+        history: history
+          .filter(
+            (issue) => issue.startedAt && issue.completedAt && issue.observedCalendarDays !== null,
+          )
+          .sort((a, b) => b.completedAt!.localeCompare(a.completedAt!))
+          .map(({ id, title, description, size, points, workType, scopeShape, reasoning }) => ({
+            id,
+            title,
+            description,
+            size,
+            points,
+            workType,
+            scopeShape,
+            reasoning,
+          })),
+      },
       (value) => {
         const parsed = RemainingOutputSchema.parse(value);
         const expected = baseline.product.requirements.map((r) => r.id).sort();
@@ -106,7 +125,10 @@ export async function remainingEstimates(
           JSON.stringify(expected)
         )
           throw new Error('Estimate remaining work for every reviewed requirement once.');
-        for (const row of parsed.requirements) validateRemaining(row, report);
+        for (const row of parsed.requirements) {
+          validateRemaining(row, report);
+          validateMatches(row, history);
+        }
         return parsed;
       },
     );
@@ -159,9 +181,9 @@ export function buildRequirementEstimates(
     const summary = durationSummary(comparisons);
     return {
       ...base,
-      durationDays: overrides.durations[original.requirementId] ?? summary?.median ?? null,
+      durationDays: summary?.median ?? null,
       suggestedDurationDays: summary?.median ?? null,
-      durationOverridden: original.requirementId in overrides.durations,
+      durationOverridden: false,
       comparisons: comparisons.map((issue) => issue.id),
     };
   });
@@ -192,4 +214,31 @@ function verifyRemainingCoverage(
     !row.workItems.length
   )
     throw new Error(`${row.requirementId}: estimable remaining work needs concrete work items.`);
+}
+
+/** Reject invented, duplicated, or incompatible comparison IDs; timing evidence is never model-generated. */
+function validateMatches(row: RemainingEstimate, history: HistoryIssue[]): void {
+  const seen = new Set<string>();
+  for (const match of row.comparisonMatches ?? []) {
+    const issue = history.find((value) => value.id === match.id);
+    if (
+      !row.estimable ||
+      !row.points ||
+      seen.has(match.id) ||
+      !issue ||
+      issue.points !== row.points ||
+      issue.workType !== row.workType ||
+      issue.scopeShape !== row.scopeShape ||
+      row.workType === 'unknown' ||
+      row.scopeShape === 'unknown' ||
+      !issue.startedAt ||
+      !issue.completedAt ||
+      issue.observedCalendarDays === null
+    ) {
+      throw new Error(
+        `${row.requirementId}: comparisons must be unique eligible history IDs with matching size, work type, and scope.`,
+      );
+    }
+    seen.add(match.id);
+  }
 }

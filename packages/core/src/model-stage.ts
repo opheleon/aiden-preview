@@ -11,7 +11,8 @@ import { atomic, optionalJson } from './storage.js';
 import type { WorkflowContext } from './workflow-context.js';
 
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-const root = sourceRoot.endsWith('/dist') ? path.dirname(sourceRoot) : sourceRoot;
+/** Repository or packaged-app root that contains the versioned workflow prompts. */
+export const workflowRoot = sourceRoot.endsWith('/dist') ? path.dirname(sourceRoot) : sourceRoot;
 
 /** Stage dependencies keep runtime calls, checkpoint paths, and progress scoped to one run. */
 interface ModelStageOptions {
@@ -49,7 +50,10 @@ export function createModelStage(options: ModelStageOptions): ModelStage {
     const saved = await optionalJson<unknown>(path.join(dir, `${name}.json`));
     if (saved !== null) return validate(saved);
     await options.onStage?.(name, validate);
-    const instructions = await readFile(path.join(root, 'workflows/v1', `${name}.md`), 'utf8');
+    const instructions = await readFile(
+      path.join(workflowRoot, 'workflows/v1', `${name}.md`),
+      'utf8',
+    );
     let feedback = '';
     for (let attempt = 0; attempt < 3; attempt++) {
       signal.throwIfAborted();

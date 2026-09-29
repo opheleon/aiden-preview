@@ -1,0 +1,172 @@
+/* Requirement status: code assessment plus browser check, and the browser check pop-up. */
+
+.project-status-badge--verified {
+  color: #306447;
+  background: #e3f1e6;
+}
+
+.project-status-badge--implemented {
+  color: #3d5a6c;
+  background: #eaf1f5;
+}
+
+.requirement-status .estimate-status {
+  width: auto;
+  min-width: 140px;
+  align-items: flex-end;
+}
+
+.requirement-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  color: var(--color-muted-foreground);
+}
+
+.estimate-requirement .requirement-sources {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.requirement-watch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 0;
+}
+
+.estimates-section {
+  margin: 12px 0 36px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.estimates-section > summary {
+  width: fit-content;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.estimates-section .estimation-pending p {
+  color: var(--color-muted-foreground);
+  line-height: 1.6;
+}
+
+.browser-evidence {
+  width: 880px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.browser-evidence .card-heading h2 {
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.browser-evidence-attempts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 4px;
+}
+
+.browser-evidence-attempts button {
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--color-muted-foreground);
+}
+
+.browser-evidence-attempts button[aria-pressed='true'] {
+  color: var(--color-brand);
+  border-color: color-mix(in srgb, var(--color-brand) 55%, var(--color-border));
+  background: var(--color-tint);
+}
+
+.browser-evidence-explanation {
+  margin: 14px 0;
+  color: var(--color-body);
+}
+
+.browser-evidence figure {
+  margin: 0 0 16px;
+}
+
+.browser-evidence video,
+.browser-evidence-proof img {
+  display: block;
+  width: 100%;
+  max-height: 52vh;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #111;
+  object-fit: contain;
+}
+
+.browser-evidence figcaption {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-muted-foreground);
+}
+
+.browser-evidence-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 16px;
+  margin: 0 0 16px;
+}
+
+.browser-evidence-facts dt {
+  font-weight: 600;
+}
+
+.browser-evidence-facts dd {
+  margin: 0;
+  color: var(--color-body);
+}
+
+.browser-evidence-steps {
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.browser-evidence-steps li {
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.browser-evidence-steps p {
+  margin: 2px 0 0;
+  color: var(--color-muted-foreground);
+}
+
+.browser-evidence-time {
+  flex-shrink: 0;
+  height: fit-content;
+  padding: 2px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font: 11px var(--font-mono);
+  color: var(--color-muted-foreground);
+}
+
+.browser-evidence-time:hover {
+  color: var(--color-brand);
+}
+
+.browser-evidence-actions {
+  justify-content: flex-end;
+}
+
+@media (width <= 760px) {
+  .requirement-status .estimate-status {
+    align-items: flex-start;
+  }
+}

@@ -145,7 +145,8 @@ void test('estimate overrides retain suggested values and stale pointers cannot 
     assert.equal(revised.requirements[0]?.points, 8);
     assert.equal(revised.requirements[0]?.suggestedPoints, 2);
     assert.equal(revised.requirements[0]?.remainingPoints, 5);
-    assert.equal(revised.requirements[0]?.durationDays, 7);
+    assert.equal(revised.requirements[0]?.durationDays, null);
+    assert.equal(revised.forecast.forecastFinish, null);
     assert.equal(revised.requirements[0]?.pointsOverridden, true);
     assert.equal(revised.requirements[1]?.pointsOverridden, false);
     assert.deepEqual(await json(path.join(f.folder, 'estimate-overrides.json')), overrides);
@@ -244,8 +245,8 @@ void test('standalone estimate overrides preserve historical suggestions and der
     assert.equal(revised.reportId, null);
     assert.equal(revised.history[0]?.points, 3);
     assert.equal(revised.history[1]?.points, 2);
-    assert.equal(revised.requirements[0]?.durationDays, 3);
-    assert.equal(revised.requirements[0]?.suggestedDurationDays, 3);
+    assert.equal(revised.requirements[0]?.durationDays, null);
+    assert.equal(revised.requirements[0]?.suggestedDurationDays, null);
     assert.equal(revised.requirements[0]?.durationOverridden, false);
     assert.deepEqual(
       revised.requirements[0]?.comparisonOverrides,
