@@ -4,6 +4,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import { ProjectSourcesSchema } from './integrations.js';
 export * from './estimation.js';
 export * from './integrations.js';
+export * from './verification.js';
 
 export const id = z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/);
 export const RequirementSchema = z
@@ -159,6 +160,7 @@ export type Stage =
   | 'summary'
   | 'report'
   | 'estimate'
+  | 'verify'
   | 'complete';
 /** Worker progress and terminal notifications; optional payloads depend on the event type and stage. */
 export type RunEvent = {
@@ -173,12 +175,13 @@ export type RunEvent = {
   report?: Report;
   product?: Product;
   estimation?: import('./estimation.js').EstimationSnapshot;
+  verification?: import('./verification.js').VerificationSummary;
 };
 /** Persisted run lifecycle and starting context; accepted reports remain separate from interrupted work. */
 export type RunManifest = {
   id: string;
   projectId: string;
-  kind: 'prepare' | 'report' | 'estimate';
+  kind: 'prepare' | 'report' | 'estimate' | 'verify';
   status: 'running' | 'waiting' | 'review' | 'completed' | 'failed' | 'cancelled';
   stage: Stage;
   project: Project;
@@ -188,6 +191,7 @@ export type RunManifest = {
   runtimeVersion?: string;
   runtimeModel?: string;
   latestAtStart?: string | null;
+  verifyUrl?: string;
 };
 /** Convert tool arguments to JSON Schema while retaining ordinary optional properties. */
 export const schemaFor = (schema: z.ZodType<unknown>): Record<string, unknown> =>

@@ -17,7 +17,10 @@ import type {
 import type { DesktopBridge } from '../bridge';
 
 interface WorkspaceSidebarProps {
-  busy: boolean;
+  setBusy: React.Dispatch<React.SetStateAction<boolean>>;
+  setActiveRun: React.Dispatch<React.SetStateAction<string>>;
+  setLog: React.Dispatch<React.SetStateAction<string[]>>;
+  setVerification: React.Dispatch<React.SetStateAction<WorkerResult<'verification'>>>;
   setArea: React.Dispatch<React.SetStateAction<'projects' | 'drafts' | 'settings'>>;
   setProject: React.Dispatch<React.SetStateAction<Project>>;
   newProject: () => Project;
@@ -53,24 +56,39 @@ interface WorkspaceSidebarProps {
   slackInviteUrl: 'https://join.slack.com/t/aidenbyopheleon/shared_invite/zt-4apsg5d7p-FDO9ae0imxj~KgauP8lpsw';
 }
 
+/** Open a blank project draft. Runs keep going in the worker; this window just stops following them. */
+function startNewProject(props: WorkspaceSidebarProps): void {
+  props.setBusy(false);
+  props.setActiveRun('');
+  props.setLog([]);
+  props.setVerification(null);
+  props.setArea('projects');
+  props.setProject(props.newProject());
+  props.setBaseline(undefined);
+  props.setProduct(undefined);
+  props.setReport(undefined);
+  props.setEstimation(undefined);
+  props.setContextConnectionIds([]);
+  props.setHistoryDraft({
+    connectionId: '',
+    sourceId: '',
+    sourceLabel: '',
+    historyTool: '',
+    sourceArgument: 'team',
+  });
+  props.setRuns([]);
+  props.setStep(0);
+  props.setError('');
+  props.setReviewRun('');
+  props.setShowGoalStarter(true);
+}
+
 /** Navigate saved projects, drafts, and recent workflow runs. */
 export function WorkspaceSidebar(props: WorkspaceSidebarProps): React.JSX.Element {
   const {
-    busy,
     setArea,
-    setProject,
-    newProject,
-    setBaseline,
-    setProduct,
     setReport,
-    setEstimation,
-    setContextConnectionIds,
-    setHistoryDraft,
-    setRuns,
     setStep,
-    setError,
-    setReviewRun,
-    setShowGoalStarter,
     projects,
     project,
     load,
@@ -91,28 +109,7 @@ export function WorkspaceSidebar(props: WorkspaceSidebarProps): React.JSX.Elemen
           className="sidebar-add"
           aria-label="Create project"
           title="New project"
-          disabled={busy}
-          onClick={() => {
-            setArea('projects');
-            setProject(newProject());
-            setBaseline(undefined);
-            setProduct(undefined);
-            setReport(undefined);
-            setEstimation(undefined);
-            setContextConnectionIds([]);
-            setHistoryDraft({
-              connectionId: '',
-              sourceId: '',
-              sourceLabel: '',
-              historyTool: '',
-              sourceArgument: 'team',
-            });
-            setRuns([]);
-            setStep(0);
-            setError('');
-            setReviewRun('');
-            setShowGoalStarter(true);
-          }}
+          onClick={() => startNewProject(props)}
         >
           <Plus size={14} />
         </button>
@@ -121,7 +118,6 @@ export function WorkspaceSidebar(props: WorkspaceSidebarProps): React.JSX.Elemen
         {projects.map((p) => (
           <button
             key={p.id}
-            disabled={busy}
             className={p.id === project.id ? 'selected' : ''}
             aria-current={p.id === project.id ? 'page' : undefined}
             onClick={() => void load(p.id)}
@@ -186,7 +182,7 @@ export function WorkspaceSidebar(props: WorkspaceSidebarProps): React.JSX.Elemen
         </button>
         <button
           className="sidebar-section"
-          title="Join Aiden by Opheleon on Slack (opens in your browser)"
+          title="Report a problem, suggest a feature, or get help on Slack."
           onClick={() =>
             void action(async () => {
               await api?.openExternal(slackInviteUrl);
@@ -194,7 +190,7 @@ export function WorkspaceSidebar(props: WorkspaceSidebarProps): React.JSX.Elemen
           }
         >
           <MessageCircle size={17} />
-          <span>Contact us</span>
+          <span>Feedback &amp; support</span>
           <ExternalLink size={13} aria-hidden="true" />
         </button>
       </div>

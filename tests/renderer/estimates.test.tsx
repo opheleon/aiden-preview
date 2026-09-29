@@ -17,17 +17,14 @@ function props() {
     onReestimate: vi.fn().mockResolvedValue(undefined),
     onConfigureHistory: vi.fn(),
     onOpenExternal: vi.fn(),
-    onOpenEvidence: vi.fn(),
   };
 }
-test('saved report evidence remains accessible while unknown estimates stay explicit', async () => {
+test('estimates size remaining work separately from requirement status', async () => {
   const p = props();
   render(<RequirementEstimates {...p} />);
-  expect(screen.getByRole('heading', { name: 'Requirements & estimates' })).toBeVisible();
-  expect(screen.getByText('Not assessed')).toBeVisible();
-  await userEvent.click(screen.getAllByText('Code evidence')[0]!);
-  await userEvent.click(screen.getAllByRole('button', { name: /frontend · app.txt:1/ })[0]!);
-  expect(p.onOpenEvidence).toHaveBeenCalledWith(0, 0);
+  expect(screen.getByRole('heading', { name: 'Remaining work estimates' })).toBeVisible();
+  expect(screen.queryByText('Code evidence')).toBeNull();
+  expect(screen.queryByText('Deviated')).toBeNull();
   await userEvent.click(screen.getByRole('button', { name: 'Re-estimate' }));
   expect(p.onReestimate).toHaveBeenCalledOnce();
   await userEvent.click(screen.getByRole('button', { name: 'Configure history' }));
@@ -51,106 +48,83 @@ test('size override failures keep the editor open, and a retry saves the explici
     }),
   );
   expect(p.onSave).toHaveBeenLastCalledWith(
-    expect.objectContaining({ requirementPoints: { 'REQ-1': 3 } }),
+    expect.objectContaining({ remainingPoints: { 'REQ-1': 3 } }),
   );
   expect(screen.queryByRole('dialog', { name: 'Complexity' })).not.toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
-test('manual duration and forecast edits preserve the other override fields', async () => {
+test('no history means no time input, and saved manual durations cannot masquerade as predictions', async () => {
   const p = props();
-  render(<RequirementEstimates {...p} />);
-  await userEvent.click(screen.getByRole('button', { name: 'Edit duration REQ-2' }));
-  await userEvent.type(screen.getByRole('spinbutton', { name: 'Duration in days REQ-2' }), '4.5');
-  await userEvent.click(screen.getByRole('button', { name: 'Save duration' }));
-  expect(p.onSave).toHaveBeenLastCalledWith({ ...p.overrides, durations: { 'REQ-2': 4.5 } });
-  await userEvent.click(screen.getByRole('button', { name: 'Edit forecast' }));
-  await userEvent.type(screen.getByRole('spinbutton', { name: 'Expected points per week' }), '5');
-  await userEvent.clear(screen.getByRole('spinbutton', { name: 'Team capacity for this project' }));
-  await userEvent.type(
-    screen.getByRole('spinbutton', { name: 'Team capacity for this project' }),
-    '50',
-  );
-  await userEvent.click(screen.getByRole('button', { name: 'Save forecast' }));
-  expect(p.onSave).toHaveBeenLastCalledWith({
-    ...p.overrides,
-    manualWeeklyRate: 5,
-    capacityPercent: 50,
-  });
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-});
-test('forecast write failures remain visible and cancellation does not save', async () => {
-  const p = props();
-  p.onSave.mockRejectedValue(new Error('Disk full'));
-  render(<RequirementEstimates {...p} />);
-  await userEvent.click(screen.getByRole('button', { name: 'Edit forecast' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Save forecast' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Disk full');
-  await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-  expect(p.onSave).toHaveBeenCalledOnce();
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-});
-
-test('manual size and duration can reset independently without discarding other overrides', async () => {
-  const p = props();
-  Object.assign(p.estimation.requirements[0]!, {
-    points: 5,
-    pointsOverridden: true,
-    durationDays: 1,
-    durationOverridden: true,
-  });
-  p.overrides.requirementPoints = { 'REQ-1': 5 };
+  Object.assign(p.estimation.requirements[0]!, { durationDays: 1, durationOverridden: true });
   p.overrides.durations = { 'REQ-1': 1 };
   render(<RequirementEstimates {...p} />);
-  expect(screen.getByRole('button', { name: 'Edit duration REQ-1' })).toHaveTextContent('1 day');
-  await userEvent.click(screen.getByRole('button', { name: 'Edit complexity REQ-1' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Reset size to suggested' }));
-  expect(p.onSave).toHaveBeenLastCalledWith({ ...p.overrides, requirementPoints: {} });
-  await userEvent.click(screen.getByRole('button', { name: 'Edit duration REQ-1' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Reset duration to predicted' }));
-  expect(p.onSave).toHaveBeenLastCalledWith({ ...p.overrides, durations: {} });
-  await userEvent.click(screen.getByRole('button', { name: 'Edit duration REQ-1' }));
-  await userEvent.click(
-    within(screen.getByRole('dialog')).getByRole('button', { name: 'Configure history' }),
+  expect(screen.getByRole('button', { name: 'Explain duration REQ-1' })).toHaveTextContent(
+    'Unavailable',
   );
+  await userEvent.click(screen.getByRole('button', { name: 'Explain duration REQ-1' }));
+  const dialog = within(screen.getByRole('dialog'));
+  expect(dialog.queryByRole('spinbutton')).not.toBeInTheDocument();
+  await userEvent.click(dialog.getByRole('button', { name: 'Configure history' }));
   expect(p.onConfigureHistory).toHaveBeenCalledOnce();
+  expect(p.onSave).not.toHaveBeenCalled();
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 
-test('historical duration shows only saved comparison links and flags truncated history', async () => {
+test('remaining size reset preserves other saved overrides', async () => {
+  const p = props();
+  Object.assign(p.estimation.requirements[0]!, {
+    remainingPoints: 5,
+    remainingPointsOverridden: true,
+  });
+  p.overrides.remainingPoints = { 'REQ-1': 5 };
+  render(<RequirementEstimates {...p} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Edit complexity REQ-1' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Reset size to suggested' }));
+  expect(p.onSave).toHaveBeenCalledWith({ ...p.overrides, remainingPoints: {} });
+});
+
+test('historical duration explains matches, dates, range, median, and insufficient samples', async () => {
   const p = props();
   p.estimation.historyTruncated = true;
-  p.estimation.history = [1, 2, 3].map((i) => ({
+  p.estimation.historyCollectedAt = '2026-09-26T00:00:00.000Z';
+  p.estimation.history = [1, 3, 5].map((days, index) => ({
     connectionId: 'fixture',
     sourceId: 'team',
-    id: `issue-${i}`,
-    identifier: `TEAM-${i}`,
+    id: `issue-${index}`,
+    identifier: `TEAM-${index}`,
     title: 'Synthetic work',
     description: '',
-    url: i === 1 ? 'https://example.invalid/1' : undefined,
-    startedAt: null,
-    completedAt: null,
-    observedCalendarDays: i === 3 ? null : i,
-    size: null,
-    points: null,
-    workType: 'unknown',
-    scopeShape: 'unknown',
+    ...(index === 0 ? { url: 'https://example.invalid/1' } : {}),
+    startedAt: '2026-09-01T00:00:00.000Z',
+    completedAt: `2026-09-0${days + 1}T00:00:00.000Z`,
+    observedCalendarDays: days,
+    size: 'S',
+    points: 2,
+    workType: 'integration',
+    scopeShape: 'bounded_change',
   }));
-  Object.assign(p.estimation.requirements[0]!, {
-    suggestedDurationDays: 2,
-    durationDays: 2,
-    comparisons: ['issue-1', 'issue-2', 'issue-3', 'unavailable'],
-  });
-  render(<RequirementEstimates {...p} />);
-  expect(screen.getByText('History reached its configured collection limit.')).toBeVisible();
-  await userEvent.click(screen.getByRole('button', { name: 'Edit duration REQ-1' }));
+  const row = p.estimation.requirements[0]!;
+  row.comparisons = p.estimation.history.map((issue) => issue.id);
+  row.remaining!.comparisonMatches = row.comparisons.map((id) => ({
+    id,
+    reasoning: `Shared integration testing boundary: ${id}`,
+  }));
+  const { rerender } = render(<RequirementEstimates {...p} />);
+  expect(screen.getByRole('button', { name: 'Explain duration REQ-1' })).toHaveTextContent(
+    '1–5 days',
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Explain duration REQ-1' }));
   const dialog = within(screen.getByRole('dialog'));
-  expect(dialog.queryByRole('button', { name: 'Configure history' })).not.toBeInTheDocument();
-  await userEvent.click(dialog.getByText('4 similar completed issues'));
-  await userEvent.click(dialog.getByRole('button', { name: 'TEAM-1 · Synthetic work' }));
+  expect(dialog.getByText(/Median: 3 days/)).toBeVisible();
+  expect(dialog.getByText('Shared integration testing boundary: issue-0')).toBeVisible();
+  expect(dialog.getByText(/1 day · 2026-09-01 to 2026-09-02/)).toBeVisible();
+  await userEvent.click(dialog.getByRole('button', { name: 'TEAM-0 · Synthetic work' }));
   expect(p.onOpenExternal).toHaveBeenCalledWith('https://example.invalid/1');
-  await userEvent.click(dialog.getByRole('button', { name: 'TEAM-2 · Synthetic work' }));
-  expect(p.onOpenExternal).toHaveBeenCalledOnce();
-  expect(dialog.queryByText('unavailable')).not.toBeInTheDocument();
+  expect(dialog.queryByRole('button', { name: 'TEAM-1 · Synthetic work' })).not.toBeInTheDocument();
+  p.estimation.history = p.estimation.history.slice(0, 2);
+  rerender(<RequirementEstimates {...p} />);
+  expect(dialog.getByText(/Only 2 eligible comparisons/)).toBeVisible();
+  expect(dialog.queryByText(/Median:/)).not.toBeInTheDocument();
   await userEvent.click(dialog.getByRole('button', { name: 'Close' }));
   expect(p.onSave).not.toHaveBeenCalled();
 });
@@ -194,4 +168,39 @@ test('historical calibration links, adjustments, resets, and cancellation stay l
   await userEvent.click(screen.getByRole('button', { name: 'Close' }));
   expect(p.onSave).toHaveBeenCalledTimes(2);
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('complete and unknown requirements do not offer editable remaining sizes or invented time', async () => {
+  const p = props();
+  p.estimation.requirements[0]!.remainingPoints = 0;
+  p.estimation.requirements[1]!.remainingPoints = null;
+  p.estimation.requirements[1]!.remaining = null;
+  render(<RequirementEstimates {...p} />);
+  expect(screen.getByRole('button', { name: 'Edit complexity REQ-1' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Edit complexity REQ-2' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Explain duration REQ-1' })).toHaveTextContent(
+    'No work left',
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Explain duration REQ-1' }));
+  expect(
+    screen.getByText('No implementation work remains in the accepted assessment.'),
+  ).toBeVisible();
+  await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Explain duration REQ-2' }));
+  expect(
+    screen.getByText('Re-estimate to size the remaining change from code evidence.'),
+  ).toBeVisible();
+});
+
+test('legacy estimates remain readable and explain how to obtain the new comparisons', () => {
+  const p = props();
+  p.estimation.estimatorVersion = '1';
+  p.estimation.requirements[0]!.remaining = null;
+  p.estimation.requirements[0]!.durationDays = 10;
+  render(<RequirementEstimates {...p} />);
+  expect(screen.getByText(/This saved estimate uses the earlier method/)).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Explain duration REQ-1' })).toHaveTextContent(
+    'Unavailable',
+  );
+  expect(screen.getByRole('button', { name: 'Re-estimate' })).toBeEnabled();
 });

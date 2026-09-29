@@ -6,12 +6,16 @@ import { ClarificationDialog } from './ClarificationDialog';
 
 /** Show active clarification and evidence without privileged renderer access. */
 export function WorkspaceDialogs({ workspace }: { workspace: Workspace }): JSX.Element {
-  const { question, evidence, setEvidence } = workspace;
+  const { question, evidence, setEvidence, project, projects } = workspace;
+  const otherProject =
+    question?.projectId && question.projectId !== project.id
+      ? (projects.find((item) => item.id === question.projectId)?.name ?? 'another project')
+      : undefined;
   return (
     <>
       {question && (
         <div className="modal-overlay">
-          <ClarificationDialog {...workspace} question={question} />
+          <ClarificationDialog {...workspace} question={question} otherProject={otherProject} />
         </div>
       )}
       {evidence && (

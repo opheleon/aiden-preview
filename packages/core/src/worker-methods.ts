@@ -10,9 +10,10 @@ import {
   ProjectSourcesSchema,
   RuntimeSchema,
 } from '../../contracts/src/index.js';
-import { Runtimes } from '../../runtimes/src/index.js';
+import { publicError, Runtimes } from '../../runtimes/src/index.js';
 import { discoverRepositories } from '../../tools/src/discovery.js';
 import { Engine } from './engine.js';
+import { readAppUrl, readVerification, saveAppUrl } from './verification-workflow.js';
 /** Provider controls separate authentication/model discovery from run execution. */
 export type RuntimeControls = Pick<Runtimes, 'diagnostics' | 'models' | 'setKey' | 'loginCodex'>;
 /** Validate unknown worker inputs before dispatching a typed operation. */
@@ -35,14 +36,22 @@ export function createMethods(
       discoverRepositories(p.rootPath),
     ),
     projects: operation(z.object({}).strict(), () => engine.projects()),
-    state: operation(project, (p) => engine.state(p.projectId)),
+    state: operation(project, async (p) => {
+      const saved = await engine.state(p.projectId);
+      const activeRunIds = saved.runs.filter((r) => engine.isActive(r.id)).map((r) => r.id);
+      return { ...saved, activeRunIds };
+    }),
     prepare: operation(z.object({ project: ProjectSchema }).strict(), (p) =>
       engine.prepare(p.project),
     ),
     approve: operation(run.extend({ product: ProductSchema }).strict(), (p) =>
       engine.approve(p.projectId, p.runId, p.product),
     ),
-    report: operation(project, (p) => engine.report(p.projectId)),
+    report: operation(project.extend({ browserCheck: z.boolean().optional() }), async (p) => {
+      const started = await engine.report(p.projectId);
+      if (p.browserCheck) followWithBrowserCheck(engine, p.projectId, started.runId);
+      return started;
+    }),
     resume: operation(run, (p) => engine.resume(p.projectId, p.runId)),
     cancel: operation(z.object({ runId: id }).strict(), (p) => engine.cancel(p.runId)),
     waitForRun: operation(z.object({ runId: id }).strict(), async (p) => {
@@ -84,7 +93,37 @@ export function createMethods(
     estimateOverrides: operation(project.extend({ overrides: EstimateOverridesSchema }), (p) =>
       engine.applyEstimateOverrides(p.projectId, p.overrides),
     ),
+    verify: operation(project.extend({ url: z.string().min(1).max(2000).optional() }), (p) =>
+      engine.verify(p.projectId, p.url),
+    ),
+    verificationSettings: operation(project, (p) => readAppUrl(engine, p.projectId)),
+    updateVerificationSettings: operation(
+      project.extend({ url: z.string().min(1).max(2000).nullable() }),
+      (p) => saveAppUrl(engine, p.projectId, p.url),
+    ),
+    verification: operation(project.extend({ runId: id.optional() }), (p) =>
+      readVerification(engine, p.projectId, p.runId),
+    ),
   };
+}
+
+/** After an accepted code assessment, check the saved app URL in a browser; no URL means no check. */
+function followWithBrowserCheck(engine: Engine, projectId: string, reportRunId: string): void {
+  void (async () => {
+    // The run releases its project lock before wait() settles, so the check can take the lock.
+    await engine.wait(reportRunId);
+    const { runs } = await engine.state(projectId);
+    if (runs.find((run) => run.id === reportRunId)?.status !== 'completed') return;
+    if (!(await readAppUrl(engine, projectId)).url) return;
+    await engine.verify(projectId);
+  })().catch((e: unknown) =>
+    engine.emit({
+      type: 'failed',
+      runId: reportRunId,
+      projectId,
+      message: `The code assessment finished, but the browser check could not start. ${publicError(e)}`,
+    }),
+  );
 }
 
 /** Keep credential and model controls separate from run execution while validating their inputs. */

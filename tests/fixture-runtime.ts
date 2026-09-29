@@ -78,6 +78,9 @@ export class FixtureRuntime implements AgentRuntime {
           requirements: data.baseline.requirements.map((q: any, index: number) => ({
             requirementId: q.id,
             estimable: true,
+            comparisonMatches: [],
+            workType: 'integration',
+            scopeShape: 'bounded_change',
             size: index === 0 ? 'S' : 'M',
             points: index === 0 ? 2 : 3,
             reasoning: 'FIXTURE remaining work.',

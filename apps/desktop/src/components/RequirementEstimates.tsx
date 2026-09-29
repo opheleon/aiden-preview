@@ -6,7 +6,10 @@ import { EstimateHistory, HistoryEditor } from './EstimateHistory';
 import { EstimateRow } from './EstimateRow';
 import ProjectHealth from './ProjectHealth';
 
-/** Present accepted requirement estimates, supporting evidence, and explicit manual adjustments. */
+/**
+ * Present remaining work estimates: change size, history-based time, and manual adjustments.
+ * Requirement status and code evidence live in RequirementStatus; this view is secondary.
+ */
 export default function RequirementEstimates({
   estimation,
   report,
@@ -16,11 +19,9 @@ export default function RequirementEstimates({
   onReestimate,
   onConfigureHistory,
   onOpenExternal,
-  onOpenEvidence,
 }: RequirementEstimatesProps): JSX.Element {
   const [editing, setEditing] = useState<EstimateEditing | null>(null);
   const [historyEdit, setHistoryEdit] = useState<string | null>(null);
-  const [days, setDays] = useState('');
   const [error, setError] = useState('');
   const row = editing
     ? estimation.requirements.find((item) => item.requirementId === editing.id)
@@ -30,18 +31,11 @@ export default function RequirementEstimates({
     : null;
   /** Persist or reset a requirement size before closing its editor. */
   const saveSize = async (id: string, points: number | null) => {
-    const requirementPoints = { ...overrides.requirementPoints };
-    if (points === null) delete requirementPoints[id];
-    else requirementPoints[id] = points;
-    if (await persistOverride(onSave, { ...overrides, requirementPoints }, setError))
+    const remainingPoints = { ...overrides.remainingPoints };
+    if (points === null) delete remainingPoints[id];
+    else remainingPoints[id] = points;
+    if (await persistOverride(onSave, { ...overrides, remainingPoints }, setError))
       setEditing(null);
-  };
-  /** Persist or reset a duration override before closing its editor. */
-  const saveDuration = async (id: string, duration: number | null) => {
-    const durations = { ...overrides.durations };
-    if (duration === null) delete durations[id];
-    else durations[id] = duration;
-    if (await persistOverride(onSave, { ...overrides, durations }, setError)) setEditing(null);
   };
   /** Persist or reset historical calibration points without modifying the external task manager. */
   const saveHistory = async (id: string, points: number | null) => {
@@ -53,39 +47,31 @@ export default function RequirementEstimates({
   };
   return (
     <section className="requirement-estimates" aria-label="Requirement estimates">
-      <ProjectHealth
-        estimation={estimation}
-        report={report}
-        overrides={overrides}
-        onSave={onSave}
-        busy={busy}
-      />
-      <section className="project-overview" aria-label="Approved product intent">
-        <h2>Overview</h2>
-        <div className="product-markdown">
-          <p>{report.baseline.overview}</p>
-        </div>
-      </section>
+      <ProjectHealth estimation={estimation} report={report} />
       <div className="estimate-heading">
         <div>
-          <h2>Requirements & estimates</h2>
+          <h2>Remaining work estimates</h2>
           <p>
-            Original scope and historical duration are shown below. Project forecasts use remaining
-            work from the latest code assessment.
+            Size reflects the remaining change and its testing risk. Time comes only from similar
+            completed tickets, with no delivery-rate setup.
           </p>
         </div>
         <button className="text-button" disabled={busy} onClick={() => void onReestimate()}>
           Re-estimate
         </button>
       </div>
-      <AssessmentSummary report={report} />
+      {estimation.estimatorVersion === '1' && (
+        <p className="estimate-footnote">
+          This saved estimate uses the earlier method. Re-estimate to match remaining changes with
+          recent tickets. Previously entered durations are no longer used as time predictions.
+        </p>
+      )}
       {error && <p role="alert">{error}</p>}
       <div className="estimate-column-headings" aria-hidden="true">
         <span>Requirement</span>
         <div>
-          <span className="estimate-status">Status in code</span>
-          <span className="estimate-size">Complexity</span>
-          <span className="estimate-time">Duration</span>
+          <span className="estimate-size">Change size</span>
+          <span className="estimate-time">Time range</span>
         </div>
       </div>
       {estimation.requirements.map((item) => (
@@ -95,21 +81,9 @@ export default function RequirementEstimates({
           report={report}
           busy={busy}
           setEditing={setEditing}
-          setDays={setDays}
-          onOpenEvidence={onOpenEvidence}
+          estimation={estimation}
         />
       ))}
-      <details className="project-inspected-code">
-        <summary>Inspected code · {report.snapshots.length} snapshots</summary>
-        <ul>
-          {report.snapshots.map((target) => (
-            <li key={`${target.repositoryId}-${target.sha}`}>
-              {target.repositoryId} · {target.branch} · <code>{target.sha.slice(0, 8)}</code>
-              <p>{target.reason}</p>
-            </li>
-          ))}
-        </ul>
-      </details>
       <EstimateHistory
         estimation={estimation}
         overrides={overrides}
@@ -120,10 +94,12 @@ export default function RequirementEstimates({
       <details className="estimate-method">
         <summary>How estimates work</summary>
         <p className="estimate-footnote">
-          Suggested duration is the median of at least 3 comparable issues in the saved 90-day
-          history window, including manual history adjustments. Matches use size and known scope
-          shape, preferring the same work type. Remaining work uses the published code assessment.
-          Click a size or duration to review its reasoning and make changes.
+          The LLM sizes touch points, testing difficulty, and change risk. We match the same size,
+          work type, and scope shape in your selected source’s last 90 days. The LLM selects up to
+          five analogous changes and explains each match. At least three tickets with start and
+          completion dates are required. The range is their observed minimum to maximum, with the
+          median shown in the explanation. It includes reviews and waiting, not just coding. Click a
+          time range to see the tickets.
         </p>
       </details>
       {estimation.historyTruncated && (
@@ -136,9 +112,6 @@ export default function RequirementEstimates({
           report={report}
           busy={busy}
           saveSize={saveSize}
-          saveDuration={saveDuration}
-          days={days}
-          setDays={setDays}
           estimation={estimation}
           onConfigureHistory={onConfigureHistory}
           onOpenExternal={onOpenExternal}
@@ -154,32 +127,6 @@ export default function RequirementEstimates({
         />
       )}
     </section>
-  );
-}
-
-/** Keep assessment conclusions and incomplete evidence coverage visible beside estimates. */
-function AssessmentSummary({ report }: Pick<RequirementEstimatesProps, 'report'>): JSX.Element {
-  return (
-    <>
-      <details className="estimate-assessment">
-        <summary>
-          Latest code assessment · {new Date(report.generatedAt).toLocaleDateString()}
-        </summary>
-        <div className="project-status-summary">
-          <p>{report.summary}</p>
-        </div>
-      </details>
-      {report.warnings.length > 0 && (
-        <details className="project-coverage-warning">
-          <summary>Coverage limitations</summary>
-          <ul>
-            {report.warnings.map((warning, index) => (
-              <li key={index}>{warning}</li>
-            ))}
-          </ul>
-        </details>
-      )}
-    </>
   );
 }
 

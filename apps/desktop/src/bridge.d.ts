@@ -23,6 +23,13 @@ export type DesktopBridge = {
     format: 'json' | 'markdown';
     includeEstimates?: boolean;
   }) => Promise<boolean>;
+  openVerificationReport: (params: { projectId: string; runId: string }) => Promise<void>;
+  /** Read a recording or screenshot named by a saved browser check, for in-app playback. */
+  verificationMedia: (params: {
+    projectId: string;
+    runId: string;
+    file: string;
+  }) => Promise<{ type: string; data: ArrayBuffer }>;
   getAppVersion: () => Promise<string>;
   getUpdateStatus: () => Promise<UpdateStatus>;
   getUpdatePreferences: () => Promise<UpdatePreferences>;

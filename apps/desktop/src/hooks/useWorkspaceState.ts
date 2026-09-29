@@ -38,6 +38,7 @@ function useProjectState() {
   const [answer, setAnswer] = useState('');
   const [evidence, setEvidence] = useState<WorkerResult<'evidence'>>();
   const [notice, setNotice] = useState('');
+  const [verification, setVerification] = useState<WorkerResult<'verification'>>(null);
   return {
     project,
     setProject,
@@ -75,6 +76,8 @@ function useProjectState() {
     setEvidence,
     notice,
     setNotice,
+    verification,
+    setVerification,
   };
 }
 

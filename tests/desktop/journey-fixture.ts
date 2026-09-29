@@ -93,5 +93,5 @@ export async function createProject(app: ElectronApplication, page: Page, root: 
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('heading', { name: 'Reviewed baseline' }).waitFor();
   await page.getByRole('button', { name: 'Approve & run analysis' }).click();
-  await page.getByRole('heading', { name: 'Requirements & estimates' }).waitFor();
+  await page.getByRole('region', { name: 'Requirement status' }).waitFor();
 }

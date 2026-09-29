@@ -173,7 +173,7 @@ void test('history never calls unapproved tools and an explicit failed refresh p
     assert.equal(absent.historyComplete, false);
     assert.equal(absent.historyCollectedAt, null);
     assert.deepEqual(absent.receipts, []);
-    assert.match(absent.historyLimitations.join(' '), /No estimation history source/);
+    assert.match(absent.historyLimitations.join(' '), /Connect a ticket source/);
   } finally {
     await f.close();
   }

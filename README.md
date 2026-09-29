@@ -6,7 +6,7 @@
 
 **Understand what is built, what remains, and the evidence behind the estimate.**
 
-Aiden is a local desktop app and CLI for developers reviewing work across Git repositories. It compares reviewed requirements with committed code, links findings to exact snapshots and lines, and estimates original and remaining scope. Optional issue-tracker history helps calibrate forecasts.
+Aiden is a local desktop app and CLI for developers reviewing work across Git repositories. It compares reviewed requirements with committed code, links findings to exact snapshots and lines, and estimates original and remaining scope. Optional issue-tracker history provides time ranges from comparable completed work.
 
 **Pre-release · Apple Silicon macOS · Apache 2.0.** Public beta preparation is in progress; signed installation and upgrade verification remain release requirements.
 
@@ -37,8 +37,9 @@ To uninstall, quit and remove the app. Projects and reports remain in `~/.aiden`
 2. Choose your project folder and review the discovered Git repositories.
 3. Paste project context or import Markdown/text.
 4. Review and edit the extracted requirements, then approve the baseline.
-5. Run assessment and inspect findings, evidence, estimates, and limitations.
-6. Export JSON or Markdown. Add historical calibration or manual forecast inputs if useful.
+5. Refresh status and inspect each requirement's status, code evidence, and limitations.
+6. Optionally open **Estimates** to size the remaining work. Connect a ticket source for time ranges based on recent comparable work. No usable ticket history means no time estimate.
+7. Export JSON or Markdown.
 
 Only committed snapshots are assessed. Clean repositories may fast-forward to their configured upstream; dirty, diverged, detached, or unavailable repositories are preserved with freshness warnings. Rescan when adding repositories.
 
@@ -105,6 +106,15 @@ pnpm cli -- doctor
 pnpm cli -- discover --root /absolute/project/folder
 pnpm cli -- report --config examples/project.json --format json --out report.json
 ```
+
+To check approved requirements against a running web app (prototype), open the project in the desktop app and save its URL under **App URL** on the overview. From then on, **Refresh status** assesses the code and then tests each approved requirement in a browser. **Check now** in the App URL panel runs only the browser check. Each requirement shows both results: **Implemented in code** comes from the code assessment, **Verified in browser** means Aiden used the app and saw it work, and **Fails in browser** means it saw it fail. A requirement that cannot be tested in the UI keeps its code status. **Watch recording** on a requirement opens its video, proof screenshot, and steps, and **Open full report** opens the standalone HTML report. The CLI below runs the same browser check. Each project keeps its own URL. It can be a localhost address or a beta site you control. Aiden opens the URL in its own browser and never runs your repository code. Run `pnpm exec playwright install chromium` once first.
+
+```sh
+pnpm cli verify-url --project my-project --url http://localhost:3000
+pnpm cli verify --project my-project --out verification
+```
+
+`verify --url URL` checks a different address for one run; non-local addresses must be the saved app URL. `verify-url --project ID` shows the saved URL, and `--clear` removes it.
 
 ## Architecture
 

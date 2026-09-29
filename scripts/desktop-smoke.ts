@@ -150,9 +150,20 @@ try {
     throw new Error('Context file import failed.');
   await page.screenshot({ path: 'test-results/desktop-smoke/context-fixture.png', fullPage: true });
   await page.getByRole('button', { name: 'Fixture book project' }).click();
-  await page.getByRole('heading', { name: 'Requirements & estimates' }).waitFor();
+  await page.getByRole('region', { name: 'Requirement status' }).waitFor();
+  await page.locator('.estimates-section > summary').click();
   await expect(page.getByRole('heading', { name: 'Remaining scope' })).toBeVisible();
   await page.screenshot({ path: 'test-results/desktop-smoke/report-fixture.png', fullPage: true });
+  await page.getByRole('button', { name: 'Explain duration REQ-1' }).click();
+  const estimateDialog = page.getByRole('dialog', { name: 'Estimated duration' });
+  await expect(estimateDialog.getByText(/Connect your task manager/)).toBeVisible();
+  await expect(estimateDialog.getByRole('spinbutton')).toHaveCount(0);
+  await expect(estimateDialog.locator('.estimate-reason')).toHaveCSS('font-size', '15px');
+  await page.screenshot({
+    path: 'test-results/desktop-smoke/estimate-explanation-fixture.png',
+    fullPage: true,
+  });
+  await estimateDialog.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByText('Code evidence', { exact: true }).first().click();
   await page.getByRole('button', { name: /frontend · app.txt:1/ }).click();
   await page.getByRole('dialog', { name: 'Code evidence' }).waitFor();
@@ -244,7 +255,7 @@ try {
   await page.getByRole('button', { name: 'Integrations', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Connect Linear' })).toBeVisible();
   await page.getByRole('button', { name: 'Fixture book project' }).click();
-  await page.getByRole('heading', { name: 'Requirements & estimates' }).waitFor();
+  await page.getByRole('region', { name: 'Requirement status' }).waitFor();
   await page.screenshot({ path: 'test-results/desktop-smoke/review-fixture.png', fullPage: true });
   if (errors.length) throw new Error(errors.join('\n'));
   console.log(

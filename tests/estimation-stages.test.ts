@@ -40,6 +40,9 @@ const complexity = {
 const remaining: RemainingEstimate = {
   requirementId: 'REQ-1',
   estimable: true,
+  comparisonMatches: [],
+  workType: 'backend',
+  scopeShape: 'bounded_change',
   size: 'S',
   points: 2,
   reasoning: 'Synthetic unfinished work',
@@ -214,8 +217,8 @@ void test('estimate construction preserves original suggestions while deriving a
     identifier: `H-${index}`,
     title: 'Synthetic comparable',
     description: '',
-    startedAt: null,
-    completedAt: null,
+    startedAt: '2026-09-01T00:00:00.000Z',
+    completedAt: `2026-09-0${days + 1}T00:00:00.000Z`,
     observedCalendarDays: days,
     size: 'S' as const,
     points: 2,
@@ -224,7 +227,18 @@ void test('estimate construction preserves original suggestions while deriving a
   }));
   const suggested = buildRequirementEstimates(
     [complexity],
-    new Map([['REQ-1', remaining]]),
+    new Map([
+      [
+        'REQ-1',
+        {
+          ...remaining,
+          comparisonMatches: history.map((issue) => ({
+            id: issue.id,
+            reasoning: 'Same backend testing boundary',
+          })),
+        },
+      ],
+    ]),
     history,
     defaultOverrides(),
   );
@@ -232,7 +246,18 @@ void test('estimate construction preserves original suggestions while deriving a
   assert.equal(suggested[0]?.durationOverridden, false);
   const revised = buildRequirementEstimates(
     [complexity],
-    new Map([['REQ-1', remaining]]),
+    new Map([
+      [
+        'REQ-1',
+        {
+          ...remaining,
+          comparisonMatches: history.map((issue) => ({
+            id: issue.id,
+            reasoning: 'Same backend testing boundary',
+          })),
+        },
+      ],
+    ]),
     history,
     {
       ...defaultOverrides(),
@@ -246,8 +271,127 @@ void test('estimate construction preserves original suggestions while deriving a
   assert.equal(revised[0]?.suggestedPoints, 2);
   assert.equal(revised[0]?.remainingPoints, 3);
   assert.equal(revised[0]?.suggestedRemainingPoints, 2);
-  assert.equal(revised[0]?.durationDays, 7);
+  assert.equal(revised[0]?.durationDays, null);
   assert.equal(revised[0]?.suggestedDurationDays, null);
-  assert.equal(revised[0]?.durationOverridden, true);
-  assert.deepEqual(revised[0]?.comparisons, ['history-0']);
+  assert.equal(revised[0]?.durationOverridden, false);
+  assert.deepEqual(revised[0]?.comparisons, []);
+});
+
+void test('comparison selection uses analogies for remaining work and hides elapsed time from the LLM', async () => {
+  const { selectComparisons, durationSummary } =
+    await import('../packages/estimation/src/index.js');
+  const history = Array.from({ length: 6 }, (_, index) => ({
+    id: `h-${index}`,
+    connectionId: 'linear',
+    sourceId: 'team',
+    identifier: `TEAM-${index}`,
+    title: 'Backend authorization change',
+    description: 'Update permission checks and negative-path tests',
+    startedAt: '2026-09-01T00:00:00.000Z',
+    completedAt: `2026-09-0${index + 2}T00:00:00.000Z`,
+    observedCalendarDays: index + 1,
+    size: 'S' as const,
+    points: 2,
+    workType: 'backend' as const,
+    scopeShape: 'bounded_change' as const,
+  }));
+  const matched = {
+    ...remaining,
+    comparisonMatches: history.slice(1).map((issue) => ({
+      id: issue.id,
+      reasoning: 'Same authorization boundary and negative-path tests',
+    })),
+  };
+  let modelInput: any;
+  const stage: ModelStage = (_name, _schema, input, validate) => {
+    modelInput = input;
+    return Promise.resolve(validate({ requirements: [matched] }));
+  };
+  await remainingEstimates(stage, baseline, report, { emit: () => {} }, run, history);
+  assert.ok(modelInput.history.length);
+  assert.equal('startedAt' in modelInput.history[0], false);
+  assert.equal('completedAt' in modelInput.history[0], false);
+  assert.equal('observedCalendarDays' in modelInput.history[0], false);
+  const row = buildRequirementEstimates(
+    [{ ...complexity, size: 'L', points: 5 }],
+    new Map([['REQ-1', matched]]),
+    history,
+    defaultOverrides(),
+  )[0]!;
+  assert.deepEqual(row.comparisons, ['h-5', 'h-4', 'h-3', 'h-2', 'h-1']);
+  assert.equal(row.durationDays, 4, 'match remaining size, not original feature size');
+  assert.deepEqual(durationSummary(selectComparisons(row, history)), {
+    count: 5,
+    median: 4,
+    p10: 2,
+    p90: 6,
+  });
+  assert.deepEqual(
+    selectComparisons(row, [...history, history[5]!]).map((issue) => issue.id),
+    row.comparisons,
+  );
+  assert.equal(durationSummary(selectComparisons(row, history, ['h-1', 'h-2'])), null);
+  assert.deepEqual(
+    selectComparisons({ ...row, remaining: { ...matched, comparisonMatches: [] } }, history),
+    [],
+  );
+  assert.deepEqual(
+    selectComparisons({ ...row, remaining: { ...matched, workType: 'unknown' } }, history),
+    [],
+  );
+  assert.deepEqual(selectComparisons({ ...row, remainingPoints: null }, history), []);
+  assert.deepEqual(selectComparisons({ ...row, remainingPoints: 0 }, history), []);
+  assert.deepEqual(selectComparisons({ ...row, remaining: null }, history), []);
+  for (const changed of [
+    { startedAt: null },
+    { completedAt: null },
+    { startedAt: 'bad' },
+    { completedAt: 'bad' },
+    { completedAt: '2026-08-01T00:00:00.000Z' },
+    { observedCalendarDays: null },
+    { observedCalendarDays: -1 },
+    { observedCalendarDays: NaN },
+    { workType: 'ui' as const },
+    { scopeShape: 'multi_part' as const },
+    { points: 8 },
+  ]) {
+    assert.deepEqual(
+      selectComparisons(
+        row,
+        history.map((issue) => ({ ...issue, ...changed })),
+      ),
+      [],
+    );
+  }
+  for (const comparisonMatches of [
+    [{ id: 'invented', reasoning: 'Invented' }],
+    [
+      { id: 'h-1', reasoning: 'First' },
+      { id: 'h-1', reasoning: 'Duplicate' },
+    ],
+  ]) {
+    await assert.rejects(
+      remainingEstimates(
+        stageFor({ requirements: [{ ...remaining, comparisonMatches }] }),
+        baseline,
+        report,
+        { emit: () => {} },
+        run,
+        history,
+      ),
+      /unique eligible/,
+    );
+  }
+  const wrongSize = { ...matched, points: 3, size: 'M' };
+  await assert.rejects(
+    remainingEstimates(
+      stageFor({ requirements: [wrongSize] }),
+      baseline,
+      report,
+      { emit: () => {} },
+      run,
+      history,
+    ),
+    /unique eligible/,
+  );
 });

@@ -39,13 +39,22 @@ async function load(
     state.setBaseline(s.baseline ?? undefined);
     state.setProduct(s.baseline?.product);
     state.setRuns(s.runs);
-    const running = s.runs.find((run) => run.status === 'running' || run.status === 'waiting');
+    // Only follow runs this worker is executing; a manifest left running by the CLI or an exited
+    // worker never sends events here, so adopting it would show progress forever.
+    const running = s.runs.find((run) => s.activeRunIds.includes(run.id));
     state.setActiveRun(running?.id ?? '');
     state.setBusy(!!running);
+    state.setLog([]);
     state.setReport(undefined);
     const estimate = (await call('estimation', { projectId: id })) ?? undefined;
     state.setEstimation(estimate);
     state.setOverrides(overridesFrom(estimate));
+    state.setVerification(
+      await call('verification', { projectId: id }).catch((e: unknown) => {
+        state.setError(e instanceof Error ? e.message : 'Could not load the last browser check.');
+        return null;
+      }),
+    );
     state.setStep(s.baseline ? 3 : 0);
     state.setReviewRun('');
     const review = s.runs.find((r: RunManifest) => r.kind === 'prepare' && r.status === 'review');
@@ -112,7 +121,7 @@ async function prepare(state: WorkspaceState, call: DesktopBridge['request']): P
   });
 }
 
-/** Reject changed inputs until review, then use the saved runtime for an explicit analysis. */
+/** Reject changed inputs until review, then assess the code and check the saved app URL, if any. */
 async function analyze(state: WorkspaceState, call: DesktopBridge['request']): Promise<void> {
   await action(state, async () => {
     const saved = await call('state', { projectId: state.project.id });
@@ -132,8 +141,40 @@ async function analyze(state: WorkspaceState, call: DesktopBridge['request']): P
     state.setLog([]);
     state.setStep(3);
     await call('updateRuntime', { projectId: state.project.id, runtime: state.project.runtime });
-    const r = await call('report', { projectId: state.project.id });
+    const r = await call('report', { projectId: state.project.id, browserCheck: true });
     state.setActiveRun(r.runId);
+  });
+}
+
+/** Estimate remaining work for an accepted report; estimates never start on their own. */
+async function estimate(
+  state: WorkspaceState,
+  call: DesktopBridge['request'],
+  reportId: string,
+  refreshHistory = false,
+): Promise<void> {
+  const projectId = state.project.id;
+  await action(state, async () => {
+    state.setLog(['Estimating remaining work…']);
+    const r = await call('estimate', { projectId, reportId, refreshHistory });
+    state.setRuns((await call('state', { projectId })).runs);
+    state.setActiveRun(r.runId);
+    state.setBusy(true);
+  });
+}
+
+/** Check the saved app URL in a browser and follow that run in this window like any other. */
+async function verify(state: WorkspaceState, call: DesktopBridge['request']): Promise<void> {
+  const projectId = state.project.id;
+  await action(state, async () => {
+    const { url } = await call('verificationSettings', { projectId });
+    if (!url) throw new Error('Save an app URL for this project first.');
+    state.setLog([`Opening ${url} in a browser…`]);
+    const r = await call('verify', { projectId });
+    // The progress card names the run by its kind, so load the new run before showing it.
+    state.setRuns((await call('state', { projectId })).runs);
+    state.setActiveRun(r.runId);
+    state.setBusy(true);
   });
 }
 
@@ -144,6 +185,8 @@ export interface WorkspaceOperations {
   scanProjectFolder: (choose?: boolean) => Promise<void>;
   prepare: () => Promise<void>;
   analyze: () => Promise<void>;
+  verify: () => Promise<void>;
+  estimate: (reportId: string, refreshHistory?: boolean) => Promise<void>;
 }
 /** Bind the current render's state to user actions without performing side effects during render. */
 export function workspaceOperations(
@@ -157,5 +200,7 @@ export function workspaceOperations(
     scanProjectFolder: (choose) => scanProjectFolder(state, call, api, choose),
     prepare: () => prepare(state, call),
     analyze: () => analyze(state, call),
+    verify: () => verify(state, call),
+    estimate: (reportId, refreshHistory) => estimate(state, call, reportId, refreshHistory),
   };
 }

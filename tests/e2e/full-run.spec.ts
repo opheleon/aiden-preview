@@ -73,7 +73,13 @@ for (const provider of ['codex', 'claude'] as const) {
           async (id) => (await window.aiden!.request('state', { projectId: id })).runs,
           projectId,
         );
-      // The app starts the estimate automatically once the report completes.
+      // Estimates are optional, so start one explicitly once the report completes.
+      await until(page, async () => {
+        const report = (await runs()).find((r) => r.kind === 'report');
+        return !!report && ['completed', 'failed', 'cancelled'].includes(report.status);
+      });
+      await page.locator('.estimates-section > summary').click();
+      await page.getByRole('button', { name: 'Estimate remaining work' }).click();
       await until(page, async () => {
         const estimate = (await runs()).find((r) => r.kind === 'estimate');
         return (

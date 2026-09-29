@@ -13,6 +13,8 @@ import type {
   RepositoryDiscovery,
   RunManifest,
   RuntimeConfig,
+  VerificationResult,
+  VerificationSettings,
 } from './index.js';
 /** Coarse sign-in state safe to show without exposing provider account identifiers. */
 export type SubscriptionState =
@@ -38,11 +40,18 @@ export type WorkerAPI = {
   projects: { params: Record<string, never>; result: Project[] };
   state: {
     params: ProjectRef;
-    result: { project: Project; baseline: Baseline | null; runs: RunManifest[] };
+    /** `activeRunIds` names runs this worker is executing; other running manifests were interrupted. */
+    result: {
+      project: Project;
+      baseline: Baseline | null;
+      runs: RunManifest[];
+      activeRunIds: string[];
+    };
   };
   prepare: { params: { project: Project }; result: { runId: string } };
   approve: { params: RunRef & { product: Product }; result: Baseline };
-  report: { params: ProjectRef; result: { runId: string } };
+  /** `browserCheck` also checks the saved app URL in a browser once the assessment is accepted. */
+  report: { params: ProjectRef & { browserCheck?: boolean }; result: { runId: string } };
   resume: { params: RunRef; result: { runId: string } };
   cancel: { params: { runId: string }; result: { cancelled: boolean } };
   waitForRun: { params: { runId: string }; result: null };
@@ -102,6 +111,16 @@ export type WorkerAPI = {
   estimateOverrides: {
     params: ProjectRef & { overrides: EstimateOverrides };
     result: EstimationSnapshot;
+  };
+  verify: { params: ProjectRef & { url?: string }; result: { runId: string } };
+  verificationSettings: { params: ProjectRef; result: VerificationSettings };
+  updateVerificationSettings: {
+    params: ProjectRef & { url: string | null };
+    result: VerificationSettings;
+  };
+  verification: {
+    params: ProjectRef & { runId?: string };
+    result: { result: VerificationResult; reportPath: string } | null;
   };
 };
 /** Only these operation names may cross the trusted worker dispatch boundary. */

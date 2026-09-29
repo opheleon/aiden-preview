@@ -47,7 +47,11 @@ export function EstimateHistory({
         </details>
       ) : (
         <div className="estimate-connect-panel">
-          <p>Connect a history source to estimate duration from your team’s completed work.</p>
+          <p>
+            {estimation.historyCollectedAt
+              ? 'No completed tickets are available in the selected source’s last 90 days. Time estimates remain unavailable.'
+              : 'Connect a history source to estimate duration from your team’s completed work.'}
+          </p>
           <button className="secondary" onClick={onConfigureHistory}>
             Configure history
           </button>
@@ -82,7 +86,8 @@ export function HistoryEditor({
           </p>
         </header>
         <p className="estimate-reason">
-          This comparison was classified with the same rubric as reviewed requirements.
+          {historyItem.reasoning ??
+            'This comparison was classified with the same rubric as remaining changes.'}
         </p>
         <div className="estimate-size-options" role="group" aria-label="Comparison complexity">
           {sizes.map((size) => (

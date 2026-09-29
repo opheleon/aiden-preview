@@ -16,8 +16,9 @@ import { executeEstimate } from './estimation-workflow.js';
 import { createModelStage } from './model-stage.js';
 import { assessReport } from './report-analysis.js';
 import { atomic, optionalJson } from './storage.js';
+import { executeVerification } from './verification-workflow.js';
 import type { WorkflowContext } from './workflow-context.js';
-/** Establish one run’s tool boundary, route preparation/analysis/estimation, and always close the tool server. */
+/** Establish one run’s tool boundary, route preparation/analysis/estimation/verification, and always close the tool server. */
 export async function execute(
   context: WorkflowContext,
   run: RunManifest,
@@ -30,6 +31,10 @@ export async function execute(
   await mkdir(workspace, { recursive: true, mode: 0o700 });
   if (run.kind === 'estimate') {
     await executeEstimate(context, run, signal, dir, artifacts, workspace);
+    return;
+  }
+  if (run.kind === 'verify') {
+    await executeVerification(context, run, signal, dir, workspace);
     return;
   }
   /** Persist stage progression before provider or repository work starts. */

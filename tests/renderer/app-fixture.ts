@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 
 import type { DesktopBridge } from '../../apps/desktop/src/bridge';
+import type { WorkerResult } from '../../packages/contracts/src/api';
 import type {
   Baseline,
   McpConnection,
@@ -16,7 +17,16 @@ export function appFixture() {
   let runs: RunManifest[];
   let estimate = estimateFixture();
   let connections: McpConnection[] = [];
+  let appUrl: string | null = null;
+  let verification: WorkerResult<'verification'> = null;
   let listener: ((event: RunEvent) => void) | undefined;
+  // Runs this fixture's worker started; runs added by other processes stay out of activeRunIds.
+  let active = new Set<string>();
+  /** Record a run the desktop worker is executing and return its start result. */
+  const start = (runId: string) => {
+    active.add(runId);
+    return { runId };
+  };
   const tools = [
     {
       name: 'list_issues',
@@ -67,7 +77,10 @@ export function appFixture() {
     ];
     estimate = estimateFixture();
     connections = [];
+    appUrl = null;
+    verification = null;
     listener = undefined;
+    active = new Set();
   }
   reset();
   const request = vi.fn((method: string, p: any = {}) =>
@@ -82,7 +95,7 @@ export function appFixture() {
         case 'models':
           return [{ id: 'synthetic', label: 'Synthetic model', isDefault: true }];
         case 'state':
-          return { project, baseline, runs };
+          return { project, baseline, runs, activeRunIds: [...active] };
         case 'candidate':
           return report.baseline;
         case 'result':
@@ -91,6 +104,24 @@ export function appFixture() {
           return estimate;
         case 'integrations':
           return connections;
+        case 'verificationSettings':
+          return { url: appUrl };
+        case 'updateVerificationSettings':
+          if (p.url?.startsWith('file:'))
+            throw new Error('Only http and https URLs can be verified.');
+          appUrl = p.url;
+          return { url: appUrl };
+        case 'verify':
+          runs.push({
+            ...runs[0]!,
+            id: 'verify-run',
+            kind: 'verify',
+            status: 'running',
+            stage: 'verify',
+          });
+          return start('verify-run');
+        case 'verification':
+          return verification;
         case 'discoverRepositories':
           return {
             rootPath: '/synthetic',
@@ -99,7 +130,7 @@ export function appFixture() {
           };
         case 'prepare':
           project = p.project;
-          return { runId: 'prepare-run' };
+          return start('prepare-run');
         case 'approve':
           baseline = {
             id: 'approved',
@@ -112,9 +143,9 @@ export function appFixture() {
           return baseline;
         case 'report':
         case 'resume':
-          return { runId: 'analysis-run' };
+          return start('analysis-run');
         case 'estimate':
-          return { runId: 'estimate-run' };
+          return start('estimate-run');
         case 'cancel':
           return { cancelled: true };
         case 'answer':
@@ -197,6 +228,8 @@ export function appFixture() {
     chooseContext: vi.fn().mockResolvedValue('Imported fixture intent'),
     openExternal: vi.fn().mockResolvedValue(undefined),
     saveExport: vi.fn().mockResolvedValue(true),
+    openVerificationReport: vi.fn().mockResolvedValue(undefined),
+    verificationMedia: vi.fn().mockResolvedValue({ type: 'video/webm', data: new ArrayBuffer(8) }),
     getSchedules: vi.fn().mockResolvedValue([]),
     setSchedule: vi.fn().mockImplementation((projectId: string, config: unknown) =>
       Promise.resolve({
@@ -215,6 +248,12 @@ export function appFixture() {
     project: () => project,
     addInterruptedRun: () => {
       runs.push({ ...runs[0]!, id: 'interrupted-run', status: 'cancelled', stage: 'assess' });
+    },
+    addVerificationRun: (status: RunManifest['status']) => {
+      runs.push({ ...runs[0]!, id: 'verify-run', kind: 'verify', status, stage: 'verify' });
+    },
+    setVerification: (value: WorkerResult<'verification'>) => {
+      verification = value;
     },
     setEstimate: (value: typeof estimate) => {
       estimate = value;

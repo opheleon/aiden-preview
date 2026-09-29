@@ -10,6 +10,7 @@ import {
   EstimationSnapshotSchema,
   ProductSchema,
   ReportSchema,
+  VerificationSummarySchema,
 } from '../../contracts/src/index.js';
 
 const eventSchema = z
@@ -28,6 +29,7 @@ const eventSchema = z
         'summary',
         'report',
         'estimate',
+        'verify',
         'complete',
       ])
       .optional(),
@@ -37,6 +39,7 @@ const eventSchema = z
     product: ProductSchema.optional(),
     report: ReportSchema.optional(),
     estimation: EstimationSnapshotSchema.optional(),
+    verification: VerificationSummarySchema.optional(),
   })
   .strict();
 const responseSchema = z

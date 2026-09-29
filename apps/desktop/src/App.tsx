@@ -50,7 +50,9 @@ export default function App(): JSX.Element {
     />
   );
   const terminalRuns = runs.filter(
-    (r) => r.kind === 'report' || ['failed', 'cancelled', 'running', 'waiting'].includes(r.status),
+    (r) =>
+      r.kind === 'report' ||
+      (r.kind !== 'verify' && ['failed', 'cancelled', 'running', 'waiting'].includes(r.status)),
   );
   return (
     <div className="app">

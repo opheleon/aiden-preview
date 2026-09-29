@@ -29,7 +29,11 @@ export async function applyOverrides(
     const remainingPoints =
       overrides.remainingPoints[requirement.requirementId] ?? requirement.suggestedRemainingPoints;
     const overrideComparisons = overrides.comparisons[requirement.requirementId];
-    const comparisons = selectComparisons({ ...requirement, points }, history, overrideComparisons);
+    const comparisons = selectComparisons(
+      { ...requirement, points, remainingPoints },
+      history,
+      overrideComparisons,
+    );
     const summary = durationSummary(comparisons);
     return {
       ...requirement,
@@ -37,9 +41,9 @@ export async function applyOverrides(
       pointsOverridden: requirement.requirementId in overrides.requirementPoints,
       remainingPoints,
       remainingPointsOverridden: requirement.requirementId in overrides.remainingPoints,
-      durationDays: overrides.durations[requirement.requirementId] ?? summary?.median ?? null,
+      durationDays: summary?.median ?? null,
       suggestedDurationDays: summary?.median ?? null,
-      durationOverridden: requirement.requirementId in overrides.durations,
+      durationOverridden: false,
       comparisons: comparisons.map((issue) => issue.id),
       comparisonOverrides: overrideComparisons ?? null,
     };
