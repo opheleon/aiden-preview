@@ -22,9 +22,9 @@ test('first use navigates with readable details and only final confirmation pers
   expect(heading).toHaveFocus();
   expect(screen.getByText(/Step 1 of/)).toBeVisible();
   await userEvent.click(screen.getByText('A little more detail'));
-  expect(screen.getByText(/You stay in control/)).toBeVisible();
+  expect(screen.getByText(/Take project management off your plate/)).toBeVisible();
   await userEvent.click(screen.getByRole('button', { name: 'Next' }));
-  expect(screen.getByRole('heading', { name: 'Connect your model' })).toHaveFocus();
+  expect(screen.getByRole('heading', { name: 'Bring your own subscription' })).toHaveFocus();
   await userEvent.click(screen.getByRole('button', { name: 'Back' }));
   expect(screen.getByRole('heading', { name: 'Meet Aiden' })).toHaveFocus();
   expect(f.api.completeFirstUse).not.toHaveBeenCalled();

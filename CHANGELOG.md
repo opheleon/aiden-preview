@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Align the introduction and user docs with Aiden’s marketing: your first autonomous project manager. Organize onboarding around setting the intent, making the calls, and accepting the outcome.
+
 - Introduce a five-step first-use guide for setup, projects, maintenance, and delivery evidence. Remember explicit confirmation per local profile, keep dismissal temporary, recover preference failures visibly, and provide replayable Help with offline user documentation.
 - Treat Linear prerequisite URL autolinks and rich references to verified project tickets as equivalent during reconciliation, while preserving conflicts for changed link text, destinations, and unknown references.
 

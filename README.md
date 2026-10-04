@@ -4,9 +4,11 @@
 >
 > Get setup help, ask questions, and share feedback with the Aiden team.
 
-**Understand what is built, what remains, and the evidence behind the estimate.**
+**Meet Aiden: your first autonomous project manager.**
 
-Aiden is a local desktop app and CLI for developers reviewing work across Git repositories. It compares reviewed requirements with committed code, links findings to exact snapshots and lines, and estimates original and remaining scope. Optional issue-tracker history provides time ranges from comparable completed work.
+Aiden keeps everyone clear on what done means, where it stands, when it will land, and what’s in the way. You set the intent, make the calls, and accept the outcome.
+
+Aiden Preview is your own AI project manager, on your Mac, with your Claude or ChatGPT subscription. Tell Aiden what you’re building and it writes down what done means, checks the work, estimates what’s left, and shows what needs your attention. A CLI is also included.
 
 **Pre-release · Apple Silicon macOS · Apache 2.0.** Public beta preparation is in progress; signed installation and upgrade verification remain release requirements.
 

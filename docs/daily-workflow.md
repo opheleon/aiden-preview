@@ -1,29 +1,37 @@
 # Daily workflow
 
-Start in Overview. Read the short summary, current focus, Needs you, and any Delivery attention. Expand a delivery step or requirement when you need evidence, linked tickets, risks, or next actions.
+Aiden keeps everyone clear on what done means, where it stands, when it will land, and what’s in the way. Start in Overview for the answer, then expand a delivery step when you want to see what’s behind it.
 
-## Review and maintain the project
+## What does done mean?
 
-Use Scope to inspect or refine requirements. Scope edits start a new check. Use Activity to understand changes and Runs to inspect progress, failures, and blocked decisions. Answer a blocking question to unlock the affected work and its dependent steps. Independent investigation can continue while another part is blocked.
+Scope holds what you’re building and how you’ll know it works. Refine it as you learn; Aiden checks the work again. Keep delivery steps usable and testable, including a concrete test plan for foundation work that other steps depend on.
 
-Use More → Run check now for an immediate assessment or to pick up a stopped check. Manual acceptance tests belong to you; new code can require another test even if a previous version passed. Review the test plan before accepting a foundation layer that other work depends on.
+## Where does it stand?
 
-## Understand automatic monitoring
+Overview shows progress, what’s left, and what needs your attention. Expand a requirement for its checks, linked tickets, and next actions. Activity shows what changed and why. Runs has the details of each check.
 
-Monitoring requires the desktop app to remain open. Aiden checks the selected remote branch every minute without changing your checkout and reassesses when the remote commit changes. It also checks each morning if no check has run that day.
+While Preview is open, Aiden watches the selected remote branch every minute and checks again when pushed code changes. It also checks each morning if no check has run that day. Use More → Run check now whenever you need a fresh answer or want to pick up a stopped check.
 
-Tracker status is checked every minute while the app is open and the project is idle. A status change queues a fresh assessment; the first successful read of an already completed or canceled ticket also queues one. Saving scope and completing a code assessment reconcile tickets. Sync tickets performs an on-demand reconciliation.
+With automatic tickets enabled, Aiden checks tracker status every minute while the project is idle. A status change prompts a new code assessment, as does the first successful read of an already completed or canceled ticket. Saving scope and finishing an assessment also reconcile tickets. Sync tickets does this on demand.
 
-## Read delivery evidence
+## When will it land?
 
-Remote code progress, app or API acceptance evidence, and tracker status are separate signals. Local work is not proof that the monitored remote contains it. Code on a feature branch is not proof of a merge to main. Aiden does not automatically prove a deployment or GitHub Actions outcome.
+Expand Progress details and estimates to see how much work remains and the reasoning behind the estimate. When comparable delivery history is available, Aiden uses it to estimate how long the remaining work could take. When evidence or history is insufficient, the forecast stays unavailable.
 
-A closed ticket does not prove its requirements work. Delivery attention shows Checking completion while a fresh assessment runs, Completion unverified when evidence is unavailable or acceptance is outstanding, and Delivery deviation for confirmed missing, partial, or contradictory work. Dependent delivery steps can be affected too. Expand Evidence and next steps to see the disconnect.
+## What’s in the way?
 
-Moving a ticket back to In Progress prompts reconciliation and a fresh assessment. It removes the claim that the tracker says delivery is complete; it does not erase a real scope or behavior mismatch. Aiden does not automatically close a ticket just because code appears. Review evidence and decide when to change tracker status.
+Needs you brings the decisions that need your judgment. Answer the question to unlock affected work and its dependents. Independent investigation can continue while another part waits for a decision.
 
-## Keep connections healthy
+Delivery attention shows where the work and the agreed outcome have come apart. Checking completion means a fresh assessment is running. Completion unverified means Aiden still needs evidence or an acceptance check. Delivery deviation means it found missing, partial, or contradictory work. Expand Evidence and next steps to see the issue and any dependent steps it affects.
 
-For an unavailable tracker, use Settings → Integrations to reconnect the existing connection. Return to the project and use Sync tickets. Publishing settings lets you pause or resume automatic publishing and verify the team and destination.
+## Accept the outcome
 
-Missing repository, tracker, app, API, or deployment access stays unverified. Restore the required access or provide the requested acceptance evidence, then run another check. Do not treat a missing signal as a pass or a confirmed failure.
+Review the checks and available recordings before accepting the result. Product decides whether it meets the intent; engineering signs off on how it was built. New code may need another manual check even when the previous version passed.
+
+A closed ticket does not verify its requirements. Moving it back to In Progress prompts another assessment; it does not erase an implementation mismatch. Aiden does not automatically close a ticket just because code appears.
+
+The selected branch tells you which pushed code Aiden checked. Work on that branch may still need to be merged or deployed. App and API checks show the behavior they could actually observe. Missing access stays unverified, including repository, tracker, app, API, and deployment access.
+
+## Keep the project connected
+
+If a tracker needs attention, reconnect the existing connection in Settings → Integrations, then use Sync tickets on the project. Publishing settings lets you check the team and destination or pause automatic publishing. Restore access or supply the requested check, then let Aiden look again.

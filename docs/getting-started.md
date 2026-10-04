@@ -1,31 +1,43 @@
 # Getting started
 
-Aiden helps product managers and developers turn a scoped outcome into requirements, testable delivery steps, and evidence of progress. You own product decisions and acceptance. A model's assessment is a useful review, not a guarantee.
+Meet Aiden: your first autonomous project manager. Aiden keeps everyone clear on what done means, where it stands, when it will land, and what’s in the way.
 
-## Connect your model
+You set the intent, make the calls, and accept the outcome. Aiden Preview is your own AI project manager, on your Mac, with your Claude or ChatGPT subscription.
 
-Open Settings → Model. Choose Codex or Claude, install its runtime using the setup controls, and sign in with your existing provider account. Keep your intended subscription or API-key billing choice. Select the model and effort for your project. Aiden has no separate Aiden account sign-in.
+## Bring your own subscription
 
-Linear is optional. You can plan and assess a project without a tracker. Connect Linear under Settings → Integrations when ready; one publishing connection can serve several projects. Reading this guide never installs software, signs in, changes credentials, or opens an external page.
+Open Settings → Model and choose Codex for ChatGPT, or Claude. Follow the setup steps to install the provider and sign in with your existing account. Choose the model and effort for your project. Keep your selected subscription or API-key billing mode; provider limits and charges may apply. There is no separate Aiden sign-in.
 
-## Create your first project
+Linear is optional. Connect it in Settings → Integrations whenever you want Aiden to publish your project’s tickets there. One connection can serve several projects.
 
-Select the plus button beside Projects. Describe the outcome, who needs it, and how you will know it works. Choose the folder containing its Git repositories, review the provider choice, and select Hand it to Aiden. The project name comes from its scope, rather than the folder name.
+## Set the intent
 
-Aiden writes requirements, assesses available code, and plans delivery steps. Prefer vertical steps that produce something testable. If a prerequisite is a foundation layer, include a concrete test plan before building on it. Unknown product behavior becomes a decision for you; affected work and its dependents remain blocked until answered.
+Start from a customer call, a brief, or a sentence. Select the plus button beside Projects, tell Aiden what you’re building, and choose the folder containing its code. Then select Hand it to Aiden.
 
-## Choose the evidence branch
+Aiden writes down what done means in plain language, checks the work, and plans usable steps toward the outcome. The project takes its name from what you’re building. Each step should produce something you can test; a foundation step needs a plan for checking it before other work builds on it.
 
-Open Settings → Project → Branch monitoring. The initial selection follows the current branch's remote upstream, or the same-named branch on origin or the sole remote. Choose from the live remote branches. This setting belongs to the project and does not change when you switch your local checkout.
+Choose the branch to follow in Settings → Project → Branch monitoring. It starts with your current branch’s remote upstream, or the same-named branch on origin or the sole remote. The choice belongs to this project and stays fixed when you switch your local checkout. Saving another branch starts a fresh check and preserves earlier history.
 
-Saving another branch starts a fresh check and clears current results for the old selection, while preserving history. An unpushed, deleted, or inaccessible branch stays unverified. Local edits and local commits do not prove remote delivery. Code on a monitored feature branch does not mean it has merged into main or deployed.
+Aiden follows pushed code on that branch. Local edits stay on your computer. An unpublished or inaccessible branch remains unverified until Aiden can read it.
 
-## Publish optional Linear tickets
+## Let Aiden write the tickets
 
-On the delivery plan, use Connect tracker or Publishing settings. Choose your connection, open the Linear team dropdown, and select the destination team. Enable automatic tickets and select Create project and publish tickets. Aiden creates one Linear project for this Aiden project and publishes the planned delivery tickets with prerequisite links.
+If you use Linear, open Connect tracker or Publishing settings on the project. Choose your connection and team, enable automatic tickets, and select Create project and publish tickets.
 
-Requirements appear with their delivery ticket(s). Several requirements can share a vertical delivery ticket. If you connect later, Sync tickets publishes existing local plans and reconciles the same issues. It does not need a new Aiden project or duplicate connection.
+Aiden creates a Linear project for this project and writes tickets from the delivery plan. Each requirement links to its delivery ticket(s); several requirements can belong to one usable step. Connecting later works too: Sync tickets publishes the existing plan and keeps the same issues up to date.
 
-## Finish or revisit the introduction
+## Make the calls
 
-Only Got it on the final step saves completion. Later, the close button, or Escape hides the guide for this session; it returns next launch. Help / Getting started reopens it at any time and provides these offline docs. Replaying a completed guide never resets its completion.
+Start in Overview for where the project stands, what’s left, and what’s in the way. Aiden brings questions to Needs you. Answer the question when a decision is yours; the answer goes into the project and unlocks the affected work. Independent investigation can continue while a decision is open.
+
+Refine Scope as you learn. Aiden checks again and updates the project. Activity shows what changed, and Runs has the check details. Progress details and estimates explains the size of the remaining work and any available forecast. When there isn’t enough history to give a date, Aiden leaves the forecast unavailable.
+
+## Accept the outcome
+
+Review what Aiden checked and any available recordings. Delivery attention shows where the work differs from what you asked for, along with what to do next. Product decides whether the outcome is right; engineering signs off on how it was built.
+
+Code on the selected branch, app or API checks, and ticket status each answer a different question. A closed ticket does not verify the result. A merge or deployment needs its own evidence, and unavailable checks remain unverified. Aiden does not close tickets just because code appears.
+
+## Come back whenever you need
+
+Help / Getting started reopens the introduction and these offline docs. Got it on the final step remembers that you’ve finished. Later, close, or Escape brings the introduction back next launch. Replaying it after completion keeps your original confirmation.
