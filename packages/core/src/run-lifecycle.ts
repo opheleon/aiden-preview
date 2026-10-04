@@ -44,7 +44,7 @@ const runTimeoutMs = 30 * 60 * 1000;
 export async function acquireProjectLock(
   store: Store,
   projectId: string,
-  name: 'active' | 'browser' = 'active',
+  name: 'active' | 'browser' | 'delivery' = 'active',
 ): Promise<() => Promise<void>> {
   const folder = store.project(projectId);
   await mkdir(folder, { recursive: true, mode: 0o700 });

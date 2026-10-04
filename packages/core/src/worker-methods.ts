@@ -22,6 +22,7 @@ import { readCalls, settleAppUrlCalls } from './calls.js';
 import { cancelCoding, codingJobs, startCodingJob } from './coding-jobs.js';
 import { confirmAction, readConfirmations } from './confirmations.js';
 import { Engine } from './engine.js';
+import { guardLifecycleMethods, lifecycleMethods } from './lifecycle-methods.js';
 import { linearTeams, publishLinearTickets } from './linear-projects.js';
 import {
   answerAndLook,
@@ -32,6 +33,7 @@ import {
   startLook,
 } from './look.js';
 import { initializeMonitoring, monitoringBranches, saveMonitoredBranch } from './monitoring.js';
+import { readLifecycle } from './project-lifecycle.js';
 import { readTicketState, saveTicketSettings, ticketCapabilities } from './ticket-storage.js';
 import { syncTickets } from './ticket-sync.js';
 import { readAppUrl, saveVerificationSettings } from './verification-settings.js';
@@ -43,7 +45,11 @@ function operation<T>(
   schema: z.ZodType<T>,
   call: (params: T) => unknown,
 ): (params: unknown) => unknown {
-  return (params: unknown) => call(schema.parse(params));
+  return Object.assign((params: unknown) => call(schema.parse(params)), {
+    validate: (params: unknown) => {
+      schema.parse(params);
+    },
+  });
 }
 const project = z.object({ projectId: id }).strict();
 const run = project.extend({ runId: id });
@@ -53,7 +59,7 @@ export function createMethods(
   engine: Engine,
   runtimes: RuntimeControls,
 ): Record<WorkerMethod, (params: unknown) => unknown> {
-  return {
+  return guardLifecycleMethods(engine, {
     discoverRepositories: operation(z.object({ rootPath: z.string().min(1) }).strict(), (p) =>
       discoverRepositories(p.rootPath),
     ),
@@ -147,15 +153,17 @@ export function createMethods(
     verification: operation(project.extend({ runId: id.optional() }), (p) =>
       readVerification(engine, p.projectId, p.runId),
     ),
-  };
+  });
 }
 
 /** The automated function: looking, the action log, calls, and intent changes. */
 function functionMethods(engine: Engine) {
   return {
     ...ticketMethods(engine),
-    monitoring: operation(project, (p) =>
-      engine.isBusy(p.projectId)
+    ...lifecycleMethods(engine),
+    monitoring: operation(project, async (p) =>
+      engine.isBusy(p.projectId) ||
+      (await readLifecycle(engine.store, p.projectId)).status === 'closed'
         ? engine.state(p.projectId).then((s) => s.project)
         : initializeMonitoring(engine.store, p.projectId),
     ),

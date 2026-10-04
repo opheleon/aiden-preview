@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Record project outcome acceptance with a note, preserving automated evidence and decision history. Close projects to pause monitoring and ticket syncing; reopen them from Closed projects.
+
 - Align the introduction and user docs with Aiden’s marketing: your first autonomous project manager. Organize onboarding around setting the intent, making the calls, and accepting the outcome.
 
 - Introduce a five-step first-use guide for setup, projects, maintenance, and delivery evidence. Remember explicit confirmation per local profile, keep dismissal temporary, recover preference failures visibly, and provide replayable Help with offline user documentation.

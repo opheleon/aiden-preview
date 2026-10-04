@@ -1,0 +1,78 @@
+.project-outcome {
+  margin: 0 0 20px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.outcome-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.project-outcome p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.project-outcome details {
+  margin-top: 12px;
+}
+
+.project-outcome li {
+  margin: 12px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.outcome-dialog {
+  width: min(520px, calc(100vw - 40px));
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+}
+
+.outcome-dialog::backdrop {
+  background: rgb(0 0 0 / 35%);
+}
+
+.outcome-dialog h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.outcome-dialog p {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.outcome-dialog textarea {
+  width: 100%;
+  min-height: 100px;
+  margin-top: 8px;
+}
+
+.outcome-dialog .button-row {
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.closed-projects > summary {
+  padding: 12px 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.outcome-dialog form {
+  display: grid;
+  gap: 16px;
+}

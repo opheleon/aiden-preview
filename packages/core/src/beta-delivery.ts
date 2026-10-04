@@ -9,6 +9,8 @@ import { findJobPullRequest, github, readPullRequest } from '../../tools/src/del
 import { betaTarget, deployedRevision } from '../../verification/src/index.js';
 import { codingActive, codingJobs, saveJob } from './coding-jobs.js';
 import type { Engine } from './engine.js';
+import { readLifecycle } from './project-lifecycle.js';
+import { acquireProjectLock } from './run-lifecycle.js';
 import { atomic, optionalJson, uid } from './storage.js';
 import { readAppUrl } from './verification-settings.js';
 import { readVerification } from './verification-workflow.js';
@@ -49,13 +51,23 @@ export function reconcileDelivery(
   checking.set(engine, map);
   const previous = map.get(projectId);
   if (previous) return previous;
-  const task = reconcile(engine, projectId, now).finally(() => map.delete(projectId));
+  const task = lockedReconcile(engine, projectId, now).finally(() => map.delete(projectId));
   map.set(projectId, task);
   return task;
+}
+/** Serialize delivery reconciliation with project decisions, including detached coding callbacks. */
+async function lockedReconcile(engine: Engine, projectId: string, now: Date): Promise<CodingJob[]> {
+  const release = await acquireProjectLock(engine.store, projectId, 'delivery');
+  try {
+    return await reconcile(engine, projectId, now);
+  } finally {
+    await release();
+  }
 }
 /** Reconcile each durable job independently so one unavailable PR cannot hide other jobs. */
 async function reconcile(engine: Engine, projectId: string, now: Date): Promise<CodingJob[]> {
   const jobs = await codingJobs(engine, projectId);
+  if ((await readLifecycle(engine.store, projectId)).status === 'closed') return jobs;
   const settings = await betaSettings(engine, projectId);
   const { baseline } = await engine.state(projectId);
   for (const job of jobs) {

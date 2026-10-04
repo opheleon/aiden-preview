@@ -16,6 +16,7 @@ import { blockedRequirements } from './blockers.js';
 import { answerCall, answeredDecisions, readCalls, settleAppUrlCalls } from './calls.js';
 import type { Engine } from './engine.js';
 import { initializeMonitoring } from './monitoring.js';
+import { readLifecycle } from './project-lifecycle.js';
 import { atomic, hash, json, optionalJson } from './storage.js';
 import { syncTickets } from './ticket-sync.js';
 import { findRunningApp, saveAppUrl } from './verification-settings.js';
@@ -90,6 +91,7 @@ function afterRun(
   void (async () => {
     // The run releases its project lock before wait() settles, so the next run can take it.
     await engine.wait(runId);
+    if ((await readLifecycle(engine.store, projectId)).status === 'closed') return;
     const run = (await engine.state(projectId)).runs.find((r) => r.id === runId);
     const continued = run?.status === 'completed' && (await next(run));
     if (!continued) chainEnded(engine, projectId, runId);
@@ -312,6 +314,8 @@ async function readHeads(engine: Engine, project: Project): Promise<Head[]> {
  * looked at yet has nothing to compare against.
  */
 export async function repositoryHeads(engine: Engine, projectId: string): Promise<Heads> {
+  if ((await readLifecycle(engine.store, projectId)).status === 'closed')
+    return { repositories: [], active: false, changed: false, ready: false, lastLookAt: null };
   const project = engine.isBusy(projectId)
     ? await savedProject(engine, projectId)
     : await initializeMonitoring(engine.store, projectId);

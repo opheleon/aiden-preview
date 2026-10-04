@@ -10,6 +10,9 @@ import type { IpcAuthorization } from './desktop-ipc.js';
 const methods = new Set([
   'discoverRepositories',
   'projects',
+  'acceptOutcome',
+  'closeProject',
+  'reopenProject',
   'linearTeams',
   'publishLinearTickets',
   'ticketState',

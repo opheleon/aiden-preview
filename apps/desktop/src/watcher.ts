@@ -98,6 +98,7 @@ export class ProjectWatcher {
       const now = this.now();
       for (const project of await this.options.worker.request('projects')) {
         if (this.closed) return;
+        if (project.lifecycle?.status === 'closed') continue;
         await this.options.worker.request('reconcileDelivery', { projectId: project.id });
         const tickets = await this.options.worker.request('syncTickets', { projectId: project.id });
         if (this.options.isBusy()) continue;

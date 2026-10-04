@@ -23,7 +23,8 @@ const api = window.aiden;
  * the person; everything else is what Aiden did, found, and decided, with evidence.
  */
 export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
-  const { project, baseline, busy } = workspace;
+  const { project, baseline } = workspace;
+  const busy = workPaused(workspace);
   const [watching, setWatching] = useState<CriterionResult | null>(null);
   const delivery = useCodingDelivery(workspace);
   const tracker = useTrackerTickets(workspace);
@@ -170,4 +171,9 @@ export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
       )}
     </div>
   );
+}
+
+/** Closed projects preserve their scope and evidence until explicitly reopened. */
+function workPaused(workspace: Workspace): boolean {
+  return workspace.busy || workspace.project.lifecycle?.status === 'closed';
 }

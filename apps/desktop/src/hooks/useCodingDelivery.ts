@@ -67,6 +67,7 @@ export function useCodingDelivery(workspace: Workspace): CodingDeliveryState {
         : undefined;
       if (active.current && version === sequence.current) {
         setJobs(saved);
+        workspace.setProject(state.project);
         workspace.setBaseline(state.baseline ?? undefined);
         workspace.setRuns(state.runs);
         workspace.setVerification(verification);

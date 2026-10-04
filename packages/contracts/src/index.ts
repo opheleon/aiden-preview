@@ -4,6 +4,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import { DeliveryPlanSchema, validateDeliveryPlan } from './delivery-plan.js';
 import { edgeCaseId, requirementId } from './ids.js';
 import { ProjectSourcesSchema } from './integrations.js';
+import { ProjectLifecycleViewSchema } from './project-lifecycle.js';
 import { RuntimeSchema } from './runtime.js';
 export * from './activity.js';
 export * from './calls.js';
@@ -12,6 +13,7 @@ export * from './delivery-plan.js';
 export * from './estimation.js';
 export * from './ids.js';
 export * from './integrations.js';
+export * from './project-lifecycle.js';
 export * from './runtime.js';
 export * from './verification.js';
 
@@ -76,6 +78,8 @@ export const ProjectSchema = z
       .min(1),
     runtime: RuntimeSchema,
     sources: ProjectSourcesSchema.optional(),
+    /** Worker-derived lifecycle; trusted decisions live in a separate file. */
+    lifecycle: ProjectLifecycleViewSchema.optional(),
   })
   .strict();
 export const SnapshotSchema = z

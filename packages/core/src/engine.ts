@@ -31,6 +31,7 @@ import {
 } from './engine-queries.js';
 import { applyOverrides } from './estimate-overrides.js';
 import { initializeMonitoring } from './monitoring.js';
+import { requireOpenProject } from './project-lifecycle.js';
 import {
   acquireProjectLock,
   type ActiveRun,
@@ -95,7 +96,9 @@ export class Engine {
     input: Project,
     options: Pick<RunExtras, 'autoAccept' | 'reason'> = {},
   ): Promise<{ runId: string }> {
-    const project = await validateProjectRepositories(ProjectSchema.parse(input));
+    const parsed = ProjectSchema.parse(input);
+    delete parsed.lifecycle;
+    const project = await validateProjectRepositories(parsed);
     return this.start(project, 'prepare', undefined, options);
   }
   /** Start analysis only when the approved context still matches the saved project intent. */
@@ -196,6 +199,7 @@ export class Engine {
   ): Promise<{ runId: string }> {
     const release = await this.lockFor(project.id, kind);
     try {
+      await requireOpenProject(this.store, project.id);
       const run = await createRun(this.store, project, kind, baseline, extra);
       this.launch(run, release);
       return { runId: run.id };
@@ -211,6 +215,7 @@ export class Engine {
     );
     const release = await this.lockFor(projectId, saved.kind);
     try {
+      await requireOpenProject(this.store, projectId);
       const run = await json<RunManifest>(
         path.join(this.store.run(projectId, runId), 'manifest.json'),
       );
@@ -261,6 +266,7 @@ export class Engine {
   async approve(projectId: string, runId: string, productInput: unknown): Promise<Baseline> {
     const release = await this.lock(projectId);
     try {
+      await requireOpenProject(this.store, projectId);
       const run = await json<RunManifest>(
         path.join(this.store.run(projectId, runId), 'manifest.json'),
       );

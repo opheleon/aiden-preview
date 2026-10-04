@@ -5,6 +5,7 @@ import { deliveryTickets } from '../../reporting/src/tickets.js';
 import { publicError } from '../../runtimes/src/index.js';
 import { readCalls } from './calls.js';
 import type { Engine } from './engine.js';
+import { readLifecycle } from './project-lifecycle.js';
 import { acquireProjectLock } from './run-lifecycle.js';
 import { hash } from './storage.js';
 import { resolveLinearProject } from './ticket-project.js';
@@ -30,7 +31,7 @@ async function reconcile(engine: Engine, projectId: string): Promise<TicketState
   const release = await acquireProjectLock(engine.store, projectId);
   try {
     const state = await readTicketState(engine.store, projectId);
-    if (!state.settings?.enabled) return state;
+    if (await syncPaused(engine, projectId, state)) return state;
     const { baseline, runs } = await engine.state(projectId);
     if (!baseline) return state;
     if (!baseline.product.deliveryPlan)
@@ -124,4 +125,11 @@ async function syncFeature(
     record.remoteStatusChangedAt = state.externalChangeAt;
   }
   await writeTicketState(engine.store, projectId, state);
+}
+
+/** Closed projects and disabled integrations retain their last saved ticket snapshot. */
+async function syncPaused(engine: Engine, projectId: string, state: TicketState): Promise<boolean> {
+  return (
+    !state.settings?.enabled || (await readLifecycle(engine.store, projectId)).status === 'closed'
+  );
 }

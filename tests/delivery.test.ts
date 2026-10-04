@@ -20,6 +20,7 @@ import {
   startCodingJob,
 } from '../packages/core/src/coding-jobs.js';
 import { Engine } from '../packages/core/src/engine.js';
+import { decideProject } from '../packages/core/src/project-lifecycle.js';
 import { atomic, Store, uid } from '../packages/core/src/storage.js';
 import {
   saveAppUrl,
@@ -247,6 +248,13 @@ void test('external cancellation and crash recovery preserve work and never rela
       'Held synthetic job',
     );
     assert.equal(codingActive(engine, started.id), true);
+    await assert.rejects(
+      decideProject(engine, f.project.id, {
+        action: 'closed',
+        note: 'Trying to close active work.',
+      }),
+      /Stop the active coding job/,
+    );
     assert.equal((await reconcileDelivery(engine, f.project.id))[0]?.status, 'running');
     await cancelCoding(engine, started.id);
     assert.equal((await codingJobs(engine, f.project.id))[0]?.status, 'interrupted');
@@ -468,6 +476,24 @@ void test('coding beta opt-in is enforced before worktree creation and blockers 
     );
     assert.equal(worktrees, 0);
     assert.deepEqual(await codingJobs(engine, f.project.id), []);
+  } finally {
+    await close();
+  }
+});
+
+void test('closed projects retain delivery jobs without polling GitHub or starting beta verification', async (t) => {
+  const { f, engine, job, close } = await setup();
+  try {
+    await atomic(jobFile(engine, f.project.id, job.id), job);
+    const read = t.mock.method(deliveryServices, 'readPullRequest', () =>
+      Promise.resolve(pr(job, 'OPEN')),
+    );
+    await decideProject(engine, f.project.id, { action: 'closed', note: 'Pause delivery.' });
+    assert.deepEqual(await reconcileDelivery(engine, f.project.id), [job]);
+    assert.equal(read.mock.callCount(), 0);
+    await decideProject(engine, f.project.id, { action: 'reopened', note: 'Resume delivery.' });
+    await reconcileDelivery(engine, f.project.id);
+    assert.equal(read.mock.callCount(), 1);
   } finally {
     await close();
   }

@@ -14,6 +14,8 @@ async function fixture(initial: Partial<Heads> = {}) {
   let now = new Date(2026, 8, 29, 7, 30);
   let busy = false;
   let fail = false;
+  let closed = false;
+  const operations: string[] = [];
   let needsAssessment = false;
   let heads: Heads = { ready: true, active: false, changed: false, ...initial };
   const looks: { projectId: string; reason?: string }[] = [];
@@ -26,7 +28,11 @@ async function fixture(initial: Partial<Heads> = {}) {
     worker: {
       request: ((method: string, params: { projectId: string; reason?: string }) => {
         if (fail) return Promise.reject(new Error('worker unavailable'));
-        if (method === 'projects') return Promise.resolve([{ id: 'project' }]);
+        operations.push(method);
+        if (method === 'projects')
+          return Promise.resolve([
+            { id: 'project', lifecycle: { status: closed ? 'closed' : 'active' } },
+          ]);
         if (method === 'reconcileDelivery') return Promise.resolve([]);
         if (method === 'syncTickets')
           return Promise.resolve({ settings: { enabled: true }, needsAssessment });
@@ -42,6 +48,8 @@ async function fixture(initial: Partial<Heads> = {}) {
   await watcher.start(false);
   return {
     root,
+    operations,
+    closed: (value: boolean) => (closed = value),
     watcher,
     looks,
     errors,
@@ -166,6 +174,21 @@ void test('tracker changes trigger a fresh assessment even without commits and d
     f.ticketsChanged(false);
     await f.watcher.tick();
     assert.equal(f.looks.length, 1);
+  } finally {
+    await rm(f.root, { recursive: true, force: true });
+  }
+});
+
+void test('closed projects skip every monitoring and tracker operation until reopened', async () => {
+  const f = await fixture({ changed: true });
+  try {
+    f.closed(true);
+    f.at(new Date(2026, 8, 29, 9));
+    await f.watcher.tick();
+    assert.deepEqual(f.operations, ['projects']);
+    f.closed(false);
+    await f.watcher.tick();
+    assert.deepEqual(f.looks, [{ projectId: 'project', reason: 'commit' }]);
   } finally {
     await rm(f.root, { recursive: true, force: true });
   }

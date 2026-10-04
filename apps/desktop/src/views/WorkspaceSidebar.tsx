@@ -35,7 +35,7 @@ export function WorkspaceSidebar({
   workspace: Workspace;
   onGettingStarted: () => void;
 }): JSX.Element {
-  const { projects, project, load, area, setArea, action } = workspace;
+  const { projects, project, area, setArea, action } = workspace;
   return (
     <aside className="sidebar">
       <div className="sidebar-heading">
@@ -50,7 +50,61 @@ export function WorkspaceSidebar({
         </button>
       </div>
       <nav className="project-nav">
-        {projects.map((p) => (
+        <ProjectLinks workspace={workspace} closed={false} />
+        {projects.some((p) => p.lifecycle?.status === 'closed') && (
+          <details
+            className="closed-projects"
+            open={project.lifecycle?.status === 'closed' || undefined}
+          >
+            <summary>Closed projects</summary>
+            <ProjectLinks workspace={workspace} closed />
+          </details>
+        )}
+      </nav>
+      <div className="sidebar-bottom">
+        <button className="sidebar-section" data-guide-trigger onClick={onGettingStarted}>
+          <BookOpen size={17} />
+          <span>Help / Getting started</span>
+        </button>
+        <button
+          className={area === 'settings' ? 'sidebar-section selected' : 'sidebar-section'}
+          onClick={() => setArea('settings')}
+        >
+          <Settings2 size={17} />
+          <span>Settings</span>
+        </button>
+        <button
+          className="sidebar-section"
+          title="Report a problem, suggest a feature, or get help on Slack."
+          onClick={() =>
+            void action(async () => {
+              await api?.openExternal(slackInviteUrl);
+            })
+          }
+        >
+          <MessageCircle size={17} />
+          <span>Feedback &amp; support</span>
+          <ExternalLink size={13} aria-hidden="true" />
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+/** Separate active and closed projects while retaining access to their saved runs. */
+function ProjectLinks({
+  workspace,
+  closed,
+}: {
+  workspace: Workspace;
+  closed: boolean;
+}): JSX.Element {
+  const { projects, project, load, area, setArea } = workspace;
+  return (
+    <>
+      {projects
+        .filter((p) => (p.lifecycle?.status === 'closed') === closed)
+        .map((p) => (
           <div key={p.id}>
             <button
               className={p.id === project.id && area === 'projects' ? 'selected' : ''}
@@ -90,33 +144,6 @@ export function WorkspaceSidebar({
             )}
           </div>
         ))}
-      </nav>
-      <div className="sidebar-bottom">
-        <button className="sidebar-section" data-guide-trigger onClick={onGettingStarted}>
-          <BookOpen size={17} />
-          <span>Help / Getting started</span>
-        </button>
-        <button
-          className={area === 'settings' ? 'sidebar-section selected' : 'sidebar-section'}
-          onClick={() => setArea('settings')}
-        >
-          <Settings2 size={17} />
-          <span>Settings</span>
-        </button>
-        <button
-          className="sidebar-section"
-          title="Report a problem, suggest a feature, or get help on Slack."
-          onClick={() =>
-            void action(async () => {
-              await api?.openExternal(slackInviteUrl);
-            })
-          }
-        >
-          <MessageCircle size={17} />
-          <span>Feedback &amp; support</span>
-          <ExternalLink size={13} aria-hidden="true" />
-        </button>
-      </div>
-    </aside>
+    </>
   );
 }

@@ -19,6 +19,7 @@ import { isBlocking } from '../../reporting/src/blockers.js';
 import { markdown, markdownBundle } from '../../reporting/src/index.js';
 import { readSnapshot } from '../../tools/src/git.js';
 import { readCalls } from './calls.js';
+import { lifecycleView } from './project-lifecycle.js';
 import { hash, json, optionalJson, type Store } from './storage.js';
 
 /** List saved project metadata; a new home returns no projects, while corruption remains an error. */
@@ -40,7 +41,11 @@ export async function readProject(store: Store, projectId: string): Promise<Proj
   const project = await optionalJson<Project>(path.join(folder, 'project.json'));
   if (!project) return null;
   const baseline = await optionalJson<Baseline>(path.join(folder, 'baseline.json'));
-  return { ...project, name: scopeName(project.context, baseline?.product) };
+  return {
+    ...project,
+    name: scopeName(project.context, baseline?.product),
+    lifecycle: await lifecycleView(store, project),
+  };
 }
 
 /** List persisted run manifests newest first, excluding directories without a manifest. */

@@ -50,6 +50,12 @@ type RunRef = ProjectRef & { runId: string };
 /** Allowlisted desktop and CLI operations with stable request/result contracts across the worker boundary. */
 export type WorkerAPI = {
   discoverRepositories: { params: { rootPath: string }; result: RepositoryDiscovery };
+  /** Record human acceptance of the currently displayed scope and evidence. */
+  acceptOutcome: { params: ProjectRef & { note: string; evidenceKey: string }; result: Project };
+  /** Pause project monitoring while retaining evidence and external tracker state. */
+  closeProject: { params: ProjectRef & { note: string }; result: Project };
+  /** Resume monitoring for a closed project. */
+  reopenProject: { params: ProjectRef; result: Project };
   projects: { params: Record<string, never>; result: Project[] };
   state: {
     params: ProjectRef;

@@ -3,6 +3,7 @@ import { type JSX, type ReactNode, useRef } from 'react';
 
 import type { LookReason, RunManifest } from '../../../../packages/contracts/src/index';
 import { scopeName } from '../../../../packages/contracts/src/project-name';
+import { ProjectOutcome } from '../components/ProjectOutcome';
 import type { CodingDeliveryState } from '../hooks/useCodingDelivery';
 import type { Workspace } from '../hooks/useWorkspace';
 import { timeAgo } from '../renderer/time';
@@ -29,7 +30,11 @@ function Overflow({ workspace }: { workspace: Workspace }): JSX.Element {
         <MoreHorizontal size={16} />
       </summary>
       <div role="menu">
-        <button role="menuitem" disabled={busy} onClick={choose(() => void lookNow())}>
+        <button
+          role="menuitem"
+          disabled={busy || project.lifecycle?.status === 'closed'}
+          onClick={choose(() => void lookNow())}
+        >
           Run check now
         </button>
         <button role="menuitem" disabled={!report} onClick={choose(() => exportAs('markdown'))}>
@@ -126,6 +131,7 @@ export function BriefHeader({
   /** Work that stopped early: what happened, and the button that recovers from it. */
   note: { text: string; label: string; run: () => void } | null;
 }): JSX.Element {
+  const closed = workspace.project.lifecycle?.status === 'closed';
   const when = lastLook(workspace.runs.filter((run) => run.id === workspace.report?.id));
   return (
     <>
@@ -134,7 +140,7 @@ export function BriefHeader({
           <h1>{scopeName(workspace.project.context, workspace.baseline?.product)}</h1>
           {when && <p className="brief-when">{when}</p>}
           <p className="brief-when">
-            Monitoring{' '}
+            {closed ? 'Monitoring paused for' : 'Monitoring'}{' '}
             {workspace.project.repositories
               .map((repo) =>
                 repo.monitoredBranch
@@ -160,6 +166,7 @@ export function BriefHeader({
           <Overflow workspace={workspace} />
         </div>
       </header>
+      <ProjectOutcome key={workspace.project.id} workspace={workspace} />
       {navigation}
       {showStatus && attention}
       {showStatus && (
@@ -174,7 +181,7 @@ export function BriefHeader({
           {note && (
             <div className="brief-note">
               {note.text && <p>{note.text}</p>}
-              <button className="secondary" disabled={workspace.busy} onClick={note.run}>
+              <button className="secondary" disabled={workspace.busy || closed} onClick={note.run}>
                 {note.label}
               </button>
             </div>

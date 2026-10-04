@@ -13,6 +13,7 @@ import { publicError } from '../../runtimes/src/index.js';
 import { codingWorktree, readPullRequest } from '../../tools/src/delivery-git.js';
 import { requireDefinedScope } from './blockers.js';
 import type { Engine } from './engine.js';
+import { requireOpenProject } from './project-lifecycle.js';
 import { acquireProjectLock } from './run-lifecycle.js';
 import { atomic, json, optionalJson, uid } from './storage.js';
 
@@ -77,6 +78,7 @@ export async function startCodingJob(
 ): Promise<CodingJob> {
   const release = await acquireProjectLock(engine.store, projectId);
   try {
+    await requireOpenProject(engine.store, projectId);
     const { project, baseline } = await engine.state(projectId);
     if (!project || !baseline) throw new Error('Create the project requirements first.');
     const settings = BetaSettingsSchema.parse(
