@@ -45,6 +45,8 @@ Each project has a **Branch monitoring** setting under **Project settings**. It 
 
 ## Quick start
 
+New installations and existing profiles without a guide confirmation open a five-step introduction. Only **Got it** on the final step saves completion; **Later**, close, or Escape returns next launch. Replay it through **Help / Getting started**, which also includes offline documentation. Read [Getting started](docs/getting-started.md), [Daily workflow](docs/daily-workflow.md), and [Troubleshooting](docs/troubleshooting.md). Developers can review the [first-use implementation and validation](docs/first-use-validation.md).
+
 1. Say what you are building: type or paste anything that describes it, or import a Markdown/text file.
 2. Choose the project folder. Aiden finds the Git repositories inside it, skipping folders a repository ignores (such as build output and old checkouts) and folding extra worktrees into their main checkout. When the folder holds several products, Aiden picks the repositories your intent is about and looks only at those.
 3. Pick a provider, then **Hand it to Aiden**. Aiden names the project from its scoped outcome, so separate projects in the same folder remain distinguishable. Older projects use a short scope excerpt until their next scope rewrite. There is no review step: Aiden writes the requirements, with the edge cases that tend to break each one, and runs a check.

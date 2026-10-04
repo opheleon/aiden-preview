@@ -33,6 +33,7 @@ void test('corrupt state is visible and repairable; failed writes stay incomplet
   const preferences = new FirstUsePreferences(root);
   for (const invalid of [
     '{',
+    'null',
     '{"completed":true}',
     '{"schemaVersion":1,"completedAt":"invalid"}',
   ]) {

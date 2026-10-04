@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Introduce a five-step first-use guide for setup, projects, maintenance, and delivery evidence. Remember explicit confirmation per local profile, keep dismissal temporary, recover preference failures visibly, and provide replayable Help with offline user documentation.
+- Treat Linear prerequisite URL autolinks as equivalent during ticket reconciliation while preserving conflicts for changed link text or destinations.
+
 - Add project-specific branch monitoring with live remote choices, current-branch defaults, an overview label, and fresh assessments after branch changes. Local checkout changes do not move a saved selection.
 
 - Monitor remote default-branch commits and assess freshly fetched remote snapshots without changing the checkout. Keep local-only and legacy evidence from establishing delivery completion; surface Merge unverified when remote evidence is unavailable.

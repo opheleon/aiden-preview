@@ -2,7 +2,7 @@ import { mkdir } from 'node:fs/promises';
 
 import { z } from 'zod/v3';
 
-import { atomic, boundedPath, optionalJson } from '../../../packages/core/src/storage.js';
+import { atomic, boundedPath, json } from '../../../packages/core/src/storage.js';
 
 /** Safe, credential-free state exposed to the desktop guide. */
 export interface FirstUseState {
@@ -28,12 +28,13 @@ export class FirstUsePreferences {
   /** Missing state means first use; corrupt or unreadable state stays incomplete with visible recovery. */
   async read(): Promise<FirstUseState> {
     try {
-      const value = await optionalJson(await this.file());
-      if (value === null) return { completed: false, issue: null };
+      const value = await json<unknown>(await this.file());
       return CompletionSchema.safeParse(value).success
         ? { completed: true, issue: null }
         : { completed: false, issue: 'corrupt' };
     } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+        return { completed: false, issue: null };
       return { completed: false, issue: error instanceof SyntaxError ? 'corrupt' : 'unavailable' };
     }
   }

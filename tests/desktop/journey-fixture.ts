@@ -59,8 +59,13 @@ export async function desktopFixture() {
     await app.context().tracing.start({ screenshots: true, snapshots: true });
     const page = await app.firstWindow();
     await page.locator('[data-guide-ready="true"]').waitFor();
-    if (!showGuide && (await page.getByRole('dialog').isVisible()))
-      await page.getByRole('button', { name: 'Later', exact: true }).click();
+    if (!showGuide && (await page.getByRole('dialog').isVisible())) {
+      // Existing journeys start after onboarding; finish through the public UI so reloads stay clear.
+      while (await page.getByRole('button', { name: 'Next', exact: true }).isVisible())
+        await page.getByRole('button', { name: 'Next', exact: true }).click();
+      await page.getByRole('button', { name: 'Got it', exact: true }).click();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+    }
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     let closed = false;

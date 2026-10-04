@@ -57,6 +57,25 @@ test('first use returns after dismissal, persists confirmation across restart, a
     await running.close();
     running = await f.launch(info, {}, true);
     await expect(running.page.getByRole('dialog')).toHaveCount(0);
+    await running.page.getByRole('button', { name: 'Help / Getting started' }).click();
+    await expect(running.page.getByRole('dialog')).toHaveCount(1);
+    await running.page.getByRole('button', { name: 'Read documentation' }).click();
+    await expect(running.page.getByRole('heading', { name: 'Documentation' })).toBeFocused();
+    await running.page.getByRole('button', { name: 'Daily workflow' }).click();
+    await expect(running.page.getByRole('article')).toContainText('does not automatically close');
+    await running.page.getByRole('button', { name: 'Troubleshooting' }).click();
+    await expect(running.page.getByRole('article')).toContainText('preferences/first-use.json');
+    await running.page.getByRole('button', { name: 'Back to guide' }).click();
+    await running.page.getByRole('button', { name: 'Next', exact: true }).focus();
+    await running.page.keyboard.press('Tab');
+    await expect(running.page.getByRole('button', { name: 'Close guide for now' })).toBeFocused();
+    await running.page.keyboard.press('Shift+Tab');
+    await expect(running.page.getByRole('button', { name: 'Next', exact: true })).toBeFocused();
+    await confirmGuide(running.page);
+    await expect(running.page.getByRole('dialog')).toHaveCount(0);
+    await expect(
+      running.page.getByRole('button', { name: 'Help / Getting started' }),
+    ).toBeFocused();
     expect(await readFile(file, 'utf8')).toBe(completed);
     expect(running.errors).toEqual([]);
   } finally {
