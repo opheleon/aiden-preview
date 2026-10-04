@@ -60,7 +60,7 @@ async function setup() {
   const e = new Engine(store, runtime, (event) => events.push(event));
   e.discover = { fetch: () => Promise.reject(new Error('connection refused')) };
   const runs = async () => e.history(f.project.id);
-  /** Wait until every run is finished and the number of runs reaches `count`. */
+  /** Wait for all expected runs, including chained estimates; gaps between runs are not idle. */
   const settled = (count: number, what: string) =>
     until(async () => {
       const all = await runs();
@@ -75,9 +75,8 @@ void test('handing over the intent writes what done means, commits it, and looks
     const before = await repositoryHeads(e, f.project.id).catch(() => null);
     assert.equal(before, null, 'an unsaved project has nothing to watch');
     await prepareAndLook(e, f.project, 'intent');
-    await settled(2, 'the look after preparing');
+    await settled(3, 'the look and automatic sizing after preparing');
     assert.ok(!(await readCalls(store, f.project.id)).some((c) => c.kind === 'app-url'));
-    await settled(3, 'automatic remaining-work sizing');
     const history = await runs();
     const look = history.find((r) => r.kind === 'report');
     const prepare = history.find((r) => r.kind === 'prepare');
@@ -185,7 +184,7 @@ void test('answering a call acts on it, or right after the current work when Aid
     );
     const now = await answerAndLook(e, f.project.id, second.id, 'Date');
     assert.ok(now.runId);
-    await settled(6, 'the rewrite after an answer');
+    await settled(8, 'the rewrite, look, and sizing after an answer');
     const rewrite = (await runs()).find((r) => r.id === now.runId);
     assert.equal(rewrite?.kind, 'prepare');
     assert.equal(rewrite?.reason, 'answer');
@@ -205,7 +204,7 @@ void test('editing what done means commits it and looks; changing the intent rew
       requirements: saved.product.requirements.map((r) => ({ id: r.id, text: r.text })),
     };
     const look = await editIntent(e, f.project.id, { product });
-    await settled(2, 'the look after an edit');
+    await settled(3, 'the look and sizing after an edit');
     const edited = await json<Baseline>(path.join(store.project(f.project.id), 'baseline.json'));
     assert.equal(
       edited.product.requirements[0]?.edgeCases,
@@ -217,7 +216,7 @@ void test('editing what done means commits it and looks; changing the intent rew
     const rewrite = await editIntent(e, f.project.id, {
       context: 'Users can list and delete books.',
     });
-    await settled(4, 'the rewrite after changing the intent');
+    await settled(6, 'the rewrite, look, and sizing after changing the intent');
     const run = (await runs()).find((r) => r.id === rewrite.runId);
     assert.equal(run?.kind, 'prepare');
     assert.equal(run?.project.context, 'Users can list and delete books.');
@@ -290,7 +289,7 @@ void test('an answer given while what done means is being rewritten triggers ano
     assert.equal(answered.runId, null);
     runtime.holdUnderstand = null;
     release();
-    await settled(3, 'the second rewrite and its look');
+    await settled(4, 'the second rewrite, look, and sizing');
     const all = await runs();
     const prepares = all.filter((r) => r.kind === 'prepare');
     assert.equal(prepares.length, 2);
