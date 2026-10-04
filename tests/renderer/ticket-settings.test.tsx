@@ -44,6 +44,7 @@ function fixture(saved: Settings | null, offline = false) {
 test('one project setting grants automatic tickets in the selected destination', async () => {
   const f = fixture(null);
   render(<TicketSettings workspace={f.workspace} />);
+  expect(screen.queryByRole('option', { name: /Jira/ })).toBeNull();
   await userEvent.selectOptions(screen.getByRole('combobox', { name: 'MCP connection' }), 'linear');
   expect(f.call.mock.calls.some(([method]) => method === 'linearTeams')).toBe(false);
   await userEvent.click(screen.getByRole('combobox', { name: 'Linear team' }));
@@ -63,6 +64,40 @@ test('one project setting grants automatic tickets in the selected destination',
     teamId: 'team-books',
     tools,
     fingerprint: settings.fingerprint,
+  });
+});
+
+test('saved Jira settings remain labeled experimental and can pause publishing while offline', async () => {
+  const jira: Settings = {
+    ...settings,
+    destination: {
+      provider: 'jira',
+      connectionId: 'jira',
+      cloudId: 'site',
+      projectKey: 'BOOK',
+      issueTypeName: 'Task',
+    },
+  };
+  const f = fixture(jira, true);
+  f.workspace.integrations = [
+    {
+      id: 'jira',
+      name: 'Jira',
+      provider: 'custom',
+      url: 'https://mcp.atlassian.com/v2/mcp?tools=all',
+      status: 'connected',
+    } as Workspace['integrations'][number],
+  ];
+  render(<TicketSettings workspace={f.workspace} />);
+  await screen.findByText('Tracker offline');
+  expect(screen.getByRole('option', { name: 'Jira · Experimental' })).toBeInTheDocument();
+  expect(screen.getByText(/Live end-to-end testing is incomplete/)).toBeVisible();
+  expect(screen.getByLabelText('Jira project key')).toHaveValue('BOOK');
+  await userEvent.click(screen.getByRole('checkbox', { name: /Automatically create/ }));
+  await userEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
+  expect(f.call).toHaveBeenLastCalledWith('saveTicketSettings', {
+    projectId: 'p',
+    settings: { ...jira, enabled: false },
   });
 });
 test('automatic publishing can be paused even when the tracker cannot be reached', async () => {

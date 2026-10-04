@@ -101,14 +101,6 @@ function usePreferenceState() {
   });
   const [integrations, setIntegrations] = useState<McpConnection[]>([]);
   const [integrationTools, setIntegrationTools] = useState<Record<string, McpTool[]>>({});
-  const [customServer, setCustomServer] = useState({
-    name: '',
-    url: '',
-    auth: 'oauth' as 'oauth' | 'bearer' | 'none',
-    bearer: '',
-    clientId: '',
-    sessionOnly: false,
-  });
   return {
     area,
     setArea,
@@ -122,8 +114,6 @@ function usePreferenceState() {
     setIntegrations,
     integrationTools,
     setIntegrationTools,
-    customServer,
-    setCustomServer,
   };
 }
 

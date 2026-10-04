@@ -8,7 +8,7 @@ You set the intent, make the calls, and accept the outcome. Aiden Preview is you
 
 Open Settings → Model and choose Codex for ChatGPT, or Claude. Follow the setup steps to install the provider and sign in with your existing account. Choose the model and effort for your project. Keep your selected subscription or API-key billing mode; provider limits and charges may apply. There is no separate Aiden sign-in.
 
-Linear is optional. Connect it in Settings → Integrations whenever you want Aiden to publish your project’s tickets there. One connection can serve several projects.
+Linear is optional. Connect it in Settings → Integrations whenever you want Aiden to publish your project’s tickets there. One connection can serve several projects. Jira and custom MCP are experimental and hidden for new setup while live end-to-end testing is incomplete. Existing connections remain available under Experimental connections.
 
 ## Set the intent
 
