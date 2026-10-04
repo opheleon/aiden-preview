@@ -323,7 +323,7 @@ test('code evidence, support, and a fresh project stay one click away', async ()
     'GET /books',
   );
   await userEvent.click(screen.getByRole('button', { name: 'Close evidence' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Feedback & support' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Join our Slack' }));
   expect(f.api.openExternal).toHaveBeenCalledWith(expect.stringContaining('join.slack.com'));
   await userEvent.click(screen.getByRole('button', { name: 'Create project' }));
   expect(screen.getByLabelText('What are you building?')).toHaveValue('');

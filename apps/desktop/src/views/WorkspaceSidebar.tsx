@@ -83,7 +83,7 @@ export function WorkspaceSidebar({
           }
         >
           <MessageCircle size={17} />
-          <span>Feedback &amp; support</span>
+          <span>Join our Slack</span>
           <ExternalLink size={13} aria-hidden="true" />
         </button>
       </div>

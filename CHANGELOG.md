@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Make the community invitation easy to find with a “Join our Slack” sidebar link.
+
 ## 1.2.0
 
 - Hide new Jira and custom MCP setup while they are experimental. Preserve saved connections and project links, with clear Experimental labels.
