@@ -47,7 +47,7 @@ export default function App(): JSX.Element {
   return (
     <div className="app" data-guide-ready={!guide.loading}>
       <ApplicationHeader {...workspace} />
-      <WorkspaceSidebar workspace={workspace} />
+      <WorkspaceSidebar workspace={workspace} onGettingStarted={guide.show} />
       <main className={!saved && area !== 'settings' ? 'setup-view' : ''}>
         {area === 'settings' ? (
           <SettingsView

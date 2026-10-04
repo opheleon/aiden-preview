@@ -65,3 +65,55 @@ test('failed confirmation remains visible and a retry succeeds; completed profil
   await waitFor(() => expect(document.querySelector('[data-guide-ready="true"]')).toBeTruthy());
   expect(screen.queryByRole('dialog')).toBeNull();
 });
+
+test('completed replay exposes bundled docs without resetting completion or changing the project', async () => {
+  f.api.getFirstUseState.mockResolvedValue({ completed: true, issue: null });
+  render(<App />);
+  await waitFor(() => expect(document.querySelector('[data-guide-ready="true"]')).toBeTruthy());
+  const before = f.request.mock.calls.length;
+  await userEvent.click(screen.getByRole('button', { name: 'Help / Getting started' }));
+  expect(screen.getAllByRole('dialog')).toHaveLength(1);
+  await userEvent.click(screen.getByRole('button', { name: 'Read documentation' }));
+  expect(screen.getByRole('heading', { name: 'Documentation' })).toHaveFocus();
+  expect(screen.getByRole('article', { name: 'Getting started' })).toHaveTextContent(
+    'Linear is optional',
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Daily workflow' }));
+  expect(screen.getByRole('article', { name: 'Daily workflow' })).toHaveTextContent(
+    'does not automatically close',
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Troubleshooting' }));
+  expect(screen.getByRole('article', { name: 'Troubleshooting' })).toHaveTextContent(
+    'preferences/first-use.json',
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Back to guide' }));
+  expect(screen.getByRole('heading', { name: 'Meet Aiden' })).toHaveFocus();
+  await userEvent.click(screen.getByRole('button', { name: 'Later' }));
+  expect(screen.getByRole('button', { name: 'Help / Getting started' })).toHaveFocus();
+  await userEvent.click(screen.getByRole('button', { name: 'Help / Getting started' }));
+  await finishSteps();
+  await userEvent.click(screen.getByRole('button', { name: 'Got it' }));
+  expect(f.api.completeFirstUse).not.toHaveBeenCalled();
+  expect(f.api.openExternal).not.toHaveBeenCalled();
+  expect(
+    f.request.mock.calls
+      .slice(before)
+      .filter(([method]) => !['runs', 'activities', 'activeRuns'].includes(method)),
+  ).toEqual([]);
+});
+
+test('incomplete replay and unavailable storage remain recoverable without automatic confirmation', async () => {
+  f.api.getFirstUseState.mockRejectedValueOnce(new Error('read unavailable'));
+  render(<App />);
+  expect(await screen.findByRole('status')).toHaveTextContent(
+    'could not read the guide preference',
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Later' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Help / Getting started' }));
+  expect(screen.getAllByRole('dialog')).toHaveLength(1);
+  expect(f.api.completeFirstUse).not.toHaveBeenCalled();
+  await finishSteps();
+  await userEvent.click(screen.getByRole('button', { name: 'Got it' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(f.api.completeFirstUse).toHaveBeenCalledTimes(1);
+});

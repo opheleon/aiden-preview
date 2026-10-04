@@ -1,4 +1,4 @@
-import { ExternalLink, MessageCircle, Plus, Settings2 } from 'lucide-react';
+import { BookOpen, ExternalLink, MessageCircle, Plus, Settings2 } from 'lucide-react';
 import type { JSX } from 'react';
 
 import { scopeName } from '../../../../packages/contracts/src/project-name';
@@ -28,7 +28,13 @@ function startNewProject(workspace: Workspace): void {
 }
 
 /** Projects Aiden is running, plus settings and support. */
-export function WorkspaceSidebar({ workspace }: { workspace: Workspace }): JSX.Element {
+export function WorkspaceSidebar({
+  workspace,
+  onGettingStarted,
+}: {
+  workspace: Workspace;
+  onGettingStarted: () => void;
+}): JSX.Element {
   const { projects, project, load, area, setArea, action } = workspace;
   return (
     <aside className="sidebar">
@@ -86,6 +92,10 @@ export function WorkspaceSidebar({ workspace }: { workspace: Workspace }): JSX.E
         ))}
       </nav>
       <div className="sidebar-bottom">
+        <button className="sidebar-section" data-guide-trigger onClick={onGettingStarted}>
+          <BookOpen size={17} />
+          <span>Help / Getting started</span>
+        </button>
         <button
           className={area === 'settings' ? 'sidebar-section selected' : 'sidebar-section'}
           onClick={() => setArea('settings')}

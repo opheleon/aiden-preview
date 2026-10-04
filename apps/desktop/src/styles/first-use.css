@@ -120,3 +120,38 @@
     padding: 14px 16px;
   }
 }
+
+.guide-content h1:focus {
+  outline: none;
+}
+
+.guide-doc-link {
+  margin-top: 18px;
+  color: var(--brand-dark);
+}
+
+.guide-doc-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0 28px;
+}
+
+.guide-doc-topics [aria-pressed='true'] {
+  border-color: var(--brand-dark);
+  color: var(--brand-dark);
+}
+
+.guide-docs h2 {
+  font-size: 22px;
+  margin-bottom: 16px;
+}
+
+.guide-docs h3 {
+  font-size: 17px;
+  margin: 24px 0 8px;
+}
+
+.guide-docs p + p {
+  margin-top: 14px;
+}

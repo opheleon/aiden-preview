@@ -44,6 +44,10 @@ export function useFirstUse(api: DesktopBridge | undefined): FirstUseController 
   /** Persist explicit final acknowledgement before closing; write failure leaves the guide usable. */
   async function confirm(): Promise<void> {
     if (saving) return;
+    if (state.completed) {
+      setOpen(false);
+      return;
+    }
     setSaving(true);
     setError('');
     try {
