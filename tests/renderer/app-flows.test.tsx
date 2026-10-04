@@ -375,16 +375,11 @@ test('model, integration, privacy, and update settings use the selected saved pr
     expect.objectContaining({ runtime: expect.objectContaining({ model: 'custom-model' }) }),
   );
   await userEvent.click(screen.getByRole('button', { name: 'Integrations' }));
-  await userEvent.type(screen.getByLabelText('Name'), 'Synthetic MCP');
-  await userEvent.type(screen.getByLabelText('Server URL'), 'https://example.invalid/mcp');
-  await userEvent.selectOptions(screen.getByLabelText('Authentication'), 'bearer');
-  await userEvent.type(screen.getByLabelText('Bearer token'), 'synthetic-token');
-  await userEvent.click(screen.getByLabelText('Use session-only authentication'));
-  await userEvent.click(screen.getByRole('button', { name: 'Add server' }));
-  expect(f.request).toHaveBeenCalledWith(
-    'integrationAdd',
-    expect.objectContaining({ bearer: 'synthetic-token', sessionOnly: true }),
-  );
+  expect(screen.queryByRole('button', { name: 'Connect Jira' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Add server' })).toBeNull();
+  expect(screen.queryByLabelText('Server URL')).toBeNull();
+  expect(screen.getByText(/Jira and custom MCP are experimental/)).toBeVisible();
+  await userEvent.click(screen.getByRole('button', { name: 'Connect Linear' }));
   await userEvent.click(screen.getByRole('button', { name: 'Connect / test' }));
   await userEvent.click(screen.getByRole('button', { name: 'Review tools' }));
   expect(screen.getByRole('checkbox', { name: /delete_issue/ })).toBeDisabled();
@@ -397,9 +392,9 @@ test('model, integration, privacy, and update settings use the selected saved pr
   });
   await userEvent.click(screen.getByRole('button', { name: 'Project' }));
   const sources = await screen.findByRole('region', { name: 'Context connections' });
-  await userEvent.click(within(sources).getByRole('checkbox', { name: 'Synthetic MCP' }));
-  await userEvent.click(within(sources).getByRole('checkbox', { name: 'Synthetic MCP' }));
-  await userEvent.click(within(sources).getByRole('checkbox', { name: 'Synthetic MCP' }));
+  await userEvent.click(within(sources).getByRole('checkbox', { name: 'Linear' }));
+  await userEvent.click(within(sources).getByRole('checkbox', { name: 'Linear' }));
+  await userEvent.click(within(sources).getByRole('checkbox', { name: 'Linear' }));
   await userEvent.click(within(sources).getByRole('button', { name: 'Save connections' }));
   expect(f.request).toHaveBeenCalledWith('updateSources', {
     projectId: report.projectId,
@@ -407,7 +402,7 @@ test('model, integration, privacy, and update settings use the selected saved pr
   });
   expect(await screen.findByText(/Context connections saved/)).toBeVisible();
   await userEvent.click(screen.getByRole('button', { name: 'Integrations' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Remove Synthetic MCP' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Remove Linear' }));
   expect(f.request).toHaveBeenCalledWith('integrationRemove', { connectionId: 'connection-0' });
   await userEvent.click(screen.getByRole('button', { name: 'Preferences' }));
   expect(screen.getByText(/does not collect usage metrics/)).toBeVisible();
@@ -419,6 +414,43 @@ test('browser checks started from the CLI never hold the brief as active work', 
   f.addVerificationRun('running');
   await openProject();
   expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
+});
+
+test('saved experimental connections remain manageable and preserve existing context links', async () => {
+  await f.request('integrationAdd', {
+    name: 'Saved custom',
+    provider: 'custom',
+    url: 'https://example.invalid/mcp',
+    auth: 'none',
+  });
+  await f.request('integrationAdd', {
+    name: 'Saved Jira',
+    provider: 'custom',
+    url: 'https://mcp.atlassian.com/v2/mcp?tools=all',
+    auth: 'oauth',
+  });
+  await f.request('updateSources', {
+    sources: { contextConnectionIds: ['connection-0'], history: null },
+  });
+  await openProject();
+  await userEvent.click(screen.getAllByRole('button', { name: 'Settings' })[0]!);
+  const sources = await screen.findByRole('region', { name: 'Context connections' });
+  expect(
+    within(sources).getByRole('checkbox', { name: 'Saved custom · Experimental' }),
+  ).toBeChecked();
+  expect(within(sources).queryByRole('checkbox', { name: /Saved Jira/ })).toBeNull();
+  await userEvent.click(within(sources).getByRole('button', { name: 'Save connections' }));
+  expect(f.request).toHaveBeenLastCalledWith('updateSources', {
+    projectId: report.projectId,
+    sources: { contextConnectionIds: ['connection-0'], history: null },
+  });
+  await userEvent.click(screen.getByRole('button', { name: 'Integrations' }));
+  expect(screen.getByText('Experimental connections (2)')).toBeVisible();
+  await userEvent.click(screen.getByText('Experimental connections (2)'));
+  expect(screen.getByText('Saved custom')).toBeVisible();
+  expect(screen.getByText('Saved Jira')).toBeVisible();
+  expect(screen.getAllByRole('button', { name: 'Connect / test' })).toHaveLength(2);
+  expect(screen.getByRole('button', { name: 'Remove Saved custom' })).toBeVisible();
 });
 
 test('a first look that failed says why and offers Look again instead of three messages', async () => {

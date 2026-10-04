@@ -3,11 +3,13 @@ import { ChevronRight, Plug, Settings2, ShieldCheck } from 'lucide-react';
 import type { WorkerResult } from '../../../../packages/contracts/src/api';
 import type { WorkerMethod, WorkerParams } from '../../../../packages/contracts/src/api.js';
 import type { McpConnection, McpTool, Project } from '../../../../packages/contracts/src/index';
-import { readOnlyLinear } from '../../../../packages/contracts/src/tracker-connections';
+import {
+  experimentalIntegration,
+  readOnlyLinear,
+} from '../../../../packages/contracts/src/tracker-connections';
 import type { DesktopBridge } from '../bridge';
 import type { Area, SettingsTab } from '../hooks/useWorkspaceState';
 import type { UpdatePreferences, UpdateStatus } from '../updater';
-import { CustomServerForm } from '../views/CustomServerForm';
 import { DesktopUpdateSettings } from '../views/DesktopUpdateSettings';
 import { IntegrationConnectionCard } from '../views/IntegrationConnectionCard';
 
@@ -32,24 +34,6 @@ interface SettingsViewProps {
   integrationTools: Record<string, McpTool[]>;
   refresh: () => Promise<void>;
   setNotice: React.Dispatch<React.SetStateAction<string>>;
-  customServer: {
-    name: string;
-    url: string;
-    auth: 'oauth' | 'bearer' | 'none';
-    bearer: string;
-    clientId: string;
-    sessionOnly: boolean;
-  };
-  setCustomServer: React.Dispatch<
-    React.SetStateAction<{
-      name: string;
-      url: string;
-      auth: 'oauth' | 'bearer' | 'none';
-      bearer: string;
-      clientId: string;
-      sessionOnly: boolean;
-    }>
-  >;
   updateStatus: UpdateStatus | undefined;
   updatePreferences: UpdatePreferences;
   saveUpdatePreferences: (next: UpdatePreferences) => void;
@@ -70,12 +54,6 @@ export function SettingsView(props: SettingsViewProps): React.JSX.Element {
     projectSettings,
     feedback,
     api,
-    action,
-    call,
-    setIntegrations,
-    setNotice,
-    customServer,
-    setCustomServer,
     updateStatus,
     updatePreferences,
     saveUpdatePreferences,
@@ -147,15 +125,12 @@ export function SettingsView(props: SettingsViewProps): React.JSX.Element {
             </div>
             <TrackerConnections {...props} />
           </section>
+          <p className="fine-print">
+            Jira and custom MCP are experimental. New connections are hidden while we complete
+            end-to-end testing. Saved experimental connections remain available for existing
+            projects.
+          </p>
           <SavedConnections {...props} />
-          <CustomServerForm
-            customServer={customServer}
-            setCustomServer={setCustomServer}
-            action={action}
-            call={call}
-            setIntegrations={setIntegrations}
-            setNotice={setNotice}
-          />
         </div>
       )}
       <PreferenceSettings {...props} />
@@ -209,7 +184,7 @@ function PreferenceSettings(props: SettingsViewProps): React.JSX.Element {
   );
 }
 
-/** Connect the supported read/write MCP catalogs; project settings grant bounded ticket publishing. */
+/** Offer Linear setup while preserving experimental accounts for existing projects. */
 function TrackerConnections({
   busy,
   action,
@@ -218,33 +193,25 @@ function TrackerConnections({
   setIntegrations,
 }: SettingsViewProps): React.JSX.Element {
   return (
-    <>
-      {' '}
-      {(['Linear', 'Jira'] as const).map((name) => (
-        <button
-          key={name}
-          className="primary"
-          disabled={busy}
-          onClick={() =>
-            void action(async () => {
-              setBusy(true);
-              try {
-                const connection = await call('integrationPreset', {
-                  provider: name === 'Linear' ? 'linear' : 'jira',
-                });
-                if (connection.status !== 'authorization_required')
-                  await call('integrationConnect', { connectionId: connection.id });
-              } finally {
-                setBusy(false);
-                setIntegrations(await call('integrations'));
-              }
-            })
+    <button
+      className="primary"
+      disabled={busy}
+      onClick={() =>
+        void action(async () => {
+          setBusy(true);
+          try {
+            const connection = await call('integrationPreset', { provider: 'linear' });
+            if (connection.status !== 'authorization_required')
+              await call('integrationConnect', { connectionId: connection.id });
+          } finally {
+            setBusy(false);
+            setIntegrations(await call('integrations'));
           }
-        >
-          <Plug size={15} /> Connect {name}
-        </button>
-      ))}
-    </>
+        })
+      }
+    >
+      <Plug size={15} /> Connect Linear
+    </button>
   );
 }
 
@@ -263,7 +230,7 @@ function SavedConnections(props: SettingsViewProps): React.JSX.Element {
   return (
     <>
       {integrations
-        .filter((c) => !readOnlyLinear(c))
+        .filter((c) => !readOnlyLinear(c) && !experimentalIntegration(c))
         .map((connection) => (
           <IntegrationConnectionCard
             key={connection.id}
@@ -277,6 +244,30 @@ function SavedConnections(props: SettingsViewProps): React.JSX.Element {
             setNotice={setNotice}
           />
         ))}
+      {integrations.some(experimentalIntegration) && (
+        <details>
+          <summary>
+            Experimental connections ({integrations.filter(experimentalIntegration).length})
+          </summary>
+          <p>
+            Saved Jira and custom MCP connections are preserved for existing projects. Live
+            end-to-end testing is incomplete.
+          </p>
+          {integrations.filter(experimentalIntegration).map((connection) => (
+            <IntegrationConnectionCard
+              key={connection.id}
+              connection={connection}
+              action={action}
+              call={call}
+              setIntegrations={setIntegrations}
+              setIntegrationTools={setIntegrationTools}
+              integrationTools={integrationTools}
+              refresh={refresh}
+              setNotice={setNotice}
+            />
+          ))}
+        </details>
+      )}
       {integrations.some(readOnlyLinear) && (
         <details>
           <summary>

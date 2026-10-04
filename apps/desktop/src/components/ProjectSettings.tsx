@@ -1,5 +1,6 @@
 import { type JSX, useState } from 'react';
 
+import { experimentalIntegration } from '../../../../packages/contracts/src/tracker-connections';
 import type { Workspace } from '../hooks/useWorkspace';
 import { RepositorySetup } from '../views/RepositorySetup';
 import { ApiVerificationSettings } from './ApiVerificationSettings';
@@ -13,12 +14,17 @@ const api = window.aiden;
 function ContextSources({ workspace }: { workspace: Workspace }): JSX.Element | null {
   const { project, integrations, call, action, setNotice, setProject } = workspace;
   const [selected, setSelected] = useState(project.sources?.contextConnectionIds ?? []);
-  if (!integrations.length) return null;
+  const available = integrations.filter(
+    (connection) =>
+      !experimentalIntegration(connection) ||
+      project.sources?.contextConnectionIds.includes(connection.id),
+  );
+  if (!available.length) return null;
   return (
     <section className="card settings-panel" aria-label="Context connections">
       <h2>Context connections</h2>
       <p>Aiden reads these, with the read tools you approved, to understand the project.</p>
-      {integrations.map((connection) => (
+      {available.map((connection) => (
         <label className="checkbox-row" key={connection.id}>
           <input
             type="checkbox"
@@ -32,6 +38,7 @@ function ContextSources({ workspace }: { workspace: Workspace }): JSX.Element | 
             }
           />
           {connection.name}
+          {experimentalIntegration(connection) ? ' · Experimental' : ''}
         </label>
       ))}
       <button

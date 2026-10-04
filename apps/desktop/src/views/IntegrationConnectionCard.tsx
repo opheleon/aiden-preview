@@ -7,6 +7,7 @@ import type {
   WorkerResult,
 } from '../../../../packages/contracts/src/api.js';
 import type { McpConnection, McpTool } from '../../../../packages/contracts/src/index';
+import { experimentalIntegration } from '../../../../packages/contracts/src/tracker-connections';
 
 interface IntegrationConnectionCardProps {
   connection: McpConnection;
@@ -38,6 +39,7 @@ export function IntegrationConnectionCard(
       <div className="connection-row">
         <div>
           <strong>{connection.name}</strong>
+          {experimentalIntegration(connection) && <span className="muted"> · Experimental</span>}
           <p>{connection.url}</p>
           <small>
             {connection.secureStorage === 'keyring'

@@ -265,13 +265,23 @@ export function appFixture() {
             ...report.assessments[p.index]!.evidence[p.evidenceIndex]!,
             text: 'GET /books\nrender list',
           };
+        case 'integrationPreset':
         case 'integrationAdd': {
+          const input =
+            method === 'integrationPreset'
+              ? {
+                  name: 'Linear',
+                  provider: 'linear' as const,
+                  url: 'https://mcp.linear.app/mcp',
+                  auth: 'oauth' as const,
+                }
+              : p;
           const connection: McpConnection = {
             id: `connection-${connections.length}`,
-            name: p.name,
-            provider: p.provider,
-            url: p.url,
-            auth: p.auth,
+            name: input.name,
+            provider: input.provider,
+            url: input.url,
+            auth: input.auth,
             transport: 'streamable-http',
             secureStorage: 'session',
             status: 'disconnected',

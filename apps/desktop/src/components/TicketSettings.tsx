@@ -1,11 +1,15 @@
 import { type JSX, useEffect, useState } from 'react';
 
+import type { McpConnection } from '../../../../packages/contracts/src/integrations';
 import type {
   TicketDestination,
   TicketSettings as Settings,
   TicketState,
 } from '../../../../packages/contracts/src/tickets';
-import { readOnlyLinear } from '../../../../packages/contracts/src/tracker-connections';
+import {
+  experimentalIntegration,
+  readOnlyLinear,
+} from '../../../../packages/contracts/src/tracker-connections';
 import type { Workspace } from '../hooks/useWorkspace';
 import { LinearTeamPicker } from './LinearTeamPicker';
 import { TicketSave } from './TicketSave';
@@ -102,9 +106,12 @@ export function TicketSettings({
           }}
         >
           <option value="linear">Linear</option>
-          <option value="jira">Jira</option>
+          {saved?.destination.provider === 'jira' && (
+            <option value="jira">Jira · Experimental</option>
+          )}
         </select>
       </label>
+      <ExperimentalTicketNotice destination={destination} connection={connection} />
       <TrackerConnection
         workspace={workspace}
         destination={destination}
@@ -222,4 +229,22 @@ function emptyDestination(provider: string): TicketDestination {
   return provider === 'jira'
     ? { provider: 'jira', connectionId: '', cloudId: '', projectKey: '', issueTypeName: 'Task' }
     : { provider: 'linear', connectionId: '', team: '', project: '' };
+}
+
+/** Explain why a saved destination remains available even though new experimental setup is hidden. */
+function ExperimentalTicketNotice({
+  destination,
+  connection,
+}: {
+  destination: TicketDestination;
+  connection: McpConnection | undefined;
+}): JSX.Element | null {
+  if (destination.provider !== 'jira' && (!connection || !experimentalIntegration(connection)))
+    return null;
+  return (
+    <p className="row-sub">
+      Experimental integration. Live end-to-end testing is incomplete. This project's saved
+      connection and publishing settings remain available.
+    </p>
+  );
 }

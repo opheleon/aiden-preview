@@ -2,6 +2,7 @@ import { type JSX, useState } from 'react';
 
 import type { TicketDestination } from '../../../../packages/contracts/src/tickets';
 import {
+  experimentalIntegration,
   readOnlyLinear,
   trackerLabel,
 } from '../../../../packages/contracts/src/tracker-connections';
@@ -20,7 +21,9 @@ export function TrackerConnection({
   const [connecting, setConnecting] = useState(false);
   const selected = workspace.integrations.find((c) => c.id === destination.connectionId);
   const candidates = workspace.integrations.filter(
-    (c) => !readOnlyLinear(c) || c.id === destination.connectionId,
+    (c) =>
+      c.id === destination.connectionId ||
+      (destination.provider === 'linear' && !experimentalIntegration(c) && !readOnlyLinear(c)),
   );
   const ready = selected && ['connected', 'needs_review'].includes(selected.status);
   const waiting = selected?.status === 'authorization_required';

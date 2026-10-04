@@ -17,15 +17,25 @@ test('an existing plan can connect later, publish, and resync its linked tickets
     await page.getByRole('button', { name: 'Connect tracker', exact: true }).click();
     await page.getByRole('button', { name: 'Manage tracker connections' }).click();
     await expect(page.getByRole('button', { name: 'Connect Linear', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Connect Jira', exact: true })).toBeVisible();
-    await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Synthetic tracker');
-    await page.getByRole('textbox', { name: 'Server URL' }).fill(tracker.server.url);
-    await page.getByRole('combobox', { name: 'Authentication' }).selectOption('bearer');
-    await page.getByLabel('Bearer token', { exact: true }).fill(tracker.server.token);
-    await page.getByRole('checkbox', { name: 'Use session-only authentication' }).check();
-    await page.getByRole('button', { name: 'Add server' }).click();
-    await page.getByRole('button', { name: 'Connect / test' }).click();
-    await expect(page.locator('.connection-state')).toHaveText('connected');
+    await expect(page.getByRole('button', { name: 'Connect Jira', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Add server', exact: true })).toHaveCount(0);
+    await expect(page.getByText(/Jira and custom MCP are experimental/)).toBeVisible();
+    await page.screenshot({ path: info.outputPath('linear-only-integrations.png'), fullPage: true });
+    // Seed a synthetic Linear account through the real worker. New custom-server setup is hidden.
+    await page.evaluate(
+      async ({ url, token }) => {
+        const connection = await window.aiden!.request('integrationAdd', {
+          name: 'Synthetic tracker',
+          provider: 'linear',
+          url,
+          auth: 'bearer',
+          bearer: token,
+          sessionOnly: true,
+        });
+        await window.aiden!.request('integrationConnect', { connectionId: connection.id });
+      },
+      { url: tracker.server.url, token: tracker.server.token },
+    );
     // Reopening a disconnected connection must reuse its identity from the project flow.
     await page.evaluate(async () => {
       const connections = await window.aiden!.request('integrations');

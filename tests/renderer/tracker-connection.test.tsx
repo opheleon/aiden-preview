@@ -44,6 +44,40 @@ test('publishing offers the write connection with readiness and reconnects its e
   expect(f.workspace.setIntegrations).toHaveBeenCalled();
 });
 
+test('new publishing hides experimental connections while an existing selection stays available', () => {
+  const f = fixture();
+  const custom = {
+    ...writer,
+    id: 'custom',
+    name: 'Custom tracker',
+    provider: 'custom' as const,
+    url: 'https://example.invalid/mcp',
+  };
+  const jira = {
+    ...custom,
+    id: 'jira',
+    name: 'Jira',
+    url: 'https://mcp.atlassian.com/v2/mcp?tools=all',
+  };
+  f.workspace.integrations.push(custom, jira);
+  const { rerender } = render(
+    <TrackerConnection workspace={f.workspace} destination={destination} onChange={vi.fn()} />,
+  );
+  expect(screen.queryByRole('option', { name: /Experimental/ })).toBeNull();
+  rerender(
+    <TrackerConnection
+      workspace={f.workspace}
+      destination={{ ...destination, connectionId: 'custom' }}
+      onChange={vi.fn()}
+    />,
+  );
+  expect(
+    screen.getByRole('option', { name: 'Custom tracker · Experimental · Reconnect required' }),
+  ).toHaveValue('custom');
+  expect(screen.getByRole('button', { name: 'Reconnect Custom tracker' })).toBeEnabled();
+  expect(screen.queryByRole('option', { name: /Jira/ })).toBeNull();
+});
+
 test('an explicitly saved reader is identified, while an in-progress sign-in does not restart', () => {
   const f = fixture();
   const { rerender } = render(

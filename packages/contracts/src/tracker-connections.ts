@@ -10,6 +10,14 @@ export function trackerUrl(provider: 'linear' | 'jira'): string {
 export function readOnlyLinear(connection: McpConnection): boolean {
   return connection.url.replace(/\/$/, '') === 'https://mcp.linear.app/mcp/readonly';
 }
+/** Linear connections remain available for setup; other saved servers are experimental. */
+export function experimentalIntegration(connection: McpConnection): boolean {
+  return (
+    connection.provider !== 'linear' &&
+    connection.url.replace(/\/$/, '') !== trackerUrl('linear') &&
+    !readOnlyLinear(connection)
+  );
+}
 /** Prefer a ready preset; otherwise reuse the most recently saved matching OAuth connection. */
 export function trackerConnection(
   connections: McpConnection[],
@@ -31,5 +39,5 @@ export function trackerLabel(connection: McpConnection): string {
       : connection.status === 'authorization_required'
         ? 'Finish sign-in'
         : 'Reconnect required';
-  return `${connection.name} · ${readOnlyLinear(connection) ? 'Read-only' : status}`;
+  return `${connection.name}${experimentalIntegration(connection) ? ' · Experimental' : ''} · ${readOnlyLinear(connection) ? 'Read-only' : status}`;
 }
