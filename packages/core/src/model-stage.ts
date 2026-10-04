@@ -7,6 +7,7 @@ import type { z } from 'zod/v3';
 import { outputSchemaFor, type RunManifest } from '../../contracts/src/index.js';
 import { ArtifactFormatError, publicError, type RuntimeResult } from '../../runtimes/src/index.js';
 import type { LocalToolServer } from '../../tools/src/mcp.js';
+import { answeredDecisions } from './calls.js';
 import { atomic, optionalJson } from './storage.js';
 import type { WorkflowContext } from './workflow-context.js';
 
@@ -36,6 +37,17 @@ export interface ModelStage {
   ): Promise<T>;
 }
 
+/** What each stage was trying to do, for the message shown when its output stays invalid. */
+const stageGoals: Record<string, string> = {
+  understand: 'write the requirements',
+  discover: 'choose which code to look at',
+  assess: 'check the code against the requirements',
+  summary: 'summarize the look',
+  'estimate-original': 'size the work',
+  'estimate-history': 'read past work',
+  'estimate-remaining': 'size the remaining work',
+};
+
 /** Retry only invalid model output; transport, cancellation, and storage failures never submit another turn. */
 export function createModelStage(options: ModelStageOptions): ModelStage {
   const { context, run, signal, dir, workspace, tools } = options;
@@ -58,7 +70,7 @@ export function createModelStage(options: ModelStageOptions): ModelStage {
     for (let attempt = 0; attempt < 3; attempt++) {
       signal.throwIfAborted();
       const answers = options.includeAnswers
-        ? `\n<prior_user_answers>${JSON.stringify((await optionalJson(path.join(dir, 'answers.json'))) ?? [])}</prior_user_answers>`
+        ? `\n<prior_user_answers>${JSON.stringify(await answeredDecisions(context.store, run.projectId))}</prior_user_answers>`
         : '';
       let result: RuntimeResult;
       try {
@@ -107,6 +119,9 @@ export function createModelStage(options: ModelStageOptions): ModelStage {
       await atomic(path.join(dir, 'manifest.json'), run, signal);
       return parsed;
     }
-    throw new Error(`${name} output failed validation after two correction attempts.`);
+    const reason = feedback.length > 300 ? `${feedback.slice(0, 297)}...` : feedback;
+    throw new Error(
+      `Aiden could not ${stageGoals[name] ?? `finish the ${name} step`}: the model's answer was still invalid after two corrections. Last problem: ${reason}`,
+    );
   };
 }

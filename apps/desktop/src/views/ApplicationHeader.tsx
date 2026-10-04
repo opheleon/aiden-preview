@@ -1,15 +1,14 @@
 import { Download, RefreshCw, Settings2 } from 'lucide-react';
 
 import brandMark from '../assets/brand-mark.svg';
+import type { Area, SettingsTab } from '../hooks/useWorkspaceState';
 import type { UpdateStatus } from '../updater';
 
 interface ApplicationHeaderProps {
-  area: 'projects' | 'drafts' | 'settings';
-  setArea: React.Dispatch<React.SetStateAction<'projects' | 'drafts' | 'settings'>>;
+  area: Area;
+  setArea: React.Dispatch<React.SetStateAction<Area>>;
   updateStatus: UpdateStatus | undefined;
-  setSettingsTab: React.Dispatch<
-    React.SetStateAction<'model' | 'schedule' | 'integrations' | 'preferences' | 'desktop'>
-  >;
+  setSettingsTab: React.Dispatch<React.SetStateAction<SettingsTab>>;
 }
 
 /** Navigate projects and settings and surface available application updates. */

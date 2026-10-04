@@ -26,6 +26,12 @@ export interface ToolProvider {
   call(name: string, input: unknown): Promise<unknown>;
 }
 
+/** Tools for turns that only reason over their input, such as planning checks or answering why. */
+export const noTools: ToolProvider = {
+  definitions: () => [],
+  call: () => Promise.reject(new Error('No tools are available for this turn.')),
+};
+
 /** Screenshot bytes returned to multimodal providers as MCP image content. */
 export interface ToolImage {
   data: string;

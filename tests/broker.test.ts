@@ -3,7 +3,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 
-import { ToolBroker } from '../packages/tools/src/broker.js';
+import { describeToolCall, ToolBroker } from '../packages/tools/src/broker.js';
 import { fixture, g } from './helpers.js';
 import { required } from './required.js';
 
@@ -16,7 +16,7 @@ async function brokerFixture() {
     source.project,
     artifacts,
     path.join(source.root, 'reads.json'),
-    (question) => Promise.resolve('Answer: ' + question),
+    (request) => Promise.resolve(`Proceed assuming: ${request.assumption}`),
     (message) => progress.push(message),
   );
   broker.snapshots = source.snapshots;
@@ -48,9 +48,18 @@ void test('broker validates tool schemas before progress or effects and rejects 
       throw new Error('Stage contract rejected.');
     };
     await assert.rejects(f.broker.call('artifact_validate', { value: {} }), /contract rejected/);
-    assert.deepEqual(await f.broker.call('request_clarification', { question: 'Which branch?' }), {
-      answer: 'Answer: Which branch?',
-    });
+    // A call never blocks: the tool records it and tells the model to continue on its assumption.
+    await assert.rejects(
+      f.broker.call('request_clarification', { question: 'Which branch?' }),
+      /Required/,
+    );
+    assert.deepEqual(
+      await f.broker.call('request_clarification', {
+        question: 'Which branch?',
+        assumption: 'main',
+      }),
+      { recorded: true, instruction: 'Proceed assuming: main' },
+    );
     await f.broker.call('artifact_write', { path: 'notes/readme.md', text: 'Synthetic notes' });
     assert.deepEqual(await f.broker.call('artifact_read', { path: 'notes/readme.md' }), {
       text: 'Synthetic notes',
@@ -236,4 +245,38 @@ void test('failed receipt writes grant no evidence and concurrent reads preserve
   } finally {
     await rm(f.root, { recursive: true, force: true });
   }
+});
+
+void test('tool calls read as plain steps that use folder names', () => {
+  const names = new Map([['repo-1', 'calendar-ui']]);
+  const steps = [
+    describeToolCall(
+      'repo_read',
+      { repositoryId: 'repo-1', path: 'src/App.tsx', startLine: 40 },
+      names,
+    ),
+    describeToolCall('repo_files', { repositoryId: 'repo-1', prefix: 'src' }, names),
+    describeToolCall('repo_search', { repositoryId: 'repo-1', query: 'drag' }, names),
+    describeToolCall('repo_history', { repositoryId: 'repo-9' }, names),
+    describeToolCall('repo_diff', { repositoryId: 'repo-1' }, names),
+    describeToolCall('repo_inventory', {}, names),
+    describeToolCall('artifact_write', {}, names),
+    describeToolCall('artifact_validate', {}, names),
+    describeToolCall('external_read', { tool: 'list_issues' }, names),
+    describeToolCall('request_clarification', {}, names),
+    describeToolCall('repo_sync', {}, names),
+  ];
+  assert.deepEqual(steps, [
+    'Read calendar-ui/src/App.tsx from line 40',
+    'Listed files in calendar-ui/src',
+    'Searched calendar-ui for "drag"',
+    'Read the commit history of repo-9',
+    'Compared two commits in calendar-ui',
+    'Listed the repositories and their branches',
+    'Updated its working notes',
+    'Checked its answer against the expected format',
+    'Read from list_issues',
+    'Wrote down a question for you',
+    'Used repo sync',
+  ]);
 });

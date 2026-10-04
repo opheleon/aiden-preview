@@ -1,6 +1,8 @@
+import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import {
+  type ActivityKind,
   type Baseline,
   type Discovery,
   DiscoverySchema,
@@ -14,14 +16,14 @@ import {
   validateFindings,
   validateReport,
 } from '../../contracts/src/index.js';
+import { deliveryTickets } from '../../reporting/src/tickets.js';
 import type { ToolBroker } from '../../tools/src/broker.js';
 import { validateProjectRepositories } from '../../tools/src/discovery.js';
-import {
-  freezeRepository,
-  inventory,
-  syncRepository,
-  validateRepository,
-} from '../../tools/src/git.js';
+import { freezeRepository, inventory, validateRepository } from '../../tools/src/git.js';
+import { fetchMonitoredBranch } from '../../tools/src/remote-branches.js';
+import { appendActivity } from './activity.js';
+import { applyBlockers, blockedRequirements } from './blockers.js';
+import { readCalls } from './calls.js';
 import type { ModelStage } from './model-stage.js';
 import { atomic, json, optionalJson } from './storage.js';
 import type { WorkflowContext } from './workflow-context.js';
@@ -45,20 +47,35 @@ export async function assessReport(
 ): Promise<void> {
   const baseline = run.baseline!;
   const frozen = await freezeInventory(context, run, signal, dir, broker, checkpoint);
-  const discovery = await discoverSnapshots(stage, run, baseline, frozen, broker);
+  await checkpoint('discover');
+  // The choice is saved so a resumed look and later report checks see the same snapshots.
+  const saved = await optionalJson(path.join(dir, 'discover.json'));
+  const discovery = saved ? DiscoverySchema.parse(saved) : chooseSnapshots(run, frozen);
+  if (!saved) await atomic(path.join(dir, 'discover.json'), discovery, signal);
+  for (const s of discovery.snapshots) broker.snapshot(s.repositoryId, s.sha);
   broker.snapshots = discovery.snapshots;
-  const findings = await stage(
-    'assess',
-    FindingsSchema,
-    {
-      baseline: baseline.product,
-      discovery,
-      previousReport: run.latestAtStart
-        ? await context.getReport(run.projectId, run.latestAtStart)
-        : null,
-    },
-    (v) => validateFindings(v, baseline.product, discovery.snapshots, broker.reads),
-  );
+  const blockers = await blockedRequirements(context.store, run.projectId, baseline.product);
+  const eligible = {
+    ...baseline.product,
+    requirements: baseline.product.requirements.filter((r) => !blockers.get(r.id)?.length),
+  };
+  delete eligible.deliveryPlan;
+  const assessed: Findings = eligible.requirements.length
+    ? await stage(
+        'assess',
+        FindingsSchema,
+        {
+          baseline: eligible,
+          discovery,
+          previousReport: run.latestAtStart
+            ? await context.getReport(run.projectId, run.latestAtStart)
+            : null,
+        },
+        (v) => validateFindings(v, eligible, discovery.snapshots, broker.reads),
+      )
+    : { assessments: [], risks: [], dependencies: [], unknowns: [] };
+  const findings = await applyBlockers(context.store, run.projectId, baseline.product, assessed);
+  await logFindings(context, run, findings);
   const summary = await stage(
     'summary',
     SummarySchema,
@@ -69,6 +86,27 @@ export async function assessReport(
   await atomic(path.join(dir, 'reads.json'), broker.reads);
   const report = acceptedReport(run, baseline, discovery, findings, summary, frozen, broker.reads);
   await publishReport(context, run, signal, dir, report, baseline);
+}
+/** How each code assessment reads in the action log: a confirmation, or a finding to act on. */
+const codeStatus: Record<
+  Findings['assessments'][number]['status'],
+  { kind: ActivityKind; text: string }
+> = {
+  implemented: { kind: 'check', text: 'is built in the code' },
+  partial: { kind: 'find', text: 'is only partly built in the code' },
+  missing: { kind: 'find', text: 'has no code yet' },
+  unknown: { kind: 'find', text: "can't be judged from the code alone" },
+};
+
+/** Log what the code assessment concluded for each requirement, with the model's explanation as the reason. */
+async function logFindings(context: WorkflowContext, run: RunManifest, findings: Findings) {
+  for (const a of findings.assessments)
+    await appendActivity(context, run, {
+      kind: codeStatus[a.status].kind,
+      requirementId: a.requirementId,
+      summary: `${a.requirementId} ${codeStatus[a.status].text}.`,
+      reason: a.explanation,
+    });
 }
 /** Restore frozen objects on resume, or synchronize and independently copy each repository once. */
 async function freezeInventory(
@@ -86,17 +124,32 @@ async function freezeInventory(
   if (!frozen) {
     await checkpoint('sync');
     await validateProjectRepositories(run.project);
-    const warnings: string[] = [...(run.project.discoveryWarnings ?? [])];
-    for (const repo of run.project.repositories) {
-      await validateRepository(repo);
-      warnings.push(...(await syncRepository(repo, signal)));
-    }
-    const rows = await Promise.all(run.project.repositories.map((r) => inventory(r, signal)));
+    const rows = await Promise.all(
+      run.project.repositories.map(async (repo) => {
+        await validateRepository(repo);
+        const row = await inventory(repo, signal);
+        try {
+          row.remoteDefault = await fetchMonitoredBranch(repo, signal);
+        } catch {
+          signal.throwIfAborted();
+          row.warnings.push(
+            `${repo.id}: Remote delivery branch unavailable. Local work is progress only; merge and delivery completion are unverified.`,
+          );
+        }
+        return row;
+      }),
+    );
+    const warnings = [...(run.project.discoveryWarnings ?? [])];
     for (const repo of run.project.repositories) {
       const row = rows.find((r) => r.repositoryId === repo.id)!;
       await freezeRepository(
         repo,
-        [row.head, ...row.refs.map((r) => r.sha)],
+        [
+          row.head,
+          ...row.refs.map((r) => r.sha),
+          ...(row.worktrees ?? []),
+          ...(row.remoteDefault ? [row.remoteDefault.sha] : []),
+        ],
         path.join(dir, 'snapshots', repo.id),
         signal,
       );
@@ -113,50 +166,81 @@ async function freezeInventory(
   };
   broker.snapshots = frozen.inventory.flatMap((r) => {
     const refs = [...r.refs];
+    if (r.remoteDefault)
+      refs.push({
+        repositoryId: r.repositoryId,
+        branch: r.remoteDefault.branch,
+        sha: r.remoteDefault.sha,
+      });
     if (!refs.some((s) => s.sha === r.head))
       refs.unshift({ repositoryId: r.repositoryId, branch: 'HEAD', sha: r.head });
+    for (const sha of r.worktrees ?? [])
+      if (!refs.some((s) => s.sha === sha))
+        refs.push({ repositoryId: r.repositoryId, branch: sha.slice(0, 12), sha });
     return refs.map((s) => ({ ...s, role: 'unknown' as const, reason: 'Frozen inventory' }));
   });
 
   return frozen;
 }
-/** Require selected commits to cover every repository’s baseline and belong to the frozen inventory. */
-async function discoverSnapshots(
-  stage: ModelStage,
-  run: RunManifest,
-  baseline: Baseline,
-  frozen: FrozenInventory,
-  broker: ToolBroker,
-): Promise<Discovery> {
-  const discovery = await stage(
-    'discover',
-    DiscoverySchema,
-    {
-      baseline: baseline.product,
-      inventory: frozen.inventory,
-      repositories: run.project.repositories.map((r) => ({ id: r.id, notes: r.notes })),
-    },
-    (v) => {
-      const d = DiscoverySchema.parse(v);
-      for (const repo of run.project.repositories) {
-        const selected = d.snapshots.filter((s) => s.repositoryId === repo.id);
-        if (
-          !selected.length ||
-          selected.length > 6 ||
-          new Set(selected.map((s) => s.sha)).size !== selected.length
-        )
-          throw new Error('Select 1–6 distinct snapshots per repository.');
-        const inv = frozen.inventory.find((i) => i.repositoryId === repo.id)!;
-        const required = inv.refs.find((r) => r.branch === inv.defaultBranch)?.sha ?? inv.head;
-        if (!selected.some((s) => s.sha === required))
-          throw new Error('Include the default branch snapshot (or local HEAD when unavailable).');
-      }
-      for (const s of d.snapshots) broker.snapshot(s.repositoryId, s.sha);
-      return d;
-    },
-  );
-
-  return discovery;
+/**
+ * Select the freshly fetched selected remote for delivery. If unavailable, explicitly classify
+ * local and worktree snapshots as progress-only evidence, never as a selected remote.
+ */
+export function chooseSnapshots(
+  run: Pick<RunManifest, 'project'>,
+  frozen: Pick<FrozenInventory, 'inventory'>,
+): Discovery {
+  const snapshots: Discovery['snapshots'] = [];
+  for (const repo of run.project.repositories) {
+    const inv = frozen.inventory.find((i) => i.repositoryId === repo.id)!;
+    if (inv.remoteDefault) {
+      snapshots.push({
+        repositoryId: repo.id,
+        sha: inv.remoteDefault.sha,
+        branch: inv.remoteDefault.branch,
+        role: 'integration',
+        reason:
+          'Freshly fetched from the selected remote branch. Local-only and other-branch work is excluded from delivery assessment.',
+        source: 'remote-branch',
+        checkedAt: inv.remoteDefault.checkedAt,
+      });
+      continue;
+    }
+    /** A local branch name for a commit, else a remote one, else HEAD for the checkout. */
+    const branchOf = (sha: string) =>
+      inv.refs.find((r) => r.sha === sha && !r.branch.includes('/'))?.branch ??
+      inv.refs.find((r) => r.sha === sha)?.branch ??
+      (sha === inv.head ? 'HEAD' : sha.slice(0, 12));
+    const picks: { sha: string; role: 'default' | 'feature'; reason: string }[] = [
+      {
+        sha: inv.head,
+        role: 'feature',
+        reason: 'Checked out in your repository now.',
+      },
+      ...(inv.worktrees ?? []).map((sha) => ({
+        sha,
+        role: 'feature' as const,
+        reason: 'Checked out in another worktree.',
+      })),
+    ];
+    const unique = picks.filter((p, i) => picks.findIndex((o) => o.sha === p.sha) === i);
+    snapshots.push(
+      ...unique.slice(0, 6).map((p) => ({
+        repositoryId: repo.id,
+        sha: p.sha,
+        branch: branchOf(p.sha),
+        role: p.role,
+        reason: p.reason,
+        source: 'local' as const,
+      })),
+    );
+  }
+  return {
+    snapshots,
+    warnings: [
+      'Delivery assessment uses freshly fetched selected remote branches. Where a remote is unavailable, local snapshots describe progress only and cannot establish merged or delivered work.',
+    ],
+  };
 }
 /** Derive a report solely from validated stage outputs and the immutable reviewed baseline. */
 function acceptedReport(
@@ -229,6 +313,16 @@ async function publishReport(
 ): Promise<void> {
   signal.throwIfAborted();
   await atomic(path.join(dir, 'report.json'), report);
+  const tickets = deliveryTickets(
+    baseline.product,
+    report,
+    await readCalls(context.store, run.projectId),
+  );
+  await writeFile(
+    path.join(dir, 'tickets.md'),
+    tickets.map((t) => t.markdown).join('\n\n---\n\n'),
+    { mode: 0o600 },
+  );
   signal.throwIfAborted();
   const current = await json<Baseline>(
     path.join(context.store.project(run.projectId), 'baseline.json'),

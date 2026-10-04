@@ -1,9 +1,11 @@
-import type { RunManifest } from '../../../../packages/contracts/src/index';
+import type { Product, RunManifest } from '../../../../packages/contracts/src/index';
+import { scopeName } from '../../../../packages/contracts/src/project-name';
 import type { DesktopBridge } from '../bridge';
-import { overridesFrom } from '../renderer/project-state';
 import type { WorkspaceState } from './useWorkspaceState';
 
-/** Surface user-operation failures and release busy state for a recoverable retry. */
+type Call = DesktopBridge['request'];
+
+/** Surface failures from something the person did and release busy state for a retry. */
 async function action(state: WorkspaceState, fn: () => Promise<void>): Promise<void> {
   state.setError('');
   try {
@@ -14,65 +16,54 @@ async function action(state: WorkspaceState, fn: () => Promise<void>): Promise<v
   }
 }
 
-/** Load a saved project, pending review, and accepted artifacts without restarting interrupted work. */
-async function load(
-  state: WorkspaceState,
-  call: DesktopBridge['request'],
-  id: string,
-): Promise<void> {
+/** Load a saved project and everything Aiden knows about it, without restarting interrupted work. */
+async function load(state: WorkspaceState, call: Call, id: string): Promise<void> {
   await action(state, async () => {
-    const s = await call('state', { projectId: id });
+    await call('monitoring', { projectId: id });
+    const [s, calls, activity, confirmed] = await Promise.all([
+      call('state', { projectId: id }),
+      call('calls', { projectId: id }),
+      call('activity', { projectId: id }),
+      call('confirmations', { projectId: id }),
+    ]);
+    state.setConfirmed(confirmed);
     state.setProject(s.project);
-    state.setShowGoalStarter(false);
-    state.setHistoryDraft(
-      s.project.sources?.history
-        ? { ...s.project.sources.history }
-        : {
-            connectionId: '',
-            sourceId: '',
-            sourceLabel: '',
-            historyTool: '',
-            sourceArgument: 'team',
-          },
-    );
-    state.setContextConnectionIds(s.project.sources?.contextConnectionIds ?? []);
     state.setBaseline(s.baseline ?? undefined);
-    state.setProduct(s.baseline?.product);
     state.setRuns(s.runs);
+    state.setCalls(calls);
+    state.setActivity(activity);
     // Only follow runs this worker is executing; a manifest left running by the CLI or an exited
     // worker never sends events here, so adopting it would show progress forever.
     const running = s.runs.find((run) => s.activeRunIds.includes(run.id));
+    state.setActiveRuns(s.activeRunIds);
+    // Show what each run in progress is doing now, not only steps that arrive from here on.
+    const steps = await Promise.all(
+      s.activeRunIds.map(async (runId) => {
+        const log = await call('runLog', { projectId: id, runId }).catch(() => []);
+        return [runId, log.at(-1)?.summary ?? ''] as const;
+      }),
+    );
+    state.setLiveByRun(Object.fromEntries(steps.filter(([, summary]) => summary)));
     state.setActiveRun(running?.id ?? '');
     state.setBusy(!!running);
-    state.setLog([]);
+    state.setLive(running ? (activity[0]?.summary ?? 'Aiden is working.') : '');
     state.setReport(undefined);
-    const estimate = (await call('estimation', { projectId: id })) ?? undefined;
-    state.setEstimation(estimate);
-    state.setOverrides(overridesFrom(estimate));
     state.setVerification(
       await call('verification', { projectId: id }).catch((e: unknown) => {
         state.setError(e instanceof Error ? e.message : 'Could not load the last browser check.');
         return null;
       }),
     );
-    state.setStep(s.baseline ? 3 : 0);
-    state.setReviewRun('');
-    const review = s.runs.find((r: RunManifest) => r.kind === 'prepare' && r.status === 'review');
-    if (review && (!s.baseline || review.createdAt > s.baseline.reviewedAt)) {
-      state.setProduct(await call('candidate', { projectId: id, runId: review.id }));
-      state.setReviewRun(review.id);
-      state.setStep(2);
-    }
     const latest = s.runs.find((r: RunManifest) => r.status === 'completed' && r.kind === 'report');
     if (latest) state.setReport(await call('result', { projectId: id, runId: latest.id }));
     state.setArea('projects');
   });
 }
 
-/** Discover repositories while retaining existing notes and ignoring a replaced project. */
+/** Find repositories in a folder, keeping notes on ones already listed and ignoring a replaced project. */
 async function scanProjectFolder(
   state: WorkspaceState,
-  call: DesktopBridge['request'],
+  call: Call,
   api: DesktopBridge | undefined,
   choose = false,
 ): Promise<void> {
@@ -102,105 +93,109 @@ async function scanProjectFolder(
   });
 }
 
-/** Require complete project inputs before starting paid requirements preparation. */
-async function prepare(state: WorkspaceState, call: DesktopBridge['request']): Promise<void> {
+/**
+ * Hand the project to Aiden: it writes what done means, commits it without a review step, and
+ * starts looking. Also used after changing the folder, which changes what Aiden looks at.
+ */
+async function start(state: WorkspaceState, call: Call): Promise<void> {
   await action(state, async () => {
-    if (
-      !state.project.name.trim() ||
-      !state.project.context.trim() ||
-      !state.project.repositories.length
-    )
+    if (!state.project.context.trim())
       throw new Error(
-        'Add a project name, context, and a project folder containing a Git repository.',
+        'Tell Aiden what you are building. Paste or type anything that describes it.',
       );
+    if (!state.project.repositories.length)
+      throw new Error('Choose the project folder. Aiden needs a Git repository inside it.');
+    const project = { ...state.project, name: scopeName(state.project.context) };
     state.setBusy(true);
-    state.setLog([]);
-    const r = await call('prepare', { project: state.project });
+    state.setLive('Planning features and their requirements…');
+    const r = await call('prepare', { project, autoAccept: true });
     state.setActiveRun(r.runId);
+    state.setProject(project);
     state.setProjects(await call('projects'));
+    state.setArea('projects');
   });
 }
 
-/** Reject changed inputs until review, then assess the code and check the saved app URL, if any. */
-async function analyze(state: WorkspaceState, call: DesktopBridge['request']): Promise<void> {
+/** Ask Aiden to look now instead of waiting for the next commit or morning. */
+async function lookNow(state: WorkspaceState, call: Call): Promise<void> {
   await action(state, async () => {
-    const saved = await call('state', { projectId: state.project.id });
-    if (
-      saved.project.context !== state.project.context ||
-      saved.project.rootPath !== state.project.rootPath ||
-      JSON.stringify(saved.project.discoveryWarnings) !==
-        JSON.stringify(state.project.discoveryWarnings) ||
-      JSON.stringify(saved.project.repositories) !== JSON.stringify(state.project.repositories)
-    ) {
-      state.setStep(1);
-      throw new Error(
-        'The project inputs have changed. Prepare and review the requirements before analyzing these inputs.',
-      );
-    }
     state.setBusy(true);
-    state.setLog([]);
-    state.setStep(3);
-    await call('updateRuntime', { projectId: state.project.id, runtime: state.project.runtime });
-    const r = await call('report', { projectId: state.project.id, browserCheck: true });
+    state.setLive('Starting a check…');
+    const r = await call('look', { projectId: state.project.id });
     state.setActiveRun(r.runId);
   });
 }
 
-/** Estimate remaining work for an accepted report; estimates never start on their own. */
-async function estimate(
+/** Make a call. Aiden acts on the answer straight away unless it is already working. */
+async function answerCall(
   state: WorkspaceState,
-  call: DesktopBridge['request'],
-  reportId: string,
-  refreshHistory = false,
+  call: Call,
+  callId: string,
+  answer: string,
 ): Promise<void> {
   const projectId = state.project.id;
   await action(state, async () => {
-    state.setLog(['Estimating remaining work…']);
-    const r = await call('estimate', { projectId, reportId, refreshHistory });
-    state.setRuns((await call('state', { projectId })).runs);
-    state.setActiveRun(r.runId);
-    state.setBusy(true);
+    const r = await call('answerCall', { projectId, callId, answer });
+    state.setCalls(await call('calls', { projectId }));
+    if (r.runId) {
+      state.setBusy(true);
+      state.setActiveRun(r.runId);
+      state.setLive('Using your answer…');
+    } else state.setNotice('Got it. Aiden will use this as soon as its current work finishes.');
   });
 }
 
-/** Check the saved app URL in a browser and follow that run in this window like any other. */
-async function verify(state: WorkspaceState, call: DesktopBridge['request']): Promise<void> {
+/** Change what done means or the intent behind it; Aiden then looks again. */
+async function editIntent(
+  state: WorkspaceState,
+  call: Call,
+  change: { context: string } | { product: Product },
+): Promise<void> {
   const projectId = state.project.id;
   await action(state, async () => {
-    const { url } = await call('verificationSettings', { projectId });
-    if (!url) throw new Error('Save an app URL for this project first.');
-    state.setLog([`Opening ${url} in a browser…`]);
-    const r = await call('verify', { projectId });
-    // The progress card names the run by its kind, so load the new run before showing it.
-    state.setRuns((await call('state', { projectId })).runs);
-    state.setActiveRun(r.runId);
+    const r = await call('editIntent', { projectId, ...change });
+    if ('context' in change) state.setProject((p) => ({ ...p, context: change.context }));
     state.setBusy(true);
+    state.setActiveRun(r.runId);
+    state.setLive('context' in change ? 'Rewriting the requirements…' : 'Running a check…');
   });
 }
 
-/** Explicit user actions exposed by the workspace controller. */
+/** Mark a manual test done against the latest look; it is due again after the next one. */
+async function confirm(state: WorkspaceState, call: Call, key: string): Promise<void> {
+  const projectId = state.project.id;
+  const reportId = state.report?.id;
+  if (!reportId) return;
+  await action(state, async () => {
+    state.setConfirmed(await call('confirmAction', { projectId, key, reportId }));
+  });
+}
+
+/** Actions the person can take, bound to the current workspace. */
 export interface WorkspaceOperations {
   action: (fn: () => Promise<void>) => Promise<void>;
   load: (id: string) => Promise<void>;
   scanProjectFolder: (choose?: boolean) => Promise<void>;
-  prepare: () => Promise<void>;
-  analyze: () => Promise<void>;
-  verify: () => Promise<void>;
-  estimate: (reportId: string, refreshHistory?: boolean) => Promise<void>;
+  start: () => Promise<void>;
+  lookNow: () => Promise<void>;
+  answerCall: (callId: string, answer: string) => Promise<void>;
+  editIntent: (change: { context: string } | { product: Product }) => Promise<void>;
+  confirm: (key: string) => Promise<void>;
 }
 /** Bind the current render's state to user actions without performing side effects during render. */
 export function workspaceOperations(
   state: WorkspaceState,
-  call: DesktopBridge['request'],
+  call: Call,
   api: DesktopBridge | undefined,
 ): WorkspaceOperations {
   return {
     action: (fn) => action(state, fn),
     load: (id) => load(state, call, id),
     scanProjectFolder: (choose) => scanProjectFolder(state, call, api, choose),
-    prepare: () => prepare(state, call),
-    analyze: () => analyze(state, call),
-    verify: () => verify(state, call),
-    estimate: (reportId, refreshHistory) => estimate(state, call, reportId, refreshHistory),
+    start: () => start(state, call),
+    lookNow: () => lookNow(state, call),
+    answerCall: (callId, answer) => answerCall(state, call, callId, answer),
+    editIntent: (change) => editIntent(state, call, change),
+    confirm: (key) => confirm(state, call, key),
   };
 }

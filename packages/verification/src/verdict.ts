@@ -12,7 +12,7 @@ import type {
 /** Plain-language labels for every "Couldn't verify" reason shown in reports and the CLI. */
 export const reasonLabels: Record<UnverifiedReason, string> = {
   not_testable_in_ui: "Couldn't verify: not testable in the UI.",
-  blocked: "Couldn't verify: the app blocked the check.",
+  blocked: "Couldn't verify: required setup or evidence is unavailable.",
   destructive: "Couldn't verify: it needs a destructive or irreversible action.",
   needs_credentials: "Couldn't verify: it needs test credentials.",
   other: "Couldn't verify.",
@@ -28,6 +28,8 @@ export interface AttemptEvidence {
   stepLimitReached: boolean;
   checks: readonly PageCheck[];
   vision: VisionJudgment | null;
+  /** Whether this attempt tested HTTP behavior; picks API-accurate wording over browser wording. */
+  api?: boolean;
 }
 
 /** Aiden's decision for one attempt, before the single retry is considered. */
@@ -58,12 +60,28 @@ function unverified(
   return { verdict: 'unverified', reason, explanation, proof };
 }
 
-/** Apply evidence rules: a pass needs a passing page check and a satisfied screenshot review. */
+/** Who tested the criterion and what the cited evidence is called, in API or browser wording. */
+function wording(api: boolean): { agent: string; evidence: string; review: string } {
+  return api
+    ? {
+        agent: 'The API agent',
+        evidence: 'an assertion Aiden recorded',
+        review: 'independent review',
+      }
+    : {
+        agent: 'The browser agent',
+        evidence: 'a page check Aiden recorded',
+        review: 'screenshot review',
+      };
+}
+
+/** Apply evidence rules: a pass needs a passing check and an agreeing independent review. */
 export function judgeAttempt(evidence: AttemptEvidence): AttemptJudgment {
   const { outcome, checks, vision } = evidence;
+  const { agent, evidence: cite, review } = wording(Boolean(evidence.api));
   if (evidence.stepLimitReached)
     return unverified('step_limit', 'Aiden ran out of steps before it could reach a verdict.');
-  if (!outcome) return unverified('other', 'The browser agent did not return a usable answer.');
+  if (!outcome) return unverified('other', `${agent} did not return a usable answer.`);
   if (outcome.outcome === 'unverified')
     return unverified(outcome.unverifiedReason ?? 'other', outcome.explanation);
   const claim = outcome.outcome === 'pass' ? 'passed' : 'failed';
@@ -71,22 +89,21 @@ export function judgeAttempt(evidence: AttemptEvidence): AttemptJudgment {
   if (!cited)
     return unverified(
       'no_evidence',
-      `The browser agent said the criterion ${claim} but did not cite a page check Aiden recorded.`,
+      `${agent} said the criterion ${claim} but did not cite ${cite}.`,
     );
   if (cited.passed !== (outcome.outcome === 'pass'))
     return unverified(
       'signals_disagree',
-      `The browser agent said the criterion ${claim}, but Aiden's page check found: ${cited.actual}`,
+      `${agent} said the criterion ${claim}, but the ${evidence.api ? 'API assertion' : 'page check'} found: ${cited.actual}`,
       cited,
     );
-  if (!vision)
-    return unverified('other', 'The screenshot review did not return a usable answer.', cited);
+  if (!vision) return unverified('other', `The ${review} did not return a usable answer.`, cited);
   const agrees =
     outcome.outcome === 'pass' ? vision.judgment === 'satisfied' : vision.judgment !== 'satisfied';
   if (!agrees)
     return unverified(
       'signals_disagree',
-      `The page check ${claim}, but the screenshot review found: ${vision.observation}`,
+      `The cited check ${claim}, but the ${review} found: ${vision.observation}`,
       cited,
     );
   return { verdict: outcome.outcome, reason: null, explanation: outcome.explanation, proof: cited };

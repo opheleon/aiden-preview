@@ -40,7 +40,11 @@ export function IntegrationConnectionCard(
           <strong>{connection.name}</strong>
           <p>{connection.url}</p>
           <small>
-            {connection.auth} · secrets: {connection.secureStorage}
+            {connection.secureStorage === 'keyring'
+              ? 'Sign-in saved securely on this device'
+              : connection.secureStorage === 'session'
+                ? 'Sign-in lasts until Aiden closes'
+                : 'No sign-in required'}
           </small>
         </div>
         <span className={`connection-state ${connection.status === 'connected' ? 'ready' : ''}`}>

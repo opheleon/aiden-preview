@@ -1,0 +1,168 @@
+import assert from 'node:assert/strict';
+import { readFile, rm } from 'node:fs/promises';
+import path from 'node:path';
+import test from 'node:test';
+
+import type { Call, Product } from '../packages/contracts/src/index.js';
+import { applyBlockers, requireDefinedScope } from '../packages/core/src/blockers.js';
+import {
+  answerCall,
+  readCalls,
+  recordCall,
+  replaceOpenDecisions,
+} from '../packages/core/src/calls.js';
+import { Engine } from '../packages/core/src/engine.js';
+import { prepareAndLook } from '../packages/core/src/look.js';
+import { Store } from '../packages/core/src/storage.js';
+import { requirementBlockers } from '../packages/reporting/src/blockers.js';
+import { deliveryTickets } from '../packages/reporting/src/tickets.js';
+import { FixtureRuntime } from './fixture-runtime.js';
+import { fixture } from './helpers.js';
+
+const product: Product = {
+  overview: 'Synthetic project',
+  milestones: [],
+  requirements: [1, 2, 3, 4].map((n) => ({ id: `REQ-${n}`, text: `Behavior ${n}` })),
+  deliveryPlan: [1, 2, 3, 4].map((n) => ({
+    id: `F-${n}`,
+    title: `Feature ${n}`,
+    outcome: `Outcome ${n}`,
+    kind: 'feature',
+    rationale: 'Synthetic feature',
+    requirementIds: [`REQ-${n}`],
+    dependsOn: n === 2 || n === 3 ? [`F-${n - 1}`] : [],
+  })),
+};
+const call: Call = {
+  id: 'decision',
+  kind: 'decision',
+  status: 'open',
+  requirementId: 'REQ-1',
+  edgeCaseId: null,
+  question: 'What isolation behavior is required?',
+  assumption: 'Provisioning waits for the isolation policy.',
+  options: [],
+  owner: 'you',
+  askedAt: new Date().toISOString(),
+  answer: null,
+  answeredAt: null,
+  runId: null,
+};
+
+void test('legacy blockers propagate through dependencies, while independent tickets retain acceptance criteria', () => {
+  const blocked = requirementBlockers(product, [call]);
+  assert.deepEqual(
+    [...blocked].filter(([, c]) => c.length).map(([id]) => id),
+    ['REQ-1', 'REQ-2', 'REQ-3'],
+  );
+  const tickets = deliveryTickets(product, undefined, [call]);
+  assert.deepEqual(
+    tickets.map((t) => t.blocked),
+    [true, true, true, false],
+  );
+  assert.match(tickets[1]!.markdown, /Dependencies: F-1/);
+  assert.match(tickets[1]!.markdown, /Owner: you/);
+  assert.doesNotMatch(tickets[1]!.markdown, /## Acceptance criteria|## Known remaining work/);
+  assert.match(tickets[3]!.markdown, /## Acceptance criteria/);
+  for (const variant of [
+    { ...call, requirementId: null },
+    { ...call, requirementId: 'REQ-99' },
+  ])
+    assert.equal(
+      [...requirementBlockers(product, [variant]).values()].filter((c) => c.length).length,
+      4,
+    );
+  assert.ok(
+    [...requirementBlockers(product, [{ ...call, blocking: false }]).values()].every(
+      (c) => !c.length,
+    ),
+  );
+  assert.ok(
+    [...requirementBlockers(product, [{ ...call, status: 'answered' }]).values()].every(
+      (c) => !c.length,
+    ),
+  );
+});
+
+void test('persisted blockers survive omission, suppress completion and sizing, and release only after a decision', async () => {
+  const f = await fixture();
+  const store = new Store(path.join(f.root, 'data'));
+  try {
+    const { call: saved } = await recordCall(store, f.project.id, call, 'decision', 'before');
+    await replaceOpenDecisions(store, f.project.id, [], 'rewrite');
+    assert.equal((await readCalls(store, f.project.id))[0]?.status, 'open');
+    await assert.rejects(requireDefinedScope(store, f.project.id, product), /Resolve blocking/);
+    const findings = await applyBlockers(store, f.project.id, product, {
+      assessments: product.requirements.map((r) => ({
+        requirementId: r.id,
+        status: 'implemented',
+        deviation: false,
+        evidence: [],
+        explanation: 'Unsupported synthetic claim',
+        remainingWork: ['Invented implementation'],
+        unknowns: [],
+      })),
+      risks: [],
+      dependencies: [],
+      unknowns: [],
+    });
+    assert.equal(findings.assessments[0]?.status, 'unknown');
+    assert.deepEqual(findings.assessments[0]?.remainingWork, []);
+    assert.equal(findings.assessments[3]?.status, 'implemented');
+    await answerCall(store, f.project.id, saved.id, 'Isolate each tenant.');
+    await requireDefinedScope(store, f.project.id, product);
+  } finally {
+    await rm(f.root, { recursive: true, force: true });
+  }
+});
+
+void test('automatic planning assesses only independent scope, saves blocked tickets, and skips total sizing', async () => {
+  const f = await fixture();
+  const runtime = new FixtureRuntime(f);
+  runtime.understanding = {
+    ...product,
+    repositories: [],
+    requirements: product.requirements.map((r) => ({ ...r, edgeCases: [] })),
+    calls: [
+      {
+        requirementId: call.requirementId,
+        edgeCaseId: null,
+        question: call.question,
+        assumption: call.assumption,
+        options: [],
+        owner: 'you',
+        blocking: true,
+      },
+    ],
+  };
+  const engine = new Engine(new Store(path.join(f.root, 'data')), runtime);
+  try {
+    await prepareAndLook(engine, f.project, 'intent');
+    for (let i = 0; i < 300; i++) {
+      const runs = await engine.history(f.project.id);
+      const report = runs.find((r) => r.kind === 'report');
+      if (report && !engine.isActive(report.id)) break;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    const runs = await engine.history(f.project.id);
+    const reportRun = runs.find((r) => r.kind === 'report')!;
+    assert.equal(reportRun.status, 'completed', reportRun.error);
+    const input = runtime.inputs[runtime.calls.indexOf('assess')] as { baseline: Product };
+    assert.deepEqual(
+      input.baseline.requirements.map((r) => r.id),
+      ['REQ-4'],
+    );
+    assert.ok(!runtime.calls.includes('estimate-original'));
+    const report = await engine.getReport(f.project.id, reportRun.id);
+    assert.match(report.assessments[0]!.explanation, /Blocked/);
+    const tickets = await readFile(
+      path.join(engine.store.run(f.project.id, reportRun.id), 'tickets.md'),
+      'utf8',
+    );
+    assert.match(tickets, /Blocked, draft scope/);
+    assert.match(tickets, /F-4: Feature 4/);
+  } finally {
+    await engine.dispose();
+    await rm(f.root, { recursive: true, force: true });
+  }
+});

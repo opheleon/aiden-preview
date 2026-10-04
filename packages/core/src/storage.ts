@@ -1,5 +1,16 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { lstat, mkdir, readdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import {
+  lstat,
+  mkdir,
+  open,
+  readdir,
+  readFile,
+  realpath,
+  rename,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
@@ -54,6 +65,52 @@ export async function boundedPath(root: string, relative: string): Promise<strin
     }
   }
   return current;
+}
+/**
+ * Append one JSON line beneath `root` with owner-only permissions. Existing symlink components are
+ * rejected, and the final open refuses to follow a symlink created after that check.
+ */
+export async function appendLine(root: string, relative: string, value: unknown): Promise<void> {
+  const serialized = JSON.stringify(value);
+  if (serialized === undefined) throw new Error('Cannot persist an undefined JSON value.');
+  await mkdir(root, { recursive: true, mode: 0o700 });
+  const file = await boundedPath(root, relative);
+  await mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
+  const handle = await open(
+    file,
+    constants.O_RDWR | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW,
+    0o600,
+  );
+  try {
+    const { size } = await handle.stat();
+    const last = Buffer.alloc(1);
+    if (size > 0) await handle.read(last, 0, 1, size - 1);
+    // Start on a fresh line when a crash left a torn entry, so it cannot swallow this one.
+    const separator = size > 0 && last.toString() !== '\n' ? '\n' : '';
+    await handle.write(separator + serialized + '\n');
+  } finally {
+    await handle.close();
+  }
+}
+/** Read JSON lines, skipping blank or torn lines so a crash mid-append never hides earlier entries. */
+export async function readLines(file: string): Promise<unknown[]> {
+  let text: string;
+  try {
+    text = await readFile(file, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  }
+  const rows: unknown[] = [];
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      rows.push(JSON.parse(line));
+    } catch {
+      // A torn line is expected after a crash; appendLine starts the next entry on a fresh line.
+    }
+  }
+  return rows;
 }
 /** Locate version-compatible project and run directories without accepting path fragments as IDs. */
 export class Store {

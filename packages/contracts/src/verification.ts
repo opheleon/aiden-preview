@@ -1,22 +1,39 @@
 import { z } from 'zod/v3';
 
+/** An explicitly selected API; writes require a disposable test environment. */
+export const ApiVerificationSchema = z
+  .object({
+    url: z.string().url().max(2000),
+    allowMutations: z.boolean().default(false),
+  })
+  .strict();
+
 /** Worker-only settings file; test credentials stay in the worker and never enter run output. */
 export const VerificationConfigSchema = z
   .object({
     /** The project's app URL, saved from Settings or the CLI; its origin counts as configured. */
     url: z.string().url().max(2000).optional(),
+    api: ApiVerificationSchema.optional(),
     allowedOrigins: z.array(z.string().url()).max(20).default([]),
     credentials: z
       .object({ username: z.string().min(1).max(500), password: z.string().min(1).max(500) })
       .strict()
       .optional(),
+    /**
+     * An optional fixture token the project owner confirms is genuinely expired and still
+     * properly signed, so the API agent can test expiry rejection without forging a signature.
+     */
+    expiredToken: z.string().min(1).max(4000).optional(),
     stepLimit: z.number().int().min(5).max(60).default(25),
   })
   .strict();
 /** Parsed verification settings with defaults applied. */
 export type VerificationConfig = z.infer<typeof VerificationConfigSchema>;
 /** Verification settings safe to show in the renderer; test credentials are never included. */
-export type VerificationSettings = { url: string | null };
+export type VerificationSettings = {
+  url: string | null;
+  api?: z.infer<typeof ApiVerificationSchema>;
+};
 
 /** Model-selected reasons a criterion cannot be checked; Aiden adds its own reasons in verdicts. */
 export const AgentUnverifiedReasonSchema = z.enum([
@@ -146,7 +163,13 @@ export type VerificationAttempt = {
 
 /** Final per-criterion result after evidence rules and the single retry. */
 export type CriterionResult = {
+  /** API recordings show the request ledger rather than the application UI. */
+  method?: 'app' | 'api';
   requirementId: string;
+  /** Set when this result checks one edge case of the requirement rather than its main path. */
+  edgeCaseId?: string | null;
+  /** Who Aiden acted as, when the plan named someone. */
+  persona?: string | null;
   criterion: string;
   verdict: Verdict;
   reason: UnverifiedReason | null;
@@ -172,6 +195,10 @@ export type VerificationSummary = z.infer<typeof VerificationSummarySchema>;
 
 /** Persisted verification result for one project run; media paths are relative to its folder. */
 export type VerificationResult = {
+  environment?: 'beta';
+  deploymentRevision?: string;
+  /** True while the run is still producing evidence; absent on completed legacy results. */
+  partial?: boolean;
   schemaVersion: '1.0';
   runId: string;
   projectId: string;
@@ -182,4 +209,27 @@ export type VerificationResult = {
   runtime: { provider: string; auth: string; model: string | null; version: string };
   criteria: CriterionResult[];
   summary: VerificationSummary;
+  /** How Aiden decided to check each requirement and edge case; absent on results saved before planning existed. */
+  triage?: TriageItem[];
 };
+
+/**
+ * How to check one requirement or edge case, decided the way a person would: in the running app when a
+ * user can see it, in the code when they cannot, or by a person when it happens outside software.
+ */
+export const TriageItemSchema = z
+  .object({
+    requirementId: z.string().regex(/^REQ-[1-9]\d*$/),
+    edgeCaseId: z
+      .string()
+      .regex(/^E[1-9]\d*$/)
+      .nullable(),
+    method: z.enum(['app', 'api', 'code', 'person']),
+    persona: z.string().trim().min(1).max(120).nullable(),
+    reason: z.string().trim().min(1).max(300),
+  })
+  .strict();
+/** One planned check. */
+export type TriageItem = z.infer<typeof TriageItemSchema>;
+/** Model output for the check plan. */
+export const TriageSchema = z.object({ items: z.array(TriageItemSchema).max(300) }).strict();

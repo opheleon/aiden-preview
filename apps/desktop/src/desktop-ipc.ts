@@ -6,7 +6,6 @@ import { z } from 'zod/v3';
 
 import { id, type VerificationResult } from '../../../packages/contracts/src/index.js';
 import type { WorkerClient } from '../../../packages/core/src/client.js';
-import { type LocalScheduler, ScheduleConfigSchema } from './scheduler.js';
 import type { DesktopUpdater } from './updater.js';
 /** Media types for browser check recordings and screenshots; any other file is refused. */
 const mediaTypes: Record<string, string> = {
@@ -56,19 +55,7 @@ async function readVerificationMedia(
 /** Reject IPC originating outside the trusted top-level desktop renderer. */
 export type IpcAuthorization = (event: Electron.IpcMainInvokeEvent) => void;
 /** Register preference operations; mutable inputs are validated before reaching local services. */
-export function registerPreferenceIpc(
-  authorized: IpcAuthorization,
-  scheduler: LocalScheduler,
-  updater: DesktopUpdater,
-): void {
-  ipcMain.handle('schedules:list', (event) => {
-    authorized(event);
-    return scheduler.list();
-  });
-  ipcMain.handle('schedules:set', (event, projectId: unknown, config: unknown) => {
-    authorized(event);
-    return scheduler.set(id.parse(projectId), ScheduleConfigSchema.parse(config));
-  });
+export function registerPreferenceIpc(authorized: IpcAuthorization, updater: DesktopUpdater): void {
   ipcMain.handle('app:get-version', (event) => {
     authorized(event);
     return app.getVersion();

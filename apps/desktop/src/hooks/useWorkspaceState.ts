@@ -3,39 +3,46 @@ import { useState } from 'react';
 import type { WorkerResult } from '../../../../packages/contracts/src/api.js';
 import type { RuntimeDiagnostic } from '../../../../packages/contracts/src/api.js';
 import type {
+  ActivityEntry,
   Baseline,
-  EstimateOverrides,
-  EstimationSnapshot,
+  Call,
   McpConnection,
   McpTool,
-  Product,
   Project,
   Report,
-  RunEvent,
   RunManifest,
 } from '../../../../packages/contracts/src/index';
-import { defaultOverrides } from '../../../../packages/estimation/src/index';
 import { newProject } from '../renderer/project-state';
 import type { UpdatePreferences, UpdateStatus } from '../updater';
 
-/** Own project artifacts and current run presentation. */
+/** Where the main window is: a project's brief, or settings. */
+export type Area = 'projects' | 'runs' | 'settings';
+/** Settings tabs; the project tab holds everything specific to the selected project. */
+export type SettingsTab = 'project' | 'model' | 'integrations' | 'preferences' | 'desktop';
+
+/** Own the selected project and what Aiden knows about it. */
 function useProjectState() {
   const [project, setProject] = useState<Project>(newProject);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [step, setStep] = useState(0);
   const [diagnostics, setDiagnostics] = useState<RuntimeDiagnostic[]>([]);
   const [busy, setBusy] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
-  const [log, setLog] = useState<string[]>([]);
+  const [live, setLive] = useState('');
+  /** The latest step of each run this window has seen, for live run lists. */
+  const [liveByRun, setLiveByRun] = useState<Record<string, string>>({});
+  /** Runs the worker is executing for this project right now. */
+  const [activeRuns, setActiveRuns] = useState<string[]>([]);
+  /** The run open in the runs view; empty shows the list. */
+  const [openRun, setOpenRun] = useState('');
   const [activeRun, setActiveRun] = useState('');
-  const [reviewRun, setReviewRun] = useState('');
-  const [product, setProduct] = useState<Product>();
   const [baseline, setBaseline] = useState<Baseline>();
   const [report, setReport] = useState<Report>();
   const [runs, setRuns] = useState<RunManifest[]>([]);
-  const [question, setQuestion] = useState<RunEvent>();
-  const [answer, setAnswer] = useState('');
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
+  const [calls, setCalls] = useState<Call[]>([]);
+  /** Manual tests marked done: action item key to the report they were done against. */
+  const [confirmed, setConfirmed] = useState<Record<string, string>>({});
   const [evidence, setEvidence] = useState<WorkerResult<'evidence'>>();
   const [notice, setNotice] = useState('');
   const [verification, setVerification] = useState<WorkerResult<'verification'>>(null);
@@ -44,8 +51,6 @@ function useProjectState() {
     setProject,
     projects,
     setProjects,
-    step,
-    setStep,
     diagnostics,
     setDiagnostics,
     busy,
@@ -54,24 +59,28 @@ function useProjectState() {
     setScanning,
     error,
     setError,
-    log,
-    setLog,
+    live,
+    setLive,
+    liveByRun,
+    setLiveByRun,
+    openRun,
+    setOpenRun,
+    activeRuns,
+    setActiveRuns,
     activeRun,
     setActiveRun,
-    reviewRun,
-    setReviewRun,
-    product,
-    setProduct,
     baseline,
     setBaseline,
     report,
     setReport,
     runs,
     setRuns,
-    question,
-    setQuestion,
-    answer,
-    setAnswer,
+    activity,
+    setActivity,
+    calls,
+    setCalls,
+    confirmed,
+    setConfirmed,
     evidence,
     setEvidence,
     notice,
@@ -81,12 +90,10 @@ function useProjectState() {
   };
 }
 
-/** Own navigation and desktop preference presentation. */
+/** Own navigation, desktop preferences, and integration inputs. */
 function usePreferenceState() {
-  const [area, setArea] = useState<'projects' | 'drafts' | 'settings'>('projects');
-  const [settingsTab, setSettingsTab] = useState<
-    'model' | 'schedule' | 'integrations' | 'preferences' | 'desktop'
-  >('integrations');
+  const [area, setArea] = useState<Area>('projects');
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('project');
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>();
   const [updatePreferences, setUpdatePreferences] = useState<UpdatePreferences>({
     autoDownload: true,
@@ -94,8 +101,14 @@ function usePreferenceState() {
   });
   const [integrations, setIntegrations] = useState<McpConnection[]>([]);
   const [integrationTools, setIntegrationTools] = useState<Record<string, McpTool[]>>({});
-  const [estimation, setEstimation] = useState<EstimationSnapshot>();
-  const [overrides, setOverrides] = useState<EstimateOverrides>(defaultOverrides());
+  const [customServer, setCustomServer] = useState({
+    name: '',
+    url: '',
+    auth: 'oauth' as 'oauth' | 'bearer' | 'none',
+    bearer: '',
+    clientId: '',
+    sessionOnly: false,
+  });
   return {
     area,
     setArea,
@@ -109,55 +122,15 @@ function usePreferenceState() {
     setIntegrations,
     integrationTools,
     setIntegrationTools,
-    estimation,
-    setEstimation,
-    overrides,
-    setOverrides,
-  };
-}
-
-/** Own unsaved integration and history-source inputs. */
-function useSourceState() {
-  const [customServer, setCustomServer] = useState({
-    name: '',
-    url: '',
-    auth: 'oauth' as 'oauth' | 'bearer' | 'none',
-    bearer: '',
-    clientId: '',
-    sessionOnly: false,
-  });
-  const [historyDraft, setHistoryDraft] = useState({
-    connectionId: '',
-    sourceId: '',
-    sourceLabel: '',
-    historyTool: '',
-    sourceArgument: 'team',
-  });
-  const [contextConnectionIds, setContextConnectionIds] = useState<string[]>([]);
-  const [discoveredSources, setDiscoveredSources] = useState<unknown>();
-  const [showHistoryConfig, setShowHistoryConfig] = useState(false);
-  const [showGoalStarter, setShowGoalStarter] = useState(true);
-  return {
     customServer,
     setCustomServer,
-    historyDraft,
-    setHistoryDraft,
-    contextConnectionIds,
-    setContextConnectionIds,
-    discoveredSources,
-    setDiscoveredSources,
-    showHistoryConfig,
-    setShowHistoryConfig,
-    showGoalStarter,
-    setShowGoalStarter,
   };
 }
 
 /** Mutable workspace presentation state, separate from worker and desktop side effects. */
 export type WorkspaceState = ReturnType<typeof useProjectState> &
-  ReturnType<typeof usePreferenceState> &
-  ReturnType<typeof useSourceState>;
-/** Compose project, preference, and source state with stable React setters. */
+  ReturnType<typeof usePreferenceState>;
+/** Compose project and preference state with stable React setters. */
 export function useWorkspaceState(): WorkspaceState {
-  return { ...useProjectState(), ...usePreferenceState(), ...useSourceState() };
+  return { ...useProjectState(), ...usePreferenceState() };
 }

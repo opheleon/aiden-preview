@@ -74,6 +74,14 @@ function attemptLine(attempt: VerificationAttempt): string {
   return `Run ${attempt.attempt}: ${text(verdict)} ${text(attempt.explanation)}`;
 }
 
+/** Name what a criterion card checked: a requirement or one of its edge cases, and who Aiden acted as. */
+function criterionLabel(criterion: CriterionResult): string {
+  const item = criterion.edgeCaseId
+    ? `${criterion.requirementId} edge case ${criterion.edgeCaseId}`
+    : criterion.requirementId;
+  return `${criterion.method === 'api' ? 'API · ' : ''}${text(criterion.persona ? `${item} as ${criterion.persona}` : item)}`;
+}
+
 /** Render one criterion card with verdict, explanation, proof, recording, and step log. */
 function criterionCard(criterion: CriterionResult, index: number): string {
   const decisive =
@@ -100,7 +108,7 @@ function criterionCard(criterion: CriterionResult, index: number): string {
     )
     .join('');
   return `<article class="card ${criterion.verdict}">
-  <header><span class="badge">${badges[criterion.verdict]}</span><span class="id">${text(criterion.requirementId)}</span></header>
+  <header><span class="badge">${badges[criterion.verdict]}</span><span class="id">${criterionLabel(criterion)}</span></header>
   <h2>${text(criterion.criterion)}</h2>
   ${reason}
   <p class="explanation">${text(criterion.explanation)}</p>
@@ -158,14 +166,15 @@ export function renderReport(result: VerificationResult): string {
 </head>
 <body>
 <main>
-<h1>${text(result.projectName)} acceptance check</h1>
-<p class="meta">Aiden tested ${text(result.url)} in a browser on ${text(generated)}. ${text(runtimeLabel(result.runtime))}</p>
+<h1>${text(result.projectName)} ${result.environment === 'beta' ? 'beta verification' : 'acceptance check'}</h1>
+${result.deploymentRevision ? `<p>Deployed revision: ${text(result.deploymentRevision)}</p>` : ''}
+<p class="meta">Aiden tested ${text(result.url)} using recorded checks on ${text(generated)}. ${text(runtimeLabel(result.runtime))}</p>
 <section class="summary" aria-label="Summary">
-<p>${text(summary.line)}</p>
+<p>${result.partial ? 'Check still in progress. Results below are completed criteria only. ' : ''}${text(summary.line)}</p>
 <div class="counts"><span class="count pass">${summary.verified} verified</span><span class="count fail">${summary.failed} failed</span><span class="count unverified">${summary.unverified} couldn't be verified</span></div>
 </section>
 ${result.criteria.map(criterionCard).join('\n')}
-<footer>A verdict of Verified requires both a structural page check and an independent screenshot review to agree. Failed and unverified checks were run a second time in a fresh browser. Text from the app appears as recorded and was treated as evidence only.</footer>
+<footer>Verified browser checks require structural and screenshot evidence. Verified API checks require recorded HTTP assertions and an independent review of criterion coverage. API attempts are not automatically retried, to avoid repeating test writes. Text from the app appears as recorded and was treated as evidence only.</footer>
 </main>
 <script>${script}</script>
 </body>

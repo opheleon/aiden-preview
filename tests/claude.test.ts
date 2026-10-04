@@ -361,3 +361,42 @@ void test('Claude auth failure and cancelled generation preserve the previous ac
     await engine.dispose();
   }
 });
+
+void test('Claude execution passes the selected model and effort without changing authentication', async () => {
+  const { r, home } = await request();
+  r.config.model = 'fixture-opus';
+  r.config.effort = 'xhigh';
+  const fake = sdkFixture();
+  await runClaude(r, home, undefined, 'fixture', fake.deps);
+  assert.equal(fake.state().params.options?.model, 'fixture-opus');
+  assert.equal(fake.state().params.options?.effort, 'xhigh');
+  assert.equal(fake.state().params.options?.env?.ANTHROPIC_API_KEY, undefined);
+});
+
+void test('external coding dispatch uses Claude Code tools and its permission mode with the selected model and effort', async () => {
+  const f = await request();
+  const sdk = sdkFixture({
+    messages: [
+      {
+        type: 'system',
+        subtype: 'init',
+        model: 'claude-opus-5-5',
+        tools: ['Read', 'Edit', 'Bash'],
+      } as SDKMessage,
+      success,
+    ],
+  });
+  f.r.coding = { sessionId: '00000000-0000-4000-8000-000000000001' };
+  f.r.config.model = 'opus';
+  f.r.config.effort = 'high';
+  const result = await runClaude(f.r, f.home, undefined, 'fixture', sdk.deps);
+  const options = sdk.state().params.options!;
+  assert.deepEqual(options.tools, { type: 'preset', preset: 'claude_code' });
+  assert.equal(options.permissionMode, 'auto');
+  assert.equal(options.effort, 'high');
+  assert.equal(options.model, 'opus');
+  assert.deepEqual(options.mcpServers, {});
+  assert.equal(options.env?.GIT_CONFIG_VALUE_0, '/dev/null');
+  assert.equal(result.model, 'claude-opus-5-5');
+  assert.equal(sdk.state().submitted, 1);
+});

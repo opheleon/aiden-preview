@@ -2,30 +2,26 @@ import { ChevronRight, Plug, Settings2, ShieldCheck } from 'lucide-react';
 
 import type { WorkerResult } from '../../../../packages/contracts/src/api';
 import type { WorkerMethod, WorkerParams } from '../../../../packages/contracts/src/api.js';
-import type {
-  Baseline,
-  McpConnection,
-  McpTool,
-  Project,
-} from '../../../../packages/contracts/src/index';
+import type { McpConnection, McpTool, Project } from '../../../../packages/contracts/src/index';
+import { readOnlyLinear } from '../../../../packages/contracts/src/tracker-connections';
 import type { DesktopBridge } from '../bridge';
-import ScheduleSettings from '../components/ScheduleSettings';
+import type { Area, SettingsTab } from '../hooks/useWorkspaceState';
 import type { UpdatePreferences, UpdateStatus } from '../updater';
 import { CustomServerForm } from '../views/CustomServerForm';
 import { DesktopUpdateSettings } from '../views/DesktopUpdateSettings';
 import { IntegrationConnectionCard } from '../views/IntegrationConnectionCard';
 
 interface SettingsViewProps {
-  settingsTab: 'model' | 'schedule' | 'integrations' | 'preferences' | 'desktop';
-  setSettingsTab: React.Dispatch<
-    React.SetStateAction<'model' | 'schedule' | 'integrations' | 'preferences' | 'desktop'>
-  >;
+  settingsTab: SettingsTab;
+  setSettingsTab: React.Dispatch<React.SetStateAction<SettingsTab>>;
   project: Project;
   load: (id: string) => Promise<void>;
-  setArea: React.Dispatch<React.SetStateAction<'projects' | 'drafts' | 'settings'>>;
+  setArea: React.Dispatch<React.SetStateAction<Area>>;
   projects: Project[];
   runtimeControls: React.JSX.Element;
-  baseline: Baseline | undefined;
+  projectSettings: React.JSX.Element;
+  /** Errors and notices from actions taken in settings. */
+  feedback: React.JSX.Element;
   api: DesktopBridge | undefined;
   action: (fn: () => Promise<void>) => Promise<void>;
   setBusy: React.Dispatch<React.SetStateAction<boolean>>;
@@ -61,7 +57,7 @@ interface SettingsViewProps {
   busy: boolean;
 }
 
-/** Configure provider access, integration permissions, schedules, and desktop preferences. */
+/** Configure the selected project, provider access, integration permissions, and desktop preferences. */
 export function SettingsView(props: SettingsViewProps): React.JSX.Element {
   const {
     settingsTab,
@@ -71,16 +67,12 @@ export function SettingsView(props: SettingsViewProps): React.JSX.Element {
     setArea,
     projects,
     runtimeControls,
-    baseline,
+    projectSettings,
+    feedback,
     api,
     action,
-    setBusy,
     call,
     setIntegrations,
-    integrations,
-    setIntegrationTools,
-    integrationTools,
-    refresh,
     setNotice,
     customServer,
     setCustomServer,
@@ -101,11 +93,12 @@ export function SettingsView(props: SettingsViewProps): React.JSX.Element {
           <h1>
             Application <span className="serif">settings.</span>
           </h1>
-          <p className="subtitle">Models, read-only context connections, and local preferences.</p>
+          <p className="subtitle">This project, models, connected tools, and local preferences.</p>
         </div>
       </div>
+      {feedback}
       <div className="settings-tabs">
-        {(['model', 'schedule', 'integrations', 'preferences', 'desktop'] as const).map((tab) => (
+        {(['project', 'model', 'integrations', 'preferences', 'desktop'] as const).map((tab) => (
           <button
             key={tab}
             className={settingsTab === tab ? 'active' : ''}
@@ -139,9 +132,7 @@ export function SettingsView(props: SettingsViewProps): React.JSX.Element {
           {runtimeControls}
         </div>
       )}
-      {settingsTab === 'schedule' && (
-        <ScheduleSettings key={project.id} project={project} baseline={baseline} api={api} />
-      )}
+      {settingsTab === 'project' && projectSettings}
       {settingsTab === 'integrations' && (
         <div className="settings-stack">
           <section className="card integration-hero">
@@ -149,43 +140,14 @@ export function SettingsView(props: SettingsViewProps): React.JSX.Element {
               <div className="eyebrow">HOSTED MCP</div>
               <h2>Connect work context</h2>
               <p>
-                Connections are shared by Claude and Codex. Aiden only exposes read tools you
-                approve.
+                Connections are shared by Claude and Codex. Analysts use approved read tools.
+                Automatic ticket writes are authorized separately for a destination in Project
+                settings.
               </p>
             </div>
-            <button
-              className="primary"
-              onClick={() =>
-                void action(async () => {
-                  setBusy(true);
-                  const connection = await call('integrationAdd', {
-                    name: 'Linear',
-                    provider: 'linear',
-                    url: 'https://mcp.linear.app/mcp/readonly',
-                    auth: 'oauth',
-                  });
-                  await call('integrationConnect', { connectionId: connection.id });
-                  setIntegrations(await call('integrations'));
-                  setBusy(false);
-                })
-              }
-            >
-              <Plug size={15} /> Connect Linear
-            </button>
+            <TrackerConnections {...props} />
           </section>
-          {integrations.map((connection) => (
-            <IntegrationConnectionCard
-              key={connection.id}
-              connection={connection}
-              action={action}
-              call={call}
-              setIntegrations={setIntegrations}
-              setIntegrationTools={setIntegrationTools}
-              integrationTools={integrationTools}
-              refresh={refresh}
-              setNotice={setNotice}
-            />
-          ))}
+          <SavedConnections {...props} />
           <CustomServerForm
             customServer={customServer}
             setCustomServer={setCustomServer}
@@ -242,6 +204,102 @@ function PreferenceSettings(props: SettingsViewProps): React.JSX.Element {
             </p>
           </section>
         </>
+      )}
+    </>
+  );
+}
+
+/** Connect the supported read/write MCP catalogs; project settings grant bounded ticket publishing. */
+function TrackerConnections({
+  busy,
+  action,
+  setBusy,
+  call,
+  setIntegrations,
+}: SettingsViewProps): React.JSX.Element {
+  return (
+    <>
+      {' '}
+      {(['Linear', 'Jira'] as const).map((name) => (
+        <button
+          key={name}
+          className="primary"
+          disabled={busy}
+          onClick={() =>
+            void action(async () => {
+              setBusy(true);
+              try {
+                const connection = await call('integrationPreset', {
+                  provider: name === 'Linear' ? 'linear' : 'jira',
+                });
+                if (connection.status !== 'authorization_required')
+                  await call('integrationConnect', { connectionId: connection.id });
+              } finally {
+                setBusy(false);
+                setIntegrations(await call('integrations'));
+              }
+            })
+          }
+        >
+          <Plug size={15} /> Connect {name}
+        </button>
+      ))}
+    </>
+  );
+}
+
+/** Keep older readers available without presenting them as additional publishing accounts. */
+function SavedConnections(props: SettingsViewProps): React.JSX.Element {
+  const {
+    integrations,
+    action,
+    call,
+    setIntegrations,
+    setIntegrationTools,
+    integrationTools,
+    refresh,
+    setNotice,
+  } = props;
+  return (
+    <>
+      {integrations
+        .filter((c) => !readOnlyLinear(c))
+        .map((connection) => (
+          <IntegrationConnectionCard
+            key={connection.id}
+            connection={connection}
+            action={action}
+            call={call}
+            setIntegrations={setIntegrations}
+            setIntegrationTools={setIntegrationTools}
+            integrationTools={integrationTools}
+            refresh={refresh}
+            setNotice={setNotice}
+          />
+        ))}
+      {integrations.some(readOnlyLinear) && (
+        <details>
+          <summary>
+            Older read-only Linear connections ({integrations.filter(readOnlyLinear).length})
+          </summary>
+          <p>
+            These are saved connections from earlier setup. Publishing uses the read/write
+            connection above. They remain available for projects using them as context.
+          </p>
+          {integrations.filter(readOnlyLinear).map((connection) => (
+            <IntegrationConnectionCard
+              key={connection.id}
+              connection={connection}
+              action={action}
+              call={call}
+              setIntegrations={setIntegrations}
+              setIntegrationTools={setIntegrationTools}
+              integrationTools={integrationTools}
+              refresh={refresh}
+              setNotice={setNotice}
+            />
+          ))}
+        </details>
       )}
     </>
   );

@@ -14,10 +14,10 @@ import { Engine } from '../packages/core/src/engine.js';
 import { json, Store } from '../packages/core/src/storage.js';
 import {
   readAppUrl,
-  readVerification,
   resolveVerifyUrl,
   saveAppUrl,
-} from '../packages/core/src/verification-workflow.js';
+} from '../packages/core/src/verification-settings.js';
+import { readVerification } from '../packages/core/src/verification-workflow.js';
 import {
   type AgentRuntime,
   ArtifactFormatError,

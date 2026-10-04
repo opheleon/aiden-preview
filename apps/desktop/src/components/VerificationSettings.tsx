@@ -11,20 +11,16 @@ function plainError(error: unknown, fallback: string): string {
   return error.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
 }
 
-/** Show the project's most recent browser check, open its full report, or check again now. */
+/** Show the project's most recent browser check and open its full report. */
 function LatestCheck({
   project,
   api,
   latest,
-  busy,
-  onCheck,
   onError,
 }: {
   project: Project;
   api?: DesktopBridge | undefined;
   latest: WorkerResult<'verification'>;
-  busy: boolean;
-  onCheck: () => Promise<void>;
   onError: (message: string) => void;
 }): JSX.Element {
   return (
@@ -54,27 +50,22 @@ function LatestCheck({
             Open full report
           </button>
         )}
-        <button className="secondary" disabled={busy} onClick={() => void onCheck()}>
-          Check now
-        </button>
       </div>
     </div>
   );
 }
 
-/** Load and edit the URL Aiden opens when it checks this saved project's approved requirements. */
+/**
+ * Configure this project's deployed beta target for post-merge verification.
+ */
 export default function VerificationSettings({
   project,
   api,
   latest,
-  busy,
-  onCheck,
 }: {
   project: Project;
   api?: DesktopBridge | undefined;
   latest: WorkerResult<'verification'>;
-  busy: boolean;
-  onCheck: () => Promise<void>;
 }): JSX.Element {
   const [url, setUrl] = useState('');
   const [current, setCurrent] = useState<string | null>(null);
@@ -124,8 +115,11 @@ export default function VerificationSettings({
           <Globe size={19} />
         </div>
         <div>
-          <h2>App URL for {project.name || 'this project'}</h2>
-          <p>Where Aiden opens this project to check its approved requirements.</p>
+          <h2>Beta app URL for {project.name || 'this project'}</h2>
+          <p>
+            Set the deployed beta URL for post-merge verification. Local tests belong to your coding
+            agent.
+          </p>
         </div>
       </div>
       <label>
@@ -133,17 +127,17 @@ export default function VerificationSettings({
         <input
           type="url"
           aria-label="App URL"
-          placeholder="http://localhost:3000"
+          placeholder="https://beta.example.com"
           disabled={!loaded}
           value={url}
           onChange={(e) => setUrl(e.target.value)}
         />
       </label>
       <p className="fine-print">
-        Each project keeps its own URL. Use a localhost address or a beta site you control, and
-        start the app yourself first. Aiden only opens this address in a browser and never runs
-        repository code. Saving a non-local address is what allows Aiden to open it. Aiden will not
-        delete data, send email, or make payments while testing.
+        Each project keeps its own URL. Use the deployed beta site you control. Aiden only opens
+        this address in a browser and never runs repository code. Saving a non-local address is what
+        allows Aiden to open it. Aiden will not delete data, send email, or make payments while
+        testing.
       </p>
       <div className="button-row">
         <button
@@ -162,22 +156,12 @@ export default function VerificationSettings({
       {loaded && <p role="status">{current ? `Saved: ${current}` : 'No app URL saved.'}</p>}
       {current && (
         <p className="fine-print">
-          Each status refresh also tests every approved requirement at this URL, after the code
-          assessment. Only for apps with a sign-in: before starting Aiden, set AIDEN_VERIFY_USERNAME
-          and AIDEN_VERIFY_PASSWORD to a test account. Aiden types them into the sign-in form and
-          never shows them in reports.
+          Scheduled beta checks test the requirements at this URL after merge. Only for apps with a
+          sign-in: before starting Aiden, set AIDEN_VERIFY_USERNAME and AIDEN_VERIFY_PASSWORD to a
+          test account. Aiden types them into the sign-in form and never shows them in reports.
         </p>
       )}
-      {current && (
-        <LatestCheck
-          project={project}
-          api={api}
-          latest={latest}
-          busy={busy}
-          onCheck={onCheck}
-          onError={setError}
-        />
-      )}
+      {current && <LatestCheck project={project} api={api} latest={latest} onError={setError} />}
       {error && (
         <p role="alert" className="settings-save-error">
           {error}

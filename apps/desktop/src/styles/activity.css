@@ -1,0 +1,279 @@
+/* Activity: the per-run action log and its "Why?" conversation. */
+
+/* Runs newest first, each with its lines and an optional conversation. */
+
+.run-logs {
+  gap: 16px;
+}
+
+.run-log {
+  display: grid;
+  gap: 6px;
+}
+
+.run-log-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 13px;
+}
+
+.run-log-head strong {
+  font-weight: 600;
+}
+
+.run-log-head span {
+  color: var(--color-muted-foreground);
+}
+
+.run-log-head .text-button {
+  margin-left: auto;
+}
+
+.log-line {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 6px 0;
+  border-top: 1px solid var(--color-border);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.log-line time {
+  color: var(--faint);
+  font: 11px var(--font-mono);
+}
+
+.log-line em {
+  color: var(--faint);
+  font-style: normal;
+}
+
+.log-find > span:nth-child(2) {
+  color: #9a2f3a;
+}
+
+.log-actions {
+  display: flex;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.run-chat {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--color-paper2);
+}
+
+.chat-you {
+  justify-self: end;
+  max-width: 80%;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: var(--color-card);
+  font-size: 14px;
+}
+
+.chat-aiden {
+  display: grid;
+  gap: 2px;
+  max-width: 90%;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.chat-aiden small,
+.chat-thinking {
+  color: var(--color-muted-foreground);
+  font-size: 12px;
+}
+
+.chat-error {
+  color: var(--color-destructive);
+  font-size: 13px;
+}
+
+.chat-input {
+  display: flex;
+  gap: 8px;
+}
+
+.chat-input input {
+  flex: 1;
+  height: 34px;
+  margin: 0;
+  background: var(--color-card);
+}
+
+.chat-send {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 999px;
+}
+
+@media (width <= 720px) {
+  .log-line {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .log-line time {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Runs: the list, one run in full, and the live markers in the sidebar. */
+
+.run-detail {
+  display: grid;
+  gap: 16px;
+  max-width: 860px;
+  margin: 0 auto;
+  padding-bottom: 48px;
+}
+
+.run-detail > .text-button {
+  justify-self: start;
+}
+
+.run-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--faint);
+}
+
+.stage span {
+  width: 10px;
+  height: 10px;
+  border: 2px solid currentcolor;
+  border-radius: 50%;
+}
+
+.stage--done {
+  color: #306447;
+}
+
+.stage--done span {
+  background: currentcolor;
+}
+
+.stage--now {
+  color: var(--color-brand);
+  font-weight: 600;
+}
+
+.stage--now span {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.stage--stopped {
+  color: var(--color-destructive);
+}
+
+.run-history {
+  display: grid;
+  max-height: 60vh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.run-history .log-step > span:nth-child(2) {
+  color: var(--color-body);
+}
+
+.run-history .log-step {
+  padding: 3px 0;
+  border-top: 0;
+  font-size: 12px;
+}
+
+.run-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.run-list li:first-child .run-row {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.run-row:hover .row-title {
+  color: var(--color-brand-dark);
+}
+
+.run-log-title {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.run-log-title:hover {
+  color: var(--color-brand-dark);
+  text-decoration: underline;
+}
+
+.project-nav > div {
+  display: grid;
+  gap: 2px;
+}
+
+.project-nav .project-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 24px;
+  color: var(--color-muted-foreground);
+  font-size: 13px;
+}
+
+.project-nav .project-sub span:first-child {
+  flex: 1;
+  text-align: left;
+}
+
+.live-dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-brand);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}

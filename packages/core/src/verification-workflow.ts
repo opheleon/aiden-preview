@@ -1,242 +1,208 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { Browser } from 'playwright';
-import type { z } from 'zod/v3';
-
 import {
-  type CriterionOutcome,
-  CriterionOutcomeSchema,
   type CriterionResult,
-  outputSchemaFor,
-  type PageCheck,
   type RunManifest,
-  type VerificationAttempt,
-  type VerificationConfig,
-  VerificationConfigSchema,
+  type TriageItem,
+  TriageSchema,
   type VerificationResult,
-  type VerificationSettings,
-  type VisionJudgment,
-  VisionJudgmentSchema,
 } from '../../contracts/src/index.js';
-import { ArtifactFormatError } from '../../runtimes/src/index.js';
-import { type LocalToolServer, serveTools, type ToolProvider } from '../../tools/src/mcp.js';
+import { noTools } from '../../tools/src/mcp.js';
+import { betaTarget, deployedRevision } from '../../verification/src/index.js';
 import {
-  BrowserSession,
   criterionResult,
-  judgeAttempt,
   launchBrowser,
   loadVerificationConfig,
-  parseAppUrl,
-  plainText,
-  ProofViewer,
   reasonLabels,
   redactor,
   renderReport,
-  reviewableProof,
-  settingsFile,
   shouldRetry,
   summarize,
   verificationTarget,
 } from '../../verification/src/index.js';
-import { workflowRoot } from './model-stage.js';
+import { appendActivity } from './activity.js';
+import { blockedRequirements } from './blockers.js';
 import { atomic, optionalJson } from './storage.js';
+import {
+  type AppCheck,
+  appChecks,
+  type CheckItem,
+  checkItems,
+  itemKey,
+  planSummary,
+  reconcilePlan,
+} from './triage.js';
+import { attempt, progress, turn, type Verifier } from './verification-attempt.js';
 import type { WorkflowContext } from './workflow-context.js';
 
-type Requirement = { id: string; text: string };
-
-/** Run-scoped dependencies for criterion attempts; credentials stay here and never reach a prompt. */
-interface Verifier {
-  context: WorkflowContext;
-  run: RunManifest;
-  signal: AbortSignal;
-  workspace: string;
-  out: string;
-  browser: Browser;
-  target: URL;
-  config: VerificationConfig;
-  redact: (text: string) => string;
+/** Explain the missing method-specific target without treating another service as the app. */
+function missingTarget(v: Verifier, check: AppCheck): string | null {
+  if (check.method === 'api' && !v.config.api)
+    return 'Set an API URL in project settings, or verify this requirement manually.';
+  if (check.method !== 'api' && v.config.api && !v.config.url)
+    return 'Set the browser app URL in project settings, or verify this requirement manually.';
+  return null;
 }
-
-/** Report progress on the verify stage. */
-function progress(v: Pick<Verifier, 'context' | 'run'>, message: string): void {
-  v.context.emit({
-    type: 'progress',
-    runId: v.run.id,
-    projectId: v.run.projectId,
-    stage: 'verify',
-    message,
-  });
-}
-
-/** Submit one model turn; invalid output yields null so the caller records "Couldn't verify". */
-async function turn<T>(
+/** Persist an inconclusive check and give the user a manual verification action. */
+async function saveUnavailable(
   v: Verifier,
-  workflow: string,
-  schema: z.ZodType<T>,
-  input: unknown,
-  provider: ToolProvider,
-): Promise<T | null> {
-  v.signal.throwIfAborted();
-  const instructions = await readFile(path.join(workflowRoot, 'workflows/v1', workflow), 'utf8');
-  const output = outputSchemaFor(schema);
-  const tools: LocalToolServer = await serveTools(provider);
-  try {
-    const result = await v.context.runtime.run({
-      config: v.run.project.runtime,
-      prompt: `${instructions}\n<input_data>\n${JSON.stringify(input)}\n</input_data>\nReturn ONLY the JSON object matching this schema:\n${JSON.stringify(output)}`,
-      schema: output,
-      cwd: v.workspace,
-      tools,
-      signal: v.signal,
-      progress: (message) => progress(v, v.redact(message)),
-    });
-    v.run.runtimeVersion = result.version;
-    const model = result.model ?? v.run.project.runtime.model;
-    if (model !== undefined) v.run.runtimeModel = model;
-    const parsed = schema.safeParse(result.value);
-    return parsed.success ? parsed.data : null;
-  } catch (error) {
-    if (error instanceof ArtifactFormatError) return null;
-    throw error;
-  } finally {
-    await tools.close();
-  }
-}
-
-/** Ask a separate turn, which never sees the agent's reasoning, to judge the outlined screenshot. */
-async function reviewScreenshot(
-  v: Verifier,
-  requirement: Requirement,
-  proof: PageCheck,
-  file: string,
-): Promise<VisionJudgment | null> {
-  progress(v, `${requirement.id}: reviewing the proof screenshot`);
-  return turn(
-    v,
-    'verify-vision.md',
-    VisionJudgmentSchema,
-    { criterion: requirement.text, outlinedElement: `${proof.role} "${proof.name}"` },
-    new ProofViewer(file),
-  );
-}
-
-/** Run one fresh, recorded browser session for a criterion and apply the evidence rules. */
-async function attempt(
-  v: Verifier,
-  requirement: Requirement,
-  index: number,
-): Promise<VerificationAttempt> {
-  const relative = path.posix.join(requirement.id, `attempt-${index}`);
-  const dir = path.join(v.out, relative);
-  await mkdir(dir, { recursive: true, mode: 0o700 });
-  const session = await BrowserSession.open(v.browser, {
-    start: v.target,
-    allowedOrigins: v.config.allowedOrigins,
-    credentials: v.config.credentials,
-    stepLimit: v.config.stepLimit,
-    dir,
-    criterion: requirement.text,
-    redact: v.redact,
-    progress: (action) => progress(v, `${requirement.id}: ${action}`),
-  });
-  let outcome: CriterionOutcome | null;
-  let video: string;
-  try {
-    outcome = await turn(
-      v,
-      'verify-criterion.md',
-      CriterionOutcomeSchema,
-      {
-        criterion: requirement.text,
-        startUrl: v.target.href,
-        credentialsAvailable: Boolean(v.config.credentials),
-        stepLimit: v.config.stepLimit,
-      },
-      session,
-    );
-  } finally {
-    video = await session.close();
-  }
-  const proof = reviewableProof(outcome, session.checks);
-  const vision = proof
-    ? await reviewScreenshot(v, requirement, proof, path.join(dir, proof.screenshot))
-    : null;
-  const judged = judgeAttempt({
-    outcome,
-    stepLimitReached: session.stepLimitReached,
-    checks: session.checks,
-    vision,
-  });
-  /** Redact credentials and em dashes from model text before it is saved. */
-  const clean = (value: string | null | undefined) => (value ? plainText(v.redact(value)) : null);
-  /** Make a media path relative to the verification folder so the report works from disk. */
-  const media = (file: string) => path.posix.join(relative, file);
-  return {
-    attempt: index,
-    verdict: judged.verdict,
-    reason: judged.reason,
-    explanation: clean(judged.explanation) ?? 'No explanation was recorded.',
-    expected: clean(outcome?.expected),
-    observed: clean(outcome?.observed),
-    video: media(video),
-    proof: judged.proof && { ...judged.proof, screenshot: media(judged.proof.screenshot) },
-    vision: vision && { ...vision, observation: plainText(v.redact(vision.observation)) },
-    steps: session.steps.map((step) => ({
-      ...step,
-      screenshot: step.screenshot && media(step.screenshot),
-    })),
+  check: AppCheck,
+  explanation: string,
+): Promise<CriterionResult> {
+  const result: CriterionResult = {
+    requirementId: check.requirementId,
+    edgeCaseId: check.edgeCaseId,
+    method: check.method ?? 'app',
+    criterion: check.text,
+    verdict: 'unverified',
+    reason: 'blocked',
+    explanation,
+    expected: null,
+    observed: null,
+    decisiveAttempt: null,
+    attempts: [],
   };
-}
-
-/** Verify one criterion with a single retry, reusing a saved result when a run resumes. */
-async function verifyCriterion(v: Verifier, requirement: Requirement): Promise<CriterionResult> {
-  const file = path.join(v.out, requirement.id, 'result.json');
-  const saved = await optionalJson<CriterionResult>(file);
-  if (saved && saved.requirementId === requirement.id) return saved;
-  // An interrupted criterion restarts cleanly so its evidence always comes from complete sessions.
-  await rm(path.join(v.out, requirement.id), { recursive: true, force: true });
-  progress(v, `${requirement.id}: ${requirement.text}`);
-  const attempts = [await attempt(v, requirement, 1)];
-  if (shouldRetry(attempts[0]!)) {
-    progress(v, `${requirement.id}: checking again in a fresh browser`);
-    attempts.push(await attempt(v, requirement, 2));
-  }
-  const result = criterionResult(requirement.id, v.redact(requirement.text), attempts);
-  await atomic(file, result, v.signal);
-  const label =
-    result.verdict === 'unverified' ? reasonLabels[result.reason ?? 'other'] : result.verdict;
-  progress(v, `${requirement.id}: ${label}`);
+  await atomic(path.join(v.out, check.key, 'result.json'), result, v.signal);
+  await logResult(v, check, result);
   return result;
 }
 
-/** Test every approved requirement against the configured URL and publish the evidence report. */
-export async function executeVerification(
-  context: WorkflowContext,
-  run: RunManifest,
-  signal: AbortSignal,
-  dir: string,
-  workspace: string,
-): Promise<void> {
-  const projectDir = context.store.project(run.projectId);
-  const config = await loadVerificationConfig(projectDir, process.env);
-  const target = verificationTarget(run.verifyUrl ?? '', config.allowedOrigins);
-  const redact = redactor([config.credentials?.username ?? '', config.credentials?.password ?? '']);
-  const out = path.join(dir, 'verification');
-  await mkdir(out, { recursive: true, mode: 0o700 });
-  run.stage = 'verify';
-  run.status = 'running';
-  await atomic(path.join(dir, 'manifest.json'), run, signal);
-  const browser = await launchBrowser();
-  const criteria: CriterionResult[] = [];
-  try {
-    const v: Verifier = { context, run, signal, workspace, out, browser, target, config, redact };
-    for (const requirement of run.baseline!.product.requirements)
-      criteria.push(await verifyCriterion(v, requirement));
-  } finally {
-    await browser.close();
+/** Verify one requirement or edge case with a single retry, reusing a saved result on resume. */
+async function verifyCriterion(v: Verifier, check: AppCheck): Promise<CriterionResult> {
+  const file = path.join(v.out, check.key, 'result.json');
+  const saved = await optionalJson<CriterionResult>(file);
+  if (
+    saved &&
+    saved.requirementId === check.requirementId &&
+    (saved.edgeCaseId ?? null) === check.edgeCaseId
+  )
+    return saved;
+  // An interrupted criterion restarts cleanly so its evidence always comes from complete sessions.
+  await rm(path.join(v.out, check.key), { recursive: true, force: true });
+  progress(v, `${check.key}: ${check.text}`);
+  const missing = missingTarget(v, check);
+  if (missing) return saveUnavailable(v, check, missing);
+  const attempts = [await attempt(v, check, 1)];
+  if (check.method !== 'api' && shouldRetry(attempts[0]!)) {
+    progress(v, `${check.key}: checking again in a fresh browser`);
+    attempts.push(await attempt(v, check, 2));
   }
-  const result: VerificationResult = {
+  const result: CriterionResult = {
+    ...criterionResult(check.requirementId, v.redact(check.text), attempts),
+    edgeCaseId: check.edgeCaseId,
+    persona: check.persona,
+    method: check.method ?? 'app',
+  };
+  await atomic(file, result, v.signal);
+  const label =
+    result.verdict === 'unverified' ? reasonLabels[result.reason ?? 'other'] : result.verdict;
+  progress(v, `${check.key}: ${label}`);
+  await logResult(v, check, result);
+  return result;
+}
+
+/** Record what a browser check concluded, pointing at its recording as evidence. */
+async function logResult(v: Verifier, check: AppCheck, result: CriterionResult): Promise<void> {
+  const name = check.edgeCaseId
+    ? `${check.requirementId} edge case ${check.edgeCaseId}`
+    : check.requirementId;
+  const location = check.method === 'api' ? 'via the API' : 'in the app';
+  const as = check.persona ? ` as ${check.persona}` : '';
+  const summary =
+    result.verdict === 'pass'
+      ? `${name} works ${location}${as}.`
+      : result.verdict === 'fail'
+        ? `${name} is broken ${location}${as}.${result.observed ? ` ${result.observed}` : ''}`
+        : `${name}: couldn't check ${location}. ${result.explanation}`;
+  await appendActivity(
+    v.context,
+    v.run,
+    {
+      kind: result.verdict === 'pass' ? 'check' : result.verdict === 'fail' ? 'find' : 'result',
+      requirementId: check.requirementId,
+      ...(check.edgeCaseId ? { edgeCaseId: check.edgeCaseId } : {}),
+      summary,
+      reason: result.explanation,
+      evidence: check.key,
+    },
+    v.redact,
+  );
+}
+
+/** Decide how to check each requirement and edge case, reusing a saved plan when a run resumes. */
+async function planChecks(v: Verifier, dir: string, items: CheckItem[]): Promise<TriageItem[]> {
+  if (!items.length) return [];
+  const file = path.join(dir, 'triage.json');
+  const saved = TriageSchema.safeParse(await optionalJson(file));
+  if (saved.success) return reconcilePlan(items, saved.data.items);
+  progress(v, 'Deciding how to check each requirement');
+  const proposed = await turn(
+    v,
+    'triage.md',
+    TriageSchema,
+    {
+      items: items.map(({ requirementId, edgeCaseId, text, requirement }) => ({
+        requirementId,
+        edgeCaseId,
+        text,
+        requirement: edgeCaseId ? requirement : null,
+      })),
+      appUrl: v.config.url ?? (v.config.api ? null : v.target.href),
+      apiUrl: v.config.api?.url ?? null,
+      credentialsAvailable: Boolean(v.config.credentials),
+    },
+    noTools,
+  );
+  const plan = reconcilePlan(items, proposed?.items ?? null);
+  await atomic(file, { items: plan }, v.signal);
+  await appendActivity(v.context, v.run, {
+    kind: 'decide',
+    summary: planSummary(plan),
+    reason:
+      'Aiden checks visible behavior in the app, HTTP behavior through the API, and asks a person when a check needs other evidence.',
+  });
+  for (const p of plan.filter((item) => item.method === 'person'))
+    await appendActivity(v.context, v.run, {
+      kind: 'decide',
+      requirementId: p.requirementId,
+      ...(p.edgeCaseId ? { edgeCaseId: p.edgeCaseId } : {}),
+      summary: `${itemKey(p.requirementId, p.edgeCaseId)} needs a person to confirm.`,
+      reason: p.reason,
+    });
+  return plan;
+}
+
+/** A stopped browser app must not prevent configured API checks from finishing. */
+async function verifyConfigured(v: Verifier, check: AppCheck): Promise<CriterionResult> {
+  try {
+    return await verifyCriterion(v, check);
+  } catch (error) {
+    v.signal.throwIfAborted();
+    if (
+      v.config.api &&
+      check.method !== 'api' &&
+      error instanceof Error &&
+      error.message.startsWith('Could not open ')
+    )
+      return saveUnavailable(
+        v,
+        check,
+        'The browser app could not be opened. Start it and check again, or verify this requirement manually.',
+      );
+    throw error;
+  }
+}
+
+/** Build the result for what has been checked so far; used for both progress and the final save. */
+function buildResult(
+  run: RunManifest,
+  target: URL,
+  triage: TriageItem[],
+  criteria: CriterionResult[],
+): VerificationResult {
+  return {
+    ...(run.beta ? { environment: 'beta' as const, deploymentRevision: run.beta.revision } : {}),
     schemaVersion: '1.0',
     runId: run.id,
     projectId: run.projectId,
@@ -252,7 +218,80 @@ export async function executeVerification(
     },
     criteria,
     summary: summarize(criteria),
+    triage,
   };
+}
+
+/**
+ * Save what Aiden has checked so far and tell the renderer, so Watch can show a completed
+ * criterion's recording while later criteria in the same run are still being checked.
+ */
+async function publishProgress(
+  v: Verifier,
+  out: string,
+  target: URL,
+  triage: TriageItem[],
+  criteria: CriterionResult[],
+): Promise<void> {
+  const result = { ...buildResult(v.run, target, triage, criteria), partial: true };
+  await atomic(path.join(out, 'results.json'), result, v.signal);
+  await writeFile(path.join(out, 'report.html'), renderReport(result), { mode: 0o600 });
+  v.context.emit({
+    type: 'progress',
+    runId: v.run.id,
+    projectId: v.run.projectId,
+    stage: 'verify',
+    verification: result.summary,
+  });
+}
+
+/** Test every approved requirement against the configured URL and publish the evidence report. */
+export async function executeVerification(
+  context: WorkflowContext,
+  run: RunManifest,
+  signal: AbortSignal,
+  dir: string,
+  workspace: string,
+): Promise<void> {
+  const projectDir = context.store.project(run.projectId);
+  const config = await loadVerificationConfig(projectDir, process.env);
+  const target = verificationTarget(run.verifyUrl ?? '', config.allowedOrigins);
+  if (run.beta) {
+    if (betaTarget(config, run.beta.revisionUrl).href !== target.href)
+      throw new Error('The configured beta target changed before verification.');
+    if ((await deployedRevision(run.beta.revisionUrl)) !== run.beta.revision)
+      throw new Error('Beta changed before verification. Wait for the next scheduled check.');
+  }
+  const redact = verificationRedactor(config);
+  const out = path.join(dir, 'verification');
+  await mkdir(out, { recursive: true, mode: 0o700 });
+  run.stage = 'verify';
+  run.status = 'running';
+  await atomic(path.join(dir, 'manifest.json'), run, signal);
+  const browser = await launchBrowser();
+  const criteria: CriterionResult[] = [];
+  let triage: TriageItem[];
+  try {
+    const v: Verifier = { context, run, signal, workspace, out, browser, target, config, redact };
+    const items = await eligibleChecks(context, run);
+    triage = await planChecks(v, dir, items);
+    const { checks, deferred } = appChecks(items, triage);
+    if (deferred)
+      await appendActivity(context, run, {
+        kind: 'decide',
+        summary: `Left ${deferred} edge cases for a later look to keep this one to ${checks.length} checks.`,
+      });
+    for (const check of checks) {
+      if (await checkBlocked(context, run, check.requirementId)) continue;
+      criteria.push(await verifyConfigured(v, check));
+      if (!run.beta) await publishProgress(v, out, target, triage, criteria);
+    }
+  } finally {
+    await browser.close();
+  }
+  if (run.beta && (await deployedRevision(run.beta.revisionUrl)) !== run.beta.revision)
+    throw new Error('Beta changed during verification. No completion evidence was published.');
+  const result = buildResult(run, target, triage, criteria);
   await atomic(path.join(out, 'results.json'), result, signal);
   await writeFile(path.join(out, 'report.html'), renderReport(result), { mode: 0o600 });
   await atomic(path.join(projectDir, 'latest-verification.json'), { id: run.id }, signal);
@@ -287,51 +326,29 @@ export async function readVerification(
   return result && { result, reportPath: path.join(out, 'report.html') };
 }
 
-/** Choose the given URL or the project's saved one, then apply the local-or-configured origin rule. */
-export async function resolveVerifyUrl(projectDir: string, url?: string): Promise<string> {
-  const config = await loadVerificationConfig(projectDir, process.env);
-  const target = url ?? config.url;
-  if (!target)
-    throw new Error(
-      "Save this project's app URL (App URL on its overview, or the verify-url command), or pass --url.",
-    );
-  return verificationTarget(target, config.allowedOrigins).href;
+/** Recheck eligibility immediately before browser or API actions. */
+async function checkBlocked(
+  context: WorkflowContext,
+  run: RunManifest,
+  requirementId: string,
+): Promise<boolean> {
+  const blocked = await blockedRequirements(context.store, run.projectId, run.baseline!.product);
+  return Boolean(blocked.get(requirementId)?.length);
 }
 
-/** Read the settings file as saved, without environment credentials or derived origins. */
-async function savedSettings(projectDir: string): Promise<VerificationConfig> {
-  const file = settingsFile(projectDir);
-  let raw: unknown;
-  try {
-    raw = await optionalJson(file);
-  } catch (error) {
-    if (error instanceof SyntaxError)
-      throw new Error(`${file} is not valid JSON.`, { cause: error });
-    throw error;
-  }
-  return VerificationConfigSchema.parse(raw ?? {});
+/** Exclude blocked scope before asking a model to plan browser or API checks. */
+async function eligibleChecks(context: WorkflowContext, run: RunManifest): Promise<CheckItem[]> {
+  const blocked = await blockedRequirements(context.store, run.projectId, run.baseline!.product);
+  return checkItems(run.baseline!.product).filter(
+    (item) => !blocked.get(item.requirementId)?.length,
+  );
 }
 
-/** Read the project's saved app URL for display; test credentials never leave the worker. */
-export async function readAppUrl(
-  context: Pick<WorkflowContext, 'store'>,
-  projectId: string,
-): Promise<VerificationSettings> {
-  return { url: (await savedSettings(context.store.project(projectId))).url ?? null };
-}
-
-/** Save or clear the project's app URL, keeping every other setting in the owner-only file. */
-export async function saveAppUrl(
-  context: Pick<WorkflowContext, 'store'>,
-  projectId: string,
-  url: string | null,
-): Promise<VerificationSettings> {
-  const projectDir = context.store.project(projectId);
-  if (!(await optionalJson(path.join(projectDir, 'project.json'))))
-    throw new Error('Save this project before setting its app URL.');
-  const settings = await savedSettings(projectDir);
-  delete settings.url;
-  if (url !== null) settings.url = parseAppUrl(url.trim()).href;
-  await atomic(settingsFile(projectDir), settings);
-  return { url: settings.url ?? null };
+/** Redact configured secrets consistently from browser/API evidence and recordings. */
+function verificationRedactor(config: Verifier['config']): Verifier['redact'] {
+  return redactor([
+    config.credentials?.username ?? '',
+    config.credentials?.password ?? '',
+    config.expiredToken ?? '',
+  ]);
 }

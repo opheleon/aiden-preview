@@ -32,6 +32,14 @@ export function parseAppUrl(raw: string): URL {
   return url;
 }
 
+/** Parse an API base without URL-carried secrets or ambiguous query/fragment routing. */
+export function parseApiUrl(raw: string): URL {
+  const url = parseAppUrl(raw.trim());
+  if (url.search || url.hash)
+    throw new Error('Use an API base URL without query parameters or fragments.');
+  return url;
+}
+
 /** Accept only http(s) targets on loopback or an exact origin the user configured for the project. */
 export function verificationTarget(raw: string, allowedOrigins: readonly string[]): URL {
   const url = parseAppUrl(raw);
@@ -60,13 +68,15 @@ export async function loadVerificationConfig(
   // Saving an app URL is how the user configures a non-local origin, so it joins the allowlist.
   if (config.url)
     config.allowedOrigins = [...config.allowedOrigins, parseAppUrl(config.url).origin];
-  if (config.credentials && ((await stat(file)).mode & 0o077) !== 0)
+  if (config.api) config.allowedOrigins.push(parseApiUrl(config.api.url).origin);
+  if ((config.credentials || config.expiredToken) && ((await stat(file)).mode & 0o077) !== 0)
     throw new Error(`Run chmod 600 on ${file} before storing test credentials in it.`);
   const username = env.AIDEN_VERIFY_USERNAME;
   const password = env.AIDEN_VERIFY_PASSWORD;
   if (username && password) config.credentials = { username, password };
   else if (username || password)
     throw new Error('Set both AIDEN_VERIFY_USERNAME and AIDEN_VERIFY_PASSWORD, or neither.');
+  if (env.AIDEN_VERIFY_EXPIRED_TOKEN) config.expiredToken = env.AIDEN_VERIFY_EXPIRED_TOKEN;
   return config;
 }
 

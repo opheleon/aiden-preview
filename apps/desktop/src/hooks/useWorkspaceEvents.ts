@@ -2,125 +2,175 @@ import { useEffect } from 'react';
 
 import type { RunEvent } from '../../../../packages/contracts/src/index';
 import type { DesktopBridge } from '../bridge';
-import { overridesFrom } from '../renderer/project-state';
 import type { WorkspaceState } from './useWorkspaceState';
 
 type EventState = Pick<
   WorkspaceState,
+  | 'setProject'
+  | 'setProjects'
   | 'setNotice'
   | 'setBusy'
-  | 'setLog'
+  | 'setLive'
+  | 'setLiveByRun'
+  | 'setActiveRuns'
   | 'setActiveRun'
-  | 'setQuestion'
-  | 'setAnswer'
-  | 'setProduct'
-  | 'setReviewRun'
-  | 'setStep'
   | 'setReport'
-  | 'setEstimation'
-  | 'setOverrides'
   | 'setRuns'
+  | 'setBaseline'
+  | 'setActivity'
+  | 'setCalls'
   | 'setError'
   | 'setVerification'
 >;
 type EventContext = EventState & {
   projectId: string;
   call: DesktopBridge['request'];
-  /** The run whose progress this window last showed; a new ID means a chained run started. */
-  following: string;
+  seen: Set<string>;
+  current: () => boolean;
 };
 
-/** Refresh saved history after terminal events, reporting worker failures through the normal UI. */
-function refreshHistory(state: EventContext): void {
-  void state
-    .call('state', { projectId: state.projectId })
-    .then((saved) => state.setRuns(saved.runs))
-    .catch((error: unknown) =>
-      state.setError(error instanceof Error ? error.message : 'Could not refresh run history.'),
-    );
+/** Report a failed refresh through the normal error banner. */
+function failed(state: EventContext, fallback: string): (error: unknown) => void {
+  return (error) => state.setError(error instanceof Error ? error.message : fallback);
 }
 
-/** Reload the latest browser check so requirement states include its verdicts. */
-function refreshVerification(state: EventContext): void {
+/**
+ * Reload what Aiden knows about the project after it changed: run history, what done means, calls,
+ * and the action log. Each part refreshes on its own so one failure does not hide the rest.
+ */
+function refreshProject(state: EventContext, ended = ''): void {
+  const projectId = state.projectId;
+  if (ended) state.setActiveRuns((ids) => ids.filter((id) => id !== ended));
   void state
-    .call('verification', { projectId: state.projectId })
+    .call('state', { projectId })
+    .then((saved) => {
+      if (!state.current()) return;
+      state.setProject(saved.project);
+      state.setProjects((projects) =>
+        projects.map((p) => (p.id === saved.project.id ? saved.project : p)),
+      );
+      state.setRuns(saved.runs);
+      state.setBaseline(saved.baseline ?? undefined);
+      // A run that just ended can still be finishing its cleanup when the worker answers.
+      const active = saved.activeRunIds.filter((id) => id !== ended);
+      state.setActiveRuns(active);
+      // Another run, such as the browser check beside a code check, keeps Aiden working.
+      if (ended) state.setBusy(active.length > 0);
+    })
+    .catch(failed(state, 'Could not refresh the project.'));
+  void state
+    .call('calls', { projectId })
+    .then(state.setCalls)
+    .catch(failed(state, 'Could not load calls.'));
+  void state
+    .call('activity', { projectId })
+    .then(state.setActivity)
+    .catch(failed(state, 'Could not load the activity.'));
+}
+
+/** Reload one run's verification result, so Watch reflects what it just checked. */
+function refreshVerification(state: EventContext, runId: string): void {
+  void state
+    .call('verification', { projectId: state.projectId, runId })
     .then(state.setVerification)
-    .catch((error: unknown) =>
-      state.setError(error instanceof Error ? error.message : 'Could not load the browser check.'),
-    );
+    .catch(failed(state, 'Could not load the browser check.'));
 }
 
-/** Publish accepted artifacts; estimates are only refreshed when someone asks for them. */
+/** Publish finished work: a new report, a browser check, or a rewritten "what done means". */
 function completed(state: EventContext, event: RunEvent): void {
   if (event.report) state.setReport(event.report);
-  if (event.verification) {
-    state.setNotice(`Browser check finished. ${event.verification.line}`);
-    refreshVerification(state);
-  }
-  if (event.estimation) {
-    state.setEstimation(event.estimation);
-    state.setOverrides(overridesFrom(event.estimation));
-  }
+  if (event.verification) refreshVerification(state, event.runId);
   state.setActiveRun('');
   state.setBusy(false);
-  state.setQuestion(undefined);
-  state.setStep(3);
-  refreshHistory(state);
+  state.setLive('');
+  refreshProject(state, event.runId);
 }
 
-/** Answer questions from runs in other projects and note when they finish, without leaving this one. */
-function background(state: EventContext, event: RunEvent): void {
-  if (event.type === 'clarification') {
-    state.setQuestion(event);
-    state.setAnswer('');
-  }
-  if (['completed', 'failed', 'cancelled'].includes(event.type)) {
-    state.setQuestion((current) => (current?.runId === event.runId ? undefined : current));
-    state.setNotice('A background run finished. Open its project to review history.');
-  }
+/**
+ * A run stopped. The brief explains a stopped look from its saved run, with a way to look again,
+ * so only problems that no run records (such as a follow-up that could not start) use the banner.
+ */
+function stopped(state: EventContext, event: RunEvent): void {
+  state.setActiveRun('');
+  state.setBusy(false);
+  state.setLive('');
+  refreshProject(state, event.runId);
+  void state
+    .call('state', { projectId: state.projectId })
+    .then((saved) => {
+      const run = saved.runs.find((r) => r.id === event.runId);
+      if (!run || run.status === 'completed') state.setError(event.message ?? 'Aiden stopped.');
+    })
+    .catch(failed(state, 'Could not refresh the project.'));
 }
 
-/** Show a run's progress, starting a fresh log when a chained run such as a browser check begins. */
-function progress(state: EventContext, event: RunEvent): void {
-  if (event.runId !== state.following) {
-    if (state.following) state.setLog([]);
-    state.following = event.runId;
-    refreshHistory(state);
-  }
-  state.setBusy(true);
-  state.setLog((lines) => [...lines.slice(-49), event.message ?? 'Working…']);
-  state.setActiveRun(event.runId);
+/** Add a live action-log line, newest first, without duplicating one already loaded. */
+function activity(state: EventContext, event: RunEvent): void {
+  const entry = event.activity;
+  if (!entry) return;
+  // Steps belong to a run's full history, not the brief.
+  if (entry.kind !== 'step')
+    state.setActivity((entries) =>
+      entries.some((e) => e.at === entry.at && e.summary === entry.summary)
+        ? entries
+        : [entry, ...entries],
+    );
+  state.setLive(entry.summary);
+  state.setLiveByRun((runs) => ({ ...runs, [entry.runId]: entry.summary }));
+  if (entry.kind === 'ask' || entry.kind === 'decide')
+    void state
+      .call('calls', { projectId: state.projectId })
+      .then(state.setCalls)
+      .catch(failed(state, 'Could not load calls.'));
 }
 
-/** Route current-project events while keeping background and scheduled clarification handling separate. */
+/** Route current-project events; other projects only get a quiet notice when they finish. */
 function receive(state: EventContext, event: RunEvent): void {
-  if (event.trigger === 'scheduled' && event.type === 'clarification') return;
-  if (event.projectId && event.projectId !== state.projectId) return background(state, event);
+  if (event.projectId && event.projectId !== state.projectId) {
+    if (event.type === 'completed') {
+      state.setNotice('Aiden finished a look on another project. Open it to see the brief.');
+      void state
+        .call('projects')
+        .then(state.setProjects)
+        .catch(failed(state, 'Could not refresh project names.'));
+    }
+    return;
+  }
   switch (event.type) {
-    case 'progress':
-      progress(state, event);
+    case 'coding':
+      // External jobs have their own delivery view; never mix them into analyst run history.
       break;
-    case 'clarification':
-      state.setQuestion(event);
-      state.setAnswer('');
+    case 'progress':
+      if (!state.seen.has(event.runId)) {
+        state.seen.add(event.runId);
+        void state
+          .call('state', { projectId: state.projectId })
+          .then((saved) => {
+            if (state.current()) state.setRuns(saved.runs);
+          })
+          .catch(failed(state, 'Could not refresh runs.'));
+      }
+      state.setActiveRuns((ids) => (ids.includes(event.runId) ? ids : [...ids, event.runId]));
+      state.setBusy(true);
+      state.setActiveRun(event.runId);
+      if (event.message) {
+        state.setLive(event.message);
+        const message = event.message;
+        state.setLiveByRun((runs) => ({ ...runs, [event.runId]: message }));
+      }
+      // A completed criterion inside a still-running verification: let Watch show it now.
+      if (event.verification) refreshVerification(state, event.runId);
+      break;
+    case 'activity':
+      activity(state, event);
       break;
     case 'review':
-      state.setProduct(event.product);
-      state.setReviewRun(event.runId);
-      state.setActiveRun('');
-      state.setBusy(false);
-      state.setStep(2);
-      break;
     case 'completed':
       completed(state, event);
       break;
     case 'failed':
     case 'cancelled':
-      state.setError(event.message ?? 'Run stopped.');
-      state.setActiveRun('');
-      state.setBusy(false);
-      state.setQuestion(undefined);
-      refreshHistory(state);
+      stopped(state, event);
       break;
   }
 }
@@ -133,61 +183,67 @@ export function useWorkspaceEvents(
 ): void {
   const {
     project: { id: projectId },
+    setProject,
+    setProjects,
     setNotice,
     setBusy,
-    setLog,
+    setLive,
+    setLiveByRun,
+    setActiveRuns,
     setActiveRun,
-    setQuestion,
-    setAnswer,
-    setProduct,
-    setReviewRun,
-    setStep,
     setReport,
-    setEstimation,
-    setOverrides,
     setRuns,
+    setBaseline,
+    setActivity,
+    setCalls,
     setError,
     setVerification,
   } = state;
   useEffect(() => {
+    let current = true;
     const context: EventContext = {
       projectId,
       call,
+      seen: new Set(),
+      current: () => current,
+      setProject,
+      setProjects,
       setNotice,
       setBusy,
-      setLog,
+      setLive,
+      setLiveByRun,
+      setActiveRuns,
       setActiveRun,
-      setQuestion,
-      setAnswer,
-      setProduct,
-      setReviewRun,
-      setStep,
       setReport,
-      setEstimation,
-      setOverrides,
       setRuns,
+      setBaseline,
+      setActivity,
+      setCalls,
       setError,
       setVerification,
-      following: '',
     };
-    return api?.onEvent((event) => receive(context, event));
+    const unsubscribe = api?.onEvent((event) => receive(context, event));
+    return () => {
+      current = false;
+      unsubscribe?.();
+    };
   }, [
     api,
     call,
     projectId,
+    setProject,
+    setProjects,
     setNotice,
     setBusy,
-    setLog,
+    setLive,
+    setLiveByRun,
+    setActiveRuns,
     setActiveRun,
-    setQuestion,
-    setAnswer,
-    setProduct,
-    setReviewRun,
-    setStep,
     setReport,
-    setEstimation,
-    setOverrides,
     setRuns,
+    setBaseline,
+    setActivity,
+    setCalls,
     setError,
     setVerification,
   ]);

@@ -67,7 +67,7 @@ async function isolatedConfig(
     agents: { enabled: false },
     web_search: 'disabled',
     project_doc_max_bytes: 0,
-    model_reasoning_effort: 'medium',
+    model_reasoning_effort: request.config.effort ?? 'medium',
   };
 }
 

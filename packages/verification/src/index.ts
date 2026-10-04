@@ -1,9 +1,14 @@
 import { type Browser, chromium } from 'playwright';
 
+export { ApiHttp } from './api-http.js';
+export { ApiSession } from './api-session.js';
+export { betaTarget, betaUrl, deployedRevision } from './beta.js';
 export { BrowserSession, type SessionOptions } from './browser.js';
+export { appPorts, discoverLocalApps, type DiscoverOptions } from './discover.js';
 export {
   isLocalHost,
   loadVerificationConfig,
+  parseApiUrl,
   parseAppUrl,
   redactor,
   settingsFile,

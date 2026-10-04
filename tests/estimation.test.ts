@@ -214,7 +214,7 @@ void test('estimation uses approved context tools but rejects interactive clarif
           (
             await client.callTool({
               name: 'request_clarification',
-              arguments: { question: 'Synthetic question' },
+              arguments: { question: 'Synthetic question', assumption: 'Synthetic assumption' },
             })
           ).isError,
           true,
@@ -242,7 +242,7 @@ void test('estimation uses approved context tools but rejects interactive clarif
     await engine.wait(estimated.runId);
     assert.equal((await engine.getEstimate(f.project.id))?.id, estimated.runId);
     assert.equal(reads, 1);
-    assert.ok(progress.includes('Using repo inventory'));
+    assert.ok(progress.includes('Listed the repositories and their branches'));
     const receipts = await json<{ connectionId: string }[]>(
       path.join(store.run(f.project.id, estimated.runId), 'external-reads.json'),
     );

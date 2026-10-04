@@ -2,22 +2,12 @@ import { X } from 'lucide-react';
 import type { JSX } from 'react';
 
 import type { Workspace } from '../hooks/useWorkspace';
-import { ClarificationDialog } from './ClarificationDialog';
 
-/** Show active clarification and evidence without privileged renderer access. */
+/** Show cited code evidence without privileged renderer access. */
 export function WorkspaceDialogs({ workspace }: { workspace: Workspace }): JSX.Element {
-  const { question, evidence, setEvidence, project, projects } = workspace;
-  const otherProject =
-    question?.projectId && question.projectId !== project.id
-      ? (projects.find((item) => item.id === question.projectId)?.name ?? 'another project')
-      : undefined;
+  const { evidence, setEvidence } = workspace;
   return (
     <>
-      {question && (
-        <div className="modal-overlay">
-          <ClarificationDialog {...workspace} question={question} otherProject={otherProject} />
-        </div>
-      )}
       {evidence && (
         <div className="modal-overlay">
           <section

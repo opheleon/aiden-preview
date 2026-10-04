@@ -101,3 +101,15 @@ void test('production synchronization still refuses inherited executable filters
     else process.env.GIT_CONFIG_GLOBAL = previous;
   }
 });
+void test('cancelling during sync propagates the cancellation instead of a stale-sync warning', async () => {
+  const f = await fixture();
+  const repo = required(f.project.repositories[0]);
+  const before = await g(repo.path, 'rev-parse', 'HEAD');
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(syncRepository(repo, controller.signal), (error: Error) => {
+    assert.doesNotMatch(error.message, /Git operation failed/);
+    return true;
+  });
+  assert.equal(await g(repo.path, 'rev-parse', 'HEAD'), before);
+});

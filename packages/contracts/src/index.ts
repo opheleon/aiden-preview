@@ -1,29 +1,54 @@
 import { z } from 'zod/v3';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
+import { DeliveryPlanSchema, validateDeliveryPlan } from './delivery-plan.js';
+import { edgeCaseId, requirementId } from './ids.js';
 import { ProjectSourcesSchema } from './integrations.js';
+import { RuntimeSchema } from './runtime.js';
+export * from './activity.js';
+export * from './calls.js';
+export * from './delivery-jobs.js';
+export * from './delivery-plan.js';
 export * from './estimation.js';
+export * from './ids.js';
 export * from './integrations.js';
+export * from './runtime.js';
 export * from './verification.js';
 
 export const id = z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/);
+/** A situation around a requirement that tends to break first; `found` marks one Aiden discovered while checking. */
+export const EdgeCaseSchema = z
+  .object({
+    id: edgeCaseId,
+    text: z.string().trim().min(1).max(300),
+    origin: z.enum(['scope', 'found']),
+  })
+  .strict();
+/** Edge cases are optional so baselines saved before they existed still parse. */
 export const RequirementSchema = z
-  .object({ id: z.string().regex(/^REQ-[1-9]\d*$/), text: z.string().trim().min(1) })
+  .object({
+    id: requirementId,
+    text: z.string().trim().min(1),
+    edgeCases: z.array(EdgeCaseSchema).max(8).optional(),
+  })
   .strict();
 export const ProductSchema = z
   .object({
+    /** Scope-derived project name; absent on baselines saved before project naming. */
+    title: z.string().trim().min(1).max(72).optional(),
     overview: z.string().trim().min(1),
     requirements: z.array(RequirementSchema).min(1),
     milestones: z.array(z.string()),
+    /** Ordered vertical features; absent on projects created before delivery planning. */
+    deliveryPlan: DeliveryPlanSchema.optional(),
+    /** Repositories this intent is about; absent means every repository in the project. */
+    repositories: z.array(z.string().min(1).max(100)).min(1).max(100).optional(),
   })
-  .strict();
-export const RuntimeSchema = z
-  .object({
-    provider: z.enum(['codex', 'claude']),
-    auth: z.enum(['subscription', 'apiKey']),
-    model: z.string().optional(),
-  })
-  .strict();
+  .strict()
+  .superRefine((product, context) => {
+    if (product.deliveryPlan)
+      validateDeliveryPlan(product.deliveryPlan, product.requirements, context);
+  });
 export const ProjectSchema = z
   .object({
     id,
@@ -32,7 +57,22 @@ export const ProjectSchema = z
     rootPath: z.string().min(1).optional(),
     discoveryWarnings: z.array(z.string()).optional(),
     repositories: z
-      .array(z.object({ id, path: z.string().min(1), notes: z.string() }).strict())
+      .array(
+        z
+          .object({
+            id,
+            path: z.string().min(1),
+            notes: z.string(),
+            monitoredBranch: z
+              .object({
+                remote: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/),
+                branch: z.string().min(1).max(1024),
+              })
+              .strict()
+              .optional(),
+          })
+          .strict(),
+      )
       .min(1),
     runtime: RuntimeSchema,
     sources: ProjectSourcesSchema.optional(),
@@ -45,6 +85,9 @@ export const SnapshotSchema = z
     branch: z.string(),
     role: z.enum(['default', 'feature', 'integration', 'unknown']),
     reason: z.string(),
+    /** Only fresh remote reads establish presence on the delivery branch. Older reports omit this. */
+    source: z.enum(['remote-default', 'remote-branch', 'local']).optional(),
+    checkedAt: z.string().datetime().optional(),
   })
   .strict();
 export const DiscoverySchema = z
@@ -121,6 +164,10 @@ export type RepositoryDiscovery = {
 };
 /** Human-reviewable requirements with stable IDs; approval creates a baseline from this intent. */
 export type Product = z.infer<typeof ProductSchema>;
+/** One requirement in plain language with the edge cases that decide whether it really works. */
+export type Requirement = z.infer<typeof RequirementSchema>;
+/** A situation around a requirement that tends to break first. */
+export type EdgeCase = z.infer<typeof EdgeCaseSchema>;
 /** Explicit provider, authentication source, and optional model selection; adapters must not change billing mode. */
 export type RuntimeConfig = z.infer<typeof RuntimeSchema>;
 /** Immutable selected commit and its analysis role; evidence must match this repository and SHA. */
@@ -146,6 +193,8 @@ export type Baseline = {
   id: string;
   projectId: string;
   contextHash: string;
+  /** Decisions used to establish this scope; absent on legacy baselines. */
+  decisionsHash?: string;
   product: Product;
   reviewedAt: string;
   retiredIds: string[];
@@ -165,13 +214,12 @@ export type Stage =
 /** Worker progress and terminal notifications; optional payloads depend on the event type and stage. */
 export type RunEvent = {
   projectId?: string;
-  trigger?: 'scheduled';
-  type: 'progress' | 'clarification' | 'review' | 'completed' | 'failed' | 'cancelled';
+  type: 'progress' | 'activity' | 'review' | 'completed' | 'failed' | 'cancelled' | 'coding';
+  codingActive?: boolean;
   runId: string;
   stage?: Stage;
   message?: string;
-  questionId?: string;
-  question?: string;
+  activity?: import('./activity.js').ActivityEntry;
   report?: Report;
   product?: Product;
   estimation?: import('./estimation.js').EstimationSnapshot;
@@ -179,6 +227,8 @@ export type RunEvent = {
 };
 /** Persisted run lifecycle and starting context; accepted reports remain separate from interrupted work. */
 export type RunManifest = {
+  /** Deployment identity checked before and after a scheduled beta run. */
+  beta?: { jobId: string; revision: string; revisionUrl: string };
   id: string;
   projectId: string;
   kind: 'prepare' | 'report' | 'estimate' | 'verify';
@@ -192,7 +242,13 @@ export type RunManifest = {
   runtimeModel?: string;
   latestAtStart?: string | null;
   verifyUrl?: string;
+  /** A prepare run that commits its own baseline instead of stopping for review. */
+  autoAccept?: boolean;
+  /** Why Aiden started this run, shown in the action log. */
+  reason?: LookReason;
 };
+/** What prompted Aiden to look: you asked, code changed, the morning check, or the intent or a call changed. */
+export type LookReason = 'you' | 'commit' | 'morning' | 'ticket' | 'intent' | 'answer';
 /** Convert tool arguments to JSON Schema while retaining ordinary optional properties. */
 export const schemaFor = (schema: z.ZodType<unknown>): Record<string, unknown> =>
   zodToJsonSchema(schema, { $refStrategy: 'none' });
@@ -227,10 +283,15 @@ export const outputSchemaFor = (schema: z.ZodType<unknown>): Record<string, unkn
   delete rest.$schema;
   return numericBounds(rest) as Record<string, unknown>;
 };
-/** Reject duplicate IDs before intent becomes a baseline or is compared with a later report. */
+/** Reject duplicate requirement or edge-case IDs before intent becomes a baseline or is compared with a later report. */
 export function assertUniqueRequirements(product: Product): void {
   if (new Set(product.requirements.map((r) => r.id)).size !== product.requirements.length)
     throw new Error('Requirement IDs must be unique.');
+  for (const r of product.requirements) {
+    const edges = r.edgeCases ?? [];
+    if (new Set(edges.map((e) => e.id)).size !== edges.length)
+      throw new Error(`${r.id}: edge case IDs must be unique.`);
+  }
 }
 /** Accept normalized relative artifact paths without traversal, platform drive prefixes, or NULs. */
 export function safeRelative(path: string): boolean {

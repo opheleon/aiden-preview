@@ -24,12 +24,8 @@ const e = new Engine(store, runtime, (event) => {
       runId: event.runId,
     }),
   );
-  if (event.type === 'clarification')
-    e.answer(
-      event.runId,
-      event.questionId!,
-      'This is a synthetic smoke test. Assess listing and creating books using only the two fixture repositories. No additional constraints.',
-    );
+  // Calls never block a run: an open question is logged with its assumption and the run proceeds.
+  if (event.activity?.kind === 'ask') console.log(JSON.stringify({ ask: event.activity.summary }));
 });
 try {
   const diagnostics = await runtime.diagnostics();

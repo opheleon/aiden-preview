@@ -1,30 +1,50 @@
 import type { WorkerResult } from '../../../../packages/contracts/src/api';
-import type { CriterionResult, Report } from '../../../../packages/contracts/src/index';
+import type {
+  Call,
+  CriterionResult,
+  Report,
+  TriageItem,
+} from '../../../../packages/contracts/src/index';
+import { requirementBlockers } from '../../../../packages/reporting/src/blockers';
+import { remoteDeliveryVerified } from '../../../../packages/reporting/src/delivery-source';
 import { reasonLabels } from '../../../../packages/verification/src/verdict';
 
 type CodeStatus = Report['assessments'][number]['status'];
+/** The latest browser check with its report path. */
+export type Check = NonNullable<WorkerResult<'verification'>>;
+/** Colour family a status chip uses. */
+export type Tone = 'verified' | 'manual' | 'implemented' | 'partial' | 'incomplete' | 'neutral';
 
-/** One requirement's combined state: the headline badge plus what each source said. */
-export interface RequirementState {
+/** One status chip plus the sentence that says how Aiden knows. */
+export interface ItemState {
   label: string;
-  tone: 'verified' | 'implemented' | 'partial' | 'incomplete' | 'neutral';
-  code: string;
-  browser: string;
+  tone: Tone;
+  how: string;
 }
 
-const codeLabels: Record<CodeStatus, string> = {
-  implemented: 'Implemented',
-  partial: 'Partially implemented',
-  missing: 'Not implemented',
-  unknown: 'Not assessed',
-};
+/** Everything the brief knows about one requirement. */
+export interface RequirementFacts {
+  code: CodeStatus | undefined;
+  /** False when the report has only local or legacy evidence of branch membership. */
+  remoteVerified?: boolean;
+  /** Browser result for the requirement's main path. */
+  main: CriterionResult | undefined;
+  /** Browser results for the requirement's edge cases. */
+  edges: CriterionResult[];
+  /** How Aiden planned to check the main path. */
+  method: TriageItem['method'] | undefined;
+  /** Open decisions tied to this requirement. */
+  openCalls: number;
+  /** Includes scoped edge cases that have not produced a result yet. */
+  expectedEdges?: number;
+  /** Manual confirmations are scoped to this exact accepted report. */
+  manualConfirmed?: boolean;
+  confirmedEdgeCount?: number;
+}
 
-const codeStates: Record<CodeStatus, Pick<RequirementState, 'label' | 'tone'>> = {
-  implemented: { label: 'Implemented in code', tone: 'implemented' },
-  partial: { label: 'Partially implemented', tone: 'partial' },
-  missing: { label: 'Not implemented', tone: 'incomplete' },
-  unknown: { label: 'Not assessed', tone: 'neutral' },
-};
+/** A count with its noun, singular for one: `plural(1, 'call')` is "1 call". */
+export const plural = (n: number, one: string, many = `${one}s`): string =>
+  `${n} ${n === 1 ? one : many}`;
 
 /** Describe a browser verdict in the same words the browser check report uses. */
 export function browserLabel(result: CriterionResult | undefined): string {
@@ -34,63 +54,200 @@ export function browserLabel(result: CriterionResult | undefined): string {
   return result.reason ? reasonLabels[result.reason] : "Couldn't verify.";
 }
 
-/**
- * Combine the code assessment with the browser check. A browser verdict with recorded evidence
- * outranks the code reading, because it shows what a user actually gets; "couldn't verify" leaves
- * the code status in charge. Examples: implemented + pass is "Verified in browser"; implemented +
- * fail is "Fails in browser"; implemented + not testable in the UI is "Implemented in code".
- */
-export function requirementState(
-  code: CodeStatus | undefined,
-  browser: CriterionResult | undefined,
-): RequirementState {
-  const sources = { code: codeLabels[code ?? 'unknown'], browser: browserLabel(browser) };
-  if (browser?.verdict === 'pass')
-    return { label: 'Verified in browser', tone: 'verified', ...sources };
-  if (browser?.verdict === 'fail')
-    return { label: 'Fails in browser', tone: 'incomplete', ...sources };
-  return { ...codeStates[code ?? 'unknown'], ...sources };
+/** Why a browser check could not decide, in the words the full report uses. */
+function unverifiedReason(result: CriterionResult | undefined): string {
+  if (result?.verdict === 'unverified' && result.explanation) return result.explanation;
+  return result?.reason ? reasonLabels[result.reason] : 'Not checked in your app yet.';
+}
+
+/** Status from the code assessment alone, used when the app gave no verdict. */
+function codeState(facts: RequirementFacts): ItemState {
+  if (facts.code === 'implemented' && facts.remoteVerified === false) return mergeUnverified();
+  if (facts.code === 'implemented')
+    return {
+      label: facts.method === 'code' && !facts.expectedEdges ? 'Done' : 'Built',
+      tone: 'implemented',
+      how:
+        facts.method === 'code'
+          ? 'Built in the code. It is not visible in the app, so Aiden checked the code.'
+          : `Built in the code. ${unverifiedReason(facts.main)}`,
+    };
+  if (facts.code === 'partial')
+    return { label: 'In progress', tone: 'partial', how: 'Part of it is in the code.' };
+  if (facts.code === 'missing')
+    return { label: 'Not started', tone: 'incomplete', how: 'Aiden found no code for it yet.' };
+  return { label: 'Unverified', tone: 'neutral', how: unverifiedReason(facts.main) };
 }
 
 /**
- * Return the browser check only when it tested the same approved requirements as the report;
- * a check of an older baseline would attach verdicts to requirements that have since changed.
+ * Pick the one status a requirement shows: Done, In progress, Not started, Failing, Blocked,
+ * Needs manual test, or Unverified. What Aiden saw in the app outranks the code reading, because
+ * it is what a user gets. Examples: the main path fails in the app is "Failing"; it passes but an
+ * edge case fails is "In progress"; no app verdict and built in the code is "Built" unless the planned check is code-only.
+ */
+export function requirementState(facts: RequirementFacts): ItemState {
+  if (facts.openCalls)
+    return {
+      label: 'Blocked',
+      tone: 'partial',
+      how: `Waiting on ${plural(facts.openCalls, 'decision')}. This requirement and dependent work are paused.`,
+    };
+  if (facts.main?.verdict === 'fail')
+    return {
+      label: 'Failing',
+      tone: 'incomplete',
+      how:
+        facts.main.method === 'api'
+          ? 'Failed via the API. Watch what happened.'
+          : 'Failed in your app. Watch what happened.',
+    };
+
+  if (facts.main?.verdict === 'pass' || facts.manualConfirmed)
+    return facts.remoteVerified === false ? mergeUnverified() : checkedState(facts);
+  if (facts.method === 'person')
+    return {
+      label: 'Needs manual test',
+      tone: 'neutral',
+      how: 'This needs evidence from a manual or integration test. See the action items.',
+    };
+  return codeState(facts);
+}
+
+/** Status for one edge case: Pass, Fail, or Unverified, from its browser result or its plan. */
+export function edgeState(
+  result: CriterionResult | undefined,
+  method: TriageItem['method'] | undefined,
+): ItemState {
+  if (result?.verdict === 'pass')
+    return {
+      label: 'Pass',
+      tone: 'verified',
+      how: result.method === 'api' ? 'Checked via the API.' : 'Checked in your app.',
+    };
+  if (result?.verdict === 'fail')
+    return {
+      label: 'Fail',
+      tone: 'incomplete',
+      how: result.method === 'api' ? 'Failed via the API.' : 'Failed in your app.',
+    };
+  if (method === 'code')
+    return { label: 'Unverified', tone: 'neutral', how: 'Checked only in the code.' };
+  if (method === 'person')
+    return { label: 'Unverified', tone: 'neutral', how: 'Needs a manual test.' };
+  return { label: 'Unverified', tone: 'neutral', how: unverifiedReason(result) };
+}
+
+/**
+ * Return the browser check only when it tested the same requirements as the report; a check of
+ * an older baseline would attach verdicts to requirements that have since changed.
  */
 export function matchingCheck(
   verification: WorkerResult<'verification'>,
   report: Report,
-): NonNullable<WorkerResult<'verification'>> | null {
-  return verification && verification.result.baselineId === report.baselineId ? verification : null;
+  notBefore = report.generatedAt,
+): Check | null {
+  return verification &&
+    verification.result.baselineId === report.baselineId &&
+    verification.result.generatedAt >= notBefore
+    ? verification
+    : null;
 }
 
-/** Headline counts for the status summary, by code status and browser verdict. */
-export interface StatusCounts {
-  total: number;
-  implemented: number;
-  partial: number;
-  missing: number;
-  verified: number;
-  failing: number;
-  unchecked: number;
-  deviations: number;
-}
-
-/** Count requirements by code status and browser verdict; browser counts are zero without a matching check. */
-export function statusCounts(
+/** Collect the facts for every requirement in the report. */
+export function requirementFacts(
   report: Report,
-  check: NonNullable<WorkerResult<'verification'>> | null,
-): StatusCounts {
+  check: Check | null,
+  calls: Call[],
+  confirmed: Record<string, string> = {},
+): Map<string, RequirementFacts> {
   const criteria = check?.result.criteria ?? [];
-  /** Count assessments with one code status. */
-  const code = (status: CodeStatus) => report.assessments.filter((a) => a.status === status).length;
+  const triage = check?.result.triage ?? [];
+  const blockers = requirementBlockers(report.baseline, calls);
+  return new Map(
+    report.baseline.requirements.map((r) => [
+      r.id,
+      {
+        remoteVerified: remoteDeliveryVerified(report),
+        code: report.assessments.find((a) => a.requirementId === r.id)?.status,
+        main: criteria.find((c) => c.requirementId === r.id && !c.edgeCaseId),
+        edges: criteria.filter((c) => c.requirementId === r.id && !!c.edgeCaseId),
+        expectedEdges: r.edgeCases?.length ?? 0,
+        manualConfirmed: confirmed[r.id] === report.id,
+        confirmedEdgeCount: (r.edgeCases ?? []).filter(
+          (edge) =>
+            confirmed[`${r.id}-${edge.id}`] === report.id &&
+            !criteria.some(
+              (c) => c.requirementId === r.id && c.edgeCaseId === edge.id && c.verdict === 'pass',
+            ),
+        ).length,
+        method: triage.find((t) => t.requirementId === r.id && !t.edgeCaseId)?.method,
+        openCalls: blockers.get(r.id)?.length ?? 0,
+      },
+    ]),
+  );
+}
+
+/**
+ * The status line: how many requirements are done, and how many action items are open by role.
+ * Example: "1 of 2 requirements done." with "3 action items: 1 PM, 2 Dev."
+ */
+export function briefStatus(
+  states: ItemState[],
+  actions: { pm: number; dev: number },
+): { headline: string; lands: string } {
+  const done = states.filter((s) => s.label === 'Done').length;
+  const open = actions.pm + actions.dev;
   return {
-    total: report.baseline.requirements.length,
-    implemented: code('implemented'),
-    partial: code('partial'),
-    missing: code('missing'),
-    verified: criteria.filter((c) => c.verdict === 'pass').length,
-    failing: criteria.filter((c) => c.verdict === 'fail').length,
-    unchecked: criteria.filter((c) => c.verdict === 'unverified').length,
-    deviations: report.assessments.filter((a) => a.deviation).length,
+    headline: `${done} of ${states.length} requirements done.`,
+    lands: open
+      ? `${plural(open, 'action item')}: ${actions.pm} PM, ${actions.dev} Dev.`
+      : done === states.length
+        ? 'All requirements done.'
+        : 'No action items right now.',
+  };
+}
+
+/** Completion needs every scoped edge case to pass or have a current manual confirmation. */
+function checkedState(facts: RequirementFacts): ItemState {
+  const location = evidenceLocation(facts);
+  const failing = facts.edges.filter((e) => e.verdict === 'fail').length;
+  const passing =
+    facts.edges.filter((e) => e.verdict === 'pass').length + (facts.confirmedEdgeCount ?? 0);
+  if (failing)
+    return {
+      label: 'In progress',
+      tone: 'partial',
+      how: `Passes ${location}, but ${plural(failing, 'edge case')} ${failing === 1 ? 'fails' : 'fail'}.`,
+    };
+  if (passing < Math.max(facts.expectedEdges ?? 0, facts.edges.length))
+    return {
+      label: 'Needs verification',
+      tone: 'neutral',
+      how: 'The main path passes; some edge cases still need verification.',
+    };
+  return {
+    label: 'Done',
+    tone: facts.manualConfirmed ? 'manual' : 'verified',
+    how: facts.manualConfirmed
+      ? 'Confirmed by you for this check.'
+      : facts.edges.length
+        ? `Checked ${location}, with ${passing} of ${facts.edges.length} edge cases.`
+        : `Checked ${location}.`,
+  };
+}
+
+/** Describe API and browser evidence accurately, including requirements with mixed checks. */
+function evidenceLocation(facts: RequirementFacts): string {
+  const checks = [facts.main, ...facts.edges].filter((c) => c?.verdict === 'pass');
+  if (!checks.some((c) => c?.method === 'api')) return 'in your app';
+  return checks.every((c) => c?.method === 'api') ? 'via the API' : 'with recorded checks';
+}
+
+/** Passing local checks cannot establish that the work is on the remote delivery branch. */
+function mergeUnverified(): ItemState {
+  return {
+    label: 'Branch unverified',
+    tone: 'neutral',
+    how: 'Monitored remote-branch presence is unverified. Local code and checks do not establish delivery.',
   };
 }

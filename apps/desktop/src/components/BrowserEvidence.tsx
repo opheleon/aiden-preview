@@ -66,11 +66,15 @@ export function BrowserEvidence({
         className="modal browser-evidence card"
         role="dialog"
         aria-modal="true"
-        aria-label="Browser check"
+        aria-label={criterion.method === 'api' ? 'API check' : 'Browser check'}
       >
         <div className="card-heading">
           <div>
-            <p className="eyebrow">{criterion.requirementId} · Browser check</p>
+            <p className="eyebrow">
+              {criterion.requirementId}
+              {criterion.edgeCaseId ? ` edge case ${criterion.edgeCaseId}` : ''} ·{' '}
+              {criterion.method === 'api' ? 'API check' : 'Browser check'}
+            </p>
             <h2>{criterion.criterion}</h2>
           </div>
           <button className="icon-button" aria-label="Close browser check" onClick={onClose}>
@@ -103,6 +107,7 @@ export function BrowserEvidence({
             projectId={projectId}
             runId={runId}
             attempt={attempt}
+            method={criterion.method ?? 'app'}
           />
         ) : (
           <p>{criterion.explanation}</p>
@@ -134,7 +139,9 @@ function AttemptEvidence({
   projectId,
   runId,
   attempt,
-}: EvidenceSource & { attempt: VerificationAttempt }): JSX.Element {
+  method,
+}: EvidenceSource & { attempt: VerificationAttempt; method: 'app' | 'api' }): JSX.Element {
+  const checkKind = method === 'api' ? 'API' : 'Page';
   const video = useRef<HTMLVideoElement>(null);
   const recording = useVerificationMedia(api, projectId, runId, attempt.video);
   const check = attempt.proof;
@@ -161,7 +168,7 @@ function AttemptEvidence({
         {check && (
           <figcaption>
             <button className="text-button" onClick={() => seek(check.atMs)}>
-              Jump to the page check at {clock(check.atMs)}
+              Jump to the {checkKind.toLowerCase()} check at {clock(check.atMs)}
             </button>
           </figcaption>
         )}
@@ -177,12 +184,12 @@ function AttemptEvidence({
       {check && (
         <figure className="browser-evidence-proof">
           {proof.url ? (
-            <img src={proof.url} alt={`Page check screenshot: ${check.actual}`} />
+            <img src={proof.url} alt={`${checkKind} check screenshot: ${check.actual}`} />
           ) : (
             <p className="product-muted">{proof.error || 'Loading screenshot…'}</p>
           )}
           <figcaption>
-            Page check {check.passed ? 'passed' : 'failed'}: {check.actual}
+            {checkKind} check {check.passed ? 'passed' : 'failed'}: {check.actual}
           </figcaption>
         </figure>
       )}

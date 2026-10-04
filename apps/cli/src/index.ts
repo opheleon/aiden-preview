@@ -19,6 +19,7 @@ const { positionals, values } = parseArgs({
     root: { type: 'string' },
     project: { type: 'string' },
     run: { type: 'string' },
+    call: { type: 'string' },
     format: { type: 'string', default: 'markdown' },
     out: { type: 'string' },
     connection: { type: 'string' },
@@ -56,12 +57,9 @@ const events: RunEvent[] = [];
 client.on('event', (e: RunEvent) => {
   events.push(e);
   if (e.type === 'progress') process.stderr.write(`${e.message}\n`);
-  if (e.type === 'clarification')
-    void ask(`${e.question}\n> `)
-      .then((answer) =>
-        client.request('answer', { runId: e.runId, questionId: e.questionId!, answer }),
-      )
-      .catch(() => client.request('cancel', { runId: e.runId }));
+  // Aiden never waits on a call: it records the question and proceeds on its stated assumption.
+  if (e.type === 'activity' && e.activity?.kind === 'ask')
+    process.stderr.write(`${e.activity.summary}\n  ${e.activity.reason ?? ''}\n`);
   if (['completed', 'review', 'failed', 'cancelled'].includes(e.type)) resolveRun?.(e);
 });
 /** Await a terminal event, including events received before the request returned its run ID. */
@@ -280,6 +278,29 @@ try {
         2,
       ),
     );
+  } else if (command === 'calls') {
+    if (!values.project) throw new Error('Use calls --project ID.');
+    const calls = await client.request('calls', { projectId: values.project });
+    await output(
+      JSON.stringify(
+        calls.filter((c) => c.status === 'open'),
+        null,
+        2,
+      ),
+    );
+  } else if (command === 'answer') {
+    if (!values.project || !values.call) throw new Error('Use answer --project ID --call ID.');
+    const answer = await ask('Your answer: ');
+    const r = await client.request('answerCall', {
+      projectId: values.project,
+      callId: values.call,
+      answer,
+    });
+    process.stdout.write(
+      r.runId
+        ? `Answered. Aiden is looking again.\n`
+        : 'Answered. Aiden uses it as soon as its current work finishes.\n',
+    );
   } else if (command === 'verify-url') {
     if (!values.project) throw new Error('Use verify-url --project ID [--url URL | --clear].');
     const settings =
@@ -311,7 +332,7 @@ try {
     process.stdout.write(`${saved.result.summary.line}\nReport: ${reportPath}\n`);
   } else
     process.stdout.write(
-      'Aiden\n\n  doctor\n  discover --root /path/to/project\n  login\n  report --config project.json [--format json|markdown] [--out file]\n  report --project ID\n  resume --project ID --run ID\n  validate --project ID --run ID\n  export --project ID --run ID --format markdown [--includeEstimates] --out report.md\n  integrations list\n  integrations add-linear\n  integrations add --name NAME --url URL --auth oauth|bearer|none\n  integrations connect|tools|approve|disconnect|remove --connection ID [--tools a,b]\n  sources --project ID --connection ID --source ID --historyTool TOOL --sourceArgument ARG [--label NAME]\n  estimate --project ID [--run REPORT_ID] [--refreshHistory]\n  estimation --project ID\n  estimate-overrides --project ID --config overrides.json\n  verify-url --project ID [--url URL | --clear]\n  verify --project ID [--url URL] [--out DIR]\n',
+      'Aiden\n\n  doctor\n  discover --root /path/to/project\n  login\n  report --config project.json [--format json|markdown] [--out file]\n  report --project ID\n  resume --project ID --run ID\n  validate --project ID --run ID\n  export --project ID --run ID --format markdown [--includeEstimates] --out report.md\n  integrations list\n  integrations add-linear\n  integrations add --name NAME --url URL --auth oauth|bearer|none\n  integrations connect|tools|approve|disconnect|remove --connection ID [--tools a,b]\n  sources --project ID --connection ID --source ID --historyTool TOOL --sourceArgument ARG [--label NAME]\n  estimate --project ID [--run REPORT_ID] [--refreshHistory]\n  estimation --project ID\n  estimate-overrides --project ID --config overrides.json\n  verify-url --project ID [--url URL | --clear]\n  verify --project ID [--url URL] [--out DIR]\n  calls --project ID\n  answer --project ID --call ID\n',
     );
 } catch (e) {
   process.stderr.write((e instanceof Error ? e.message : 'Command failed.') + '\n');

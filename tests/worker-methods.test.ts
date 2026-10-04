@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import type { RunEvent, RunManifest } from '../packages/contracts/src/index.js';
+import { readCalls } from '../packages/core/src/calls.js';
 import type { Engine } from '../packages/core/src/engine.js';
 import { Store } from '../packages/core/src/storage.js';
 import { createMethods, type RuntimeControls } from '../packages/core/src/worker-methods.js';
@@ -24,6 +25,8 @@ function stubEngine(
   const events: RunEvent[] = [];
   const engine = {
     store,
+    // Nothing answers on localhost, so discovery never depends on what runs on this machine.
+    discover: { fetch: () => Promise.reject(new Error('connection refused')) },
     report: () => Promise.resolve({ runId: reportRunId }),
     wait: (runId: string) => {
       calls.push(`wait:${runId}`);
@@ -34,11 +37,17 @@ function stubEngine(
         project: null,
         baseline: null,
         runs: [
-          { id: reportRunId, status: reportStatus },
+          {
+            id: reportRunId,
+            projectId,
+            status: reportStatus,
+            project: { id: projectId, repositories: [] },
+          },
           { id: 'crashed-run', status: 'running' },
         ],
       }),
     isActive: (runId: string) => runId === reportRunId,
+    isBusy: () => false,
     verify: () => {
       calls.push('verify');
       return verify();
@@ -85,8 +94,10 @@ void test('a status refresh checks the saved app URL only after the code assessm
 
     const chained = stubEngine(store, 'completed');
     await chained.methods.report({ projectId, browserCheck: true });
-    await settle(() => chained.calls.includes('verify'));
-    assert.deepEqual(chained.calls, [`wait:${reportRunId}`, 'verify']);
+    await settle(() => chained.calls.length === 3);
+    assert.deepEqual(chained.calls.slice(0, 2), [`wait:${reportRunId}`, 'verify']);
+    // The look ends when the browser check does, so an answer given meanwhile is used then.
+    assert.match(chained.calls[2] ?? '', /^wait:/);
 
     const failed = stubEngine(store, 'failed');
     await failed.methods.report({ projectId, browserCheck: true });
@@ -97,14 +108,19 @@ void test('a status refresh checks the saved app URL only after the code assessm
   }
 });
 
-void test('a status refresh without an app URL assesses the code only', async () => {
+void test('a look that finds no running app asks where it runs and checks the code only', async () => {
   const { store, root } = await storeWith(null);
   try {
     const { methods, calls, events } = stubEngine(store, 'completed');
     await methods.report({ projectId, browserCheck: true });
-    await settle(() => false);
+    await settle(() => events.length > 0);
     assert.deepEqual(calls, [`wait:${reportRunId}`]);
-    assert.deepEqual(events, []);
+    assert.equal(events[0]?.type, 'activity');
+    assert.equal(events[0]?.activity?.kind, 'ask');
+    const [call] = await readCalls(store, projectId);
+    assert.equal(call?.kind, 'app-url');
+    assert.equal(call?.status, 'open');
+    assert.match(call?.assumption ?? '', /code only/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

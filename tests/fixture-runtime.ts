@@ -8,8 +8,17 @@ import { required } from './required.js';
 import { assertStrictOutputSchema } from './schema-helpers.js';
 export class FixtureRuntime implements AgentRuntime {
   calls: string[] = [];
+  /** Parsed input data of each call, for tests that check what a stage was given. */
+  inputs: unknown[] = [];
+  /** Replaces the ask-why answer; null returns output that fails the schema. */
+  whyAnswer: string | null = 'FIXTURE answer from the run record, not live model output.';
   invalid = false;
   clarification = false;
+  clarificationBlocking = false;
+  /** Holds the understand stage until the promise settles, for tests that act mid-rewrite. */
+  holdUnderstand: Promise<void> | null = null;
+  /** Replaces the understand-stage output, for tests that need edge cases or calls. */
+  understanding: Record<string, unknown> | null = null;
   pause = false;
   pauseEstimate = false;
   constructor(public f: Awaited<ReturnType<typeof fixture>>) {}
@@ -28,16 +37,20 @@ export class FixtureRuntime implements AgentRuntime {
           ? 'estimate-remaining'
           : r.prompt.includes('Establish a minimal')
             ? 'understand'
-            : r.prompt.includes('Find relevant code snapshots')
-              ? 'discover'
-              : r.prompt.includes('Assess every reviewed')
-                ? 'assess'
-                : 'summary';
+            : r.prompt.includes('how a careful person would check')
+              ? 'triage'
+              : r.prompt.includes("answering a person's question")
+                ? 'ask-why'
+                : r.prompt.includes('Assess every reviewed')
+                  ? 'assess'
+                  : 'summary';
     this.calls.push(stage);
+    this.inputs.push(data);
     if (this.pause && stage === 'assess')
       await new Promise((_, reject) =>
         r.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }),
       );
+    if (this.holdUnderstand && stage === 'understand') await this.holdUnderstand;
     if (this.pauseEstimate && stage === 'estimate-original')
       await new Promise((_, reject) =>
         r.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }),
@@ -92,11 +105,52 @@ export class FixtureRuntime implements AgentRuntime {
         if (this.clarification)
           await client.callTool({
             name: 'request_clarification',
-            arguments: { question: 'Fixture clarification: list existing books?' },
+            arguments: {
+              blocking: this.clarificationBlocking,
+              question: this.clarificationBlocking
+                ? 'Fixture: who may access the library?'
+                : 'Fixture: reuse existing empty-state copy?',
+              assumption: this.clarificationBlocking
+                ? 'Library access waits for this policy.'
+                : 'FIXTURE: preserve existing empty-state copy.',
+            },
           });
-        value = this.f.product;
-      } else if (stage === 'discover')
-        value = { snapshots: this.f.snapshots, warnings: ['FIXTURE: no deployment evidence'] };
+        value = this.understanding ?? {
+          overview: this.f.product.overview,
+          milestones: this.f.product.milestones,
+          requirements: this.f.product.requirements.map((q: any) => ({
+            id: q.id,
+            text: q.text,
+            edgeCases: (q.edgeCases ?? []).map((e: any) => ({ id: e.id, text: e.text })),
+          })),
+          calls: [],
+          repositories: [],
+        };
+        value.title ??= this.f.product.title ?? this.f.product.overview.slice(0, 72);
+        value.calls = value.calls.map((c: any) => ({ blocking: false, ...c }));
+        value.deliveryPlan ??= [
+          {
+            id: 'F-1',
+            title: 'Synthetic usable feature',
+            kind: 'feature',
+            outcome: 'Users can complete the synthetic book workflow.',
+            rationale: 'One vertical feature, synthetic fixture only.',
+            requirementIds: value.requirements.map((q: any) => q.id),
+            dependsOn: [],
+          },
+        ];
+      } else if (stage === 'ask-why')
+        value = this.whyAnswer === null ? { answer: '' } : { answer: this.whyAnswer };
+      else if (stage === 'triage')
+        value = {
+          items: data.items.map((item: any) => ({
+            requirementId: item.requirementId,
+            edgeCaseId: item.edgeCaseId,
+            method: 'app',
+            persona: null,
+            reason: 'FIXTURE plan, not live model output.',
+          })),
+        };
       else if (stage === 'assess') {
         for (const s of this.f.snapshots)
           await client.callTool({
@@ -136,20 +190,25 @@ export class FixtureRuntime implements AgentRuntime {
               remainingWork: ['Add book creation'],
               unknowns: [],
             },
-            ...data.baseline.requirements.slice(2).map((q: any) => ({
-              requirementId: q.id,
-              status: 'unknown',
-              deviation: false,
-              explanation: 'FIXTURE: external runtime coverage unavailable',
-              evidence: [],
-              remainingWork: [],
-              unknowns: ['No deployment evidence supplied'],
-            })),
+            ...data.baseline.requirements
+              .filter((q: any) => !['REQ-1', 'REQ-2'].includes(q.id))
+              .map((q: any) => ({
+                requirementId: q.id,
+                status: 'unknown',
+                deviation: false,
+                explanation: 'FIXTURE: external runtime coverage unavailable',
+                evidence: [],
+                remainingWork: [],
+                unknowns: ['No deployment evidence supplied'],
+              })),
           ],
           risks: [],
           dependencies: ['FE/BE contract'],
           unknowns: [],
         };
+        value.assessments = value.assessments.filter((a: any) =>
+          data.baseline.requirements.some((q: any) => q.id === a.requirementId),
+        );
         if (this.invalid) required(required(value.assessments[0]).evidence[0]).endLine = 1000;
       } else
         value = {

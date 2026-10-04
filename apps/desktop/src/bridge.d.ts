@@ -4,12 +4,9 @@ import type {
   WorkerResult,
 } from '../../../packages/contracts/src/api.js';
 import type { RunEvent } from '../../../packages/contracts/src/index.js';
-import type { ProjectSchedule, ScheduleConfig } from './scheduler.js';
 import type { UpdatePreferences, UpdateStatus } from './updater.js';
 /** Narrow preload API; privileged operations are validated again in the main process and worker. */
 export type DesktopBridge = {
-  getSchedules: () => Promise<ProjectSchedule[]>;
-  setSchedule: (projectId: string, config: ScheduleConfig) => Promise<ProjectSchedule>;
   request: <K extends WorkerMethod>(
     method: K,
     params?: WorkerParams<K>,

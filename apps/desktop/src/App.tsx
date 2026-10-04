@@ -1,35 +1,27 @@
 import type { JSX } from 'react';
 
+import { ProjectSettings } from './components/ProjectSettings';
 import RuntimeSettings from './components/RuntimeSettings';
 import { useWorkspace } from './hooks/useWorkspace';
-import { newProject } from './renderer/project-state';
 import { ApplicationHeader } from './views/ApplicationHeader';
-import { DraftsView } from './views/DraftsView';
-import { ProjectWorkspace } from './views/ProjectWorkspace';
+import { Brief } from './views/Brief';
+import { Runs } from './views/Runs';
+import { SetIntent } from './views/SetIntent';
 import { SettingsView } from './views/SettingsView';
 import { WorkspaceDialogs } from './views/WorkspaceDialogs';
+import { WorkspaceFeedback } from './views/WorkspaceFeedback';
 import { WorkspaceSidebar } from './views/WorkspaceSidebar';
 const api = window.aiden;
-const slackInviteUrl =
-  'https://join.slack.com/t/aidenbyopheleon/shared_invite/zt-4apsg5d7p-FDO9ae0imxj~KgauP8lpsw';
 
-/** Compose desktop navigation around the typed workspace controller. */
+/**
+ * Compose the desktop app: a project Aiden has not been handed yet shows Set the intent, and a
+ * project it runs shows its brief.
+ */
 export default function App(): JSX.Element {
   const workspace = useWorkspace();
-  const {
-    project,
-    setProject,
-    projects,
-    setProjects,
-    step,
-    diagnostics,
-    busy,
-    baseline,
-    runs,
-    area,
-    call,
-    refresh,
-  } = workspace;
+  const { project, setProject, projects, setProjects, diagnostics, busy, area, call, refresh } =
+    workspace;
+  const saved = projects.some((p) => p.id === project.id);
   const runtimeControls = (
     <RuntimeSettings
       key={project.id}
@@ -40,7 +32,7 @@ export default function App(): JSX.Element {
       onRefresh={refresh}
       onChange={(runtime) => setProject((current) => ({ ...current, runtime }))}
       onSave={
-        projects.some((p) => p.id === project.id)
+        saved
           ? async () => {
               await call('updateRuntime', { projectId: project.id, runtime: project.runtime });
               setProjects(await call('projects'));
@@ -49,39 +41,33 @@ export default function App(): JSX.Element {
       }
     />
   );
-  const terminalRuns = runs.filter(
-    (r) =>
-      r.kind === 'report' ||
-      (r.kind !== 'verify' && ['failed', 'cancelled', 'running', 'waiting'].includes(r.status)),
-  );
   return (
     <div className="app">
       <ApplicationHeader {...workspace} />
-      <WorkspaceSidebar
-        {...workspace}
-        newProject={newProject}
-        terminalRuns={terminalRuns}
-        api={api}
-        slackInviteUrl={slackInviteUrl}
-      />
-      <main className={step === 0 ? 'setup-view' : ''}>
+      <WorkspaceSidebar workspace={workspace} />
+      <main className={!saved && area !== 'settings' ? 'setup-view' : ''}>
         {area === 'settings' ? (
           <SettingsView
             {...workspace}
             runtimeControls={runtimeControls}
-            baseline={baseline}
+            projectSettings={<ProjectSettings workspace={workspace} />}
+            feedback={<WorkspaceFeedback workspace={workspace} />}
             api={api}
           />
-        ) : area === 'drafts' ? (
-          <DraftsView {...workspace} />
+        ) : area === 'runs' && saved ? (
+          <div className="content">
+            <WorkspaceFeedback workspace={workspace} />
+            <Runs workspace={workspace} />
+          </div>
         ) : (
-          <>
-            <ProjectWorkspace
-              workspace={workspace}
-              runtimeControls={runtimeControls}
-              terminalRuns={terminalRuns}
-            />
-          </>
+          <div className={saved ? 'content' : 'content starter-content'}>
+            <WorkspaceFeedback workspace={workspace} />
+            {saved ? (
+              <Brief key={workspace.project.id} workspace={workspace} />
+            ) : (
+              <SetIntent workspace={workspace} />
+            )}
+          </div>
         )}
       </main>
       <WorkspaceDialogs workspace={workspace} />

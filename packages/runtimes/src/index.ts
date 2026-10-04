@@ -175,6 +175,8 @@ export class Runtimes implements AgentRuntime {
   /** Dispatch one turn to the selected provider; cancellation is checked before any provider work. */
   async run(r: RuntimeRequest): Promise<RuntimeResult> {
     r.signal.throwIfAborted();
+    if (r.coding && r.config.provider !== 'claude')
+      throw new Error('External coding jobs currently require Claude Code.');
     if (r.config.provider === 'claude') return this.claude(r);
     return this.codex(r);
   }

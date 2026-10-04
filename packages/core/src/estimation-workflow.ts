@@ -13,6 +13,7 @@ import {
 import { buildForecast, defaultOverrides } from '../../estimation/src/index.js';
 import { ToolBroker } from '../../tools/src/broker.js';
 import { serveTools } from '../../tools/src/mcp.js';
+import { requireDefinedScope } from './blockers.js';
 import { collectEstimationHistory, type EstimationHistory } from './estimation-history.js';
 import {
   buildRequirementEstimates,
@@ -33,6 +34,7 @@ export async function executeEstimate(
   workspace: string,
 ): Promise<void> {
   const baseline = run.baseline!;
+  await requireDefinedScope(context.store, run.projectId, baseline.product);
   const report = run.estimateReportId
     ? await context.getReport(run.projectId, run.estimateReportId)
     : null;
@@ -148,6 +150,7 @@ async function publishEstimate(
   report: Report | null,
 ): Promise<void> {
   signal.throwIfAborted();
+  await requireDefinedScope(context.store, run.projectId, baseline.product);
   const current = await json<Baseline>(
     path.join(context.store.project(run.projectId), 'baseline.json'),
   );

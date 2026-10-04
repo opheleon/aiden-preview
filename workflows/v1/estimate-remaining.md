@@ -34,6 +34,8 @@ Size the implementation change, never elapsed time. Explain these factors in rea
 XS/1: narrow, contained change with straightforward verification. S/2: a small change in one area. M/3: coordinated changes or a cross-layer feature. L/5: multiple components, data paths, or integrations with substantial verification. XL/8: several substantial coordinated parts. Preserve requirement IDs while listing concrete tasks.
 </rubric>
 
+<delivery_plan>Size the remaining work of complete vertical outcomes, including integration, permissions, failure handling, and verification. Follow deliveryPlan ownership and prerequisites where supplied. Significant shared platform work is counted once; ordinary plumbing stays within the feature it enables. Dependency order is not evidence of duration or permission to invent a delivery date. Code-based estimates do not prove browser behavior.</delivery_plan>
+
 <proceed>
 Translate assessment findings into concrete remaining implementation work. If evidence coverage is insufficient, set estimable false, size and points null, and explain the unknown. Return JSON only.
 </proceed>
@@ -43,3 +45,5 @@ An implemented requirement with a confirmed behavioral deviation receives points
 A frontend label change and a backend permission correction are not comparable even if both are XS. A retry-safe webhook task may be comparable to another integration requiring idempotency and failure-path tests; explain those shared challenges. Never invent a history ID or force three matches to obtain a time estimate.
 For independent work, return {"id":"REQ-1-label","text":"Update the settings label","sharedKey":null}.
 </examples>
+
+<blocking_decisions>Investigate available evidence before asking. Unknown basic behavior is a blocker, not permission to invent a default. Record a blocking decision using request_clarification when available and pause the affected requirement and its hard dependents. Assess only the eligible requirements supplied. Treat blocked draft scope as undefined; never claim it complete or supply executable implementation steps for it. Continue independent evidence gathering. Default delivery produces tickets; coding dispatch is opt-in beta and requires an explicit action.</blocking_decisions>

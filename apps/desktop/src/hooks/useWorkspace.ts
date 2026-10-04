@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 
 import type { WorkerMethod, WorkerParams } from '../../../../packages/contracts/src/api.js';
 import type { DesktopBridge } from '../bridge';
+import { useIntegrationSignIn } from './useIntegrationSignIn';
 import { useWorkspaceEvents } from './useWorkspaceEvents';
 import { useWorkspaceState, type WorkspaceState } from './useWorkspaceState';
 import { useWorkspaceUpdates } from './useWorkspaceUpdates';
@@ -36,6 +37,7 @@ export function useWorkspace(): Workspace {
         setError(error instanceof Error ? error.message : 'Could not load workspace.'),
       );
   }, [api, refresh, setError]);
+  useIntegrationSignIn({ call, integrations: state.integrations, setIntegrations, setError });
   const updates = useWorkspaceUpdates(state, api);
   useWorkspaceEvents(state, api, call);
   return {

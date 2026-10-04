@@ -95,16 +95,37 @@ void test('discovery bounds traversal and reports incomplete coverage', async ()
   }
 });
 
-void test('Git worktrees are discovered without treating ordinary repository subfolders as repositories', async () => {
+void test('worktrees fold into their main checkout, and ordinary subfolders are not repositories', async () => {
   const f = await fixture();
   const worktree = path.join(f.root, 'feature-worktree');
   await g(required(f.project.repositories[0]).path, 'worktree', 'add', '-b', 'feature', worktree);
   const result = await discoverRepositories(f.root);
-  assert.equal(result.repositories.length, 3);
-  assert.ok(result.repositories.some((r) => path.basename(r.path) === 'feature-worktree'));
+  assert.deepEqual(
+    result.repositories.map((r) => path.basename(r.path)),
+    ['backend', 'frontend'],
+  );
+  assert.ok(result.warnings.some((w) => /feature-worktree is a worktree of frontend/.test(w)));
+  // A worktree whose main checkout is outside the folder is kept.
+  assert.equal((await discoverRepositories(worktree)).repositories.length, 1);
   const subfolder = path.join(required(f.project.repositories[0]).path, 'src');
   await mkdir(subfolder);
   assert.equal((await discoverRepositories(subfolder)).repositories.length, 0);
+});
+
+void test('repositories inside folders a repository ignores are skipped', async () => {
+  const f = await fixture();
+  const backend = required(f.project.repositories[1]).path;
+  await writeFile(path.join(backend, '.gitignore'), 'artifacts/\n');
+  await g(backend, 'add', '.gitignore');
+  await g(backend, 'commit', '-m', 'Ignore artifacts');
+  await makeRepo(path.join(backend, 'artifacts', 'old-checkout'));
+  await makeRepo(path.join(backend, 'tools', 'kept'));
+  const result = await discoverRepositories(f.root);
+  assert.deepEqual(
+    result.repositories.map((r) => path.basename(r.path)),
+    ['backend', 'frontend', 'kept'],
+  );
+  assert.ok(result.warnings.some((w) => /Folders a repository ignores/.test(w)));
 });
 
 void test('saved projects without root remain compatible; moved repositories are detected on rescan', async () => {

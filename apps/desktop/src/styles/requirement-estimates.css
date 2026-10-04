@@ -318,10 +318,6 @@
   max-width: 680px !important;
 }
 
-.legacy-report-panel {
-  display: none !important;
-}
-
 .estimation-pending {
   margin: 28px 0;
 }

@@ -7,6 +7,7 @@ import test from 'node:test';
 import { z } from 'zod/v3';
 
 import type { Project, RunEvent, RunManifest } from '../packages/contracts/src/index.js';
+import { answerCall, recordCall } from '../packages/core/src/calls.js';
 import { Engine } from '../packages/core/src/engine.js';
 import { createModelStage } from '../packages/core/src/model-stage.js';
 import { atomic, json, optionalJson, Store } from '../packages/core/src/storage.js';
@@ -49,7 +50,6 @@ async function stageFixture(
       integrations: engine.integrations,
       getReport: engine.getReport.bind(engine),
       getEstimate: engine.getEstimate.bind(engine),
-      questions: new Map(),
     },
     run,
     signal: controller.signal,
@@ -76,9 +76,21 @@ void test('stage corrects only invalid output and resumes a validated checkpoint
   const f = await stageFixture(async (request, attempt) => {
     if (attempt === 1) return Promise.reject(new ArtifactFormatError('Malformed output.'));
     if (attempt === 2) {
-      await atomic(path.join(f.root, 'answers.json'), [
-        { question: 'Synthetic clarification', answer: 'New answer' },
-      ]);
+      const { call } = await recordCall(
+        f.options.context.store,
+        'fixture',
+        {
+          requirementId: null,
+          edgeCaseId: null,
+          question: 'Synthetic clarification',
+          options: [],
+          assumption: 'Synthetic assumption',
+          owner: 'you',
+        },
+        'decision',
+        'run',
+      );
+      await answerCall(f.options.context.store, 'fixture', call.id, 'New answer');
       return { value: { accepted: false }, version: 'fixture' };
     }
     assert.match(request.prompt, /validation_feedback/);
@@ -191,7 +203,7 @@ void test('invalid structured output has exactly two correction attempts and no 
       await writeFile(path.join(f.root, 'answers.json'), '[]');
       await assert.rejects(
         createModelStage(f.options)('understand', schema, {}, (value) => schema.parse(value)),
-        /two correction attempts/,
+        /after two corrections/,
       );
       assert.equal(f.calls(), 3);
       if (!malformed) assert.equal(f.run.runtimeModel, undefined);

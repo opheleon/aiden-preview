@@ -25,6 +25,8 @@ export const McpConnectionSchema = z
       'failed',
     ]),
     secureStorage: z.enum(['keyring', 'session', 'none']),
+    // Explicit preference is separate from the observed storage fallback.
+    sessionOnly: z.boolean().optional(),
     approvedTools: z.array(z.string()),
     toolFingerprint: z.string().optional(),
     lastTestedAt: z.string().datetime().optional(),

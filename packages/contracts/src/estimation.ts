@@ -1,5 +1,7 @@
 import { z } from 'zod/v3';
 
+import { RuntimeSchema } from './runtime.js';
+
 export const SizeSchema = z.enum(['XS', 'S', 'M', 'L', 'XL']);
 export const WorkTypeSchema = z.enum([
   'ui',
@@ -168,13 +170,7 @@ export const EstimationSnapshotSchema = z
     projectId: z.string().min(1),
     baselineId: z.string().min(1),
     reportId: z.string().nullable(),
-    runtime: z
-      .object({
-        provider: z.enum(['codex', 'claude']),
-        auth: z.enum(['subscription', 'apiKey']),
-        model: z.string().optional(),
-      })
-      .strict(),
+    runtime: RuntimeSchema,
     runtimeVersion: z.string(),
     sourceSelectionHash: z.string().regex(/^[a-f0-9]{64}$/),
     generatedAt: z.string().datetime(),

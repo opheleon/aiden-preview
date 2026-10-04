@@ -1,0 +1,115 @@
+/* Delivery risk is the first readable block; details expand without enlarging every row. */
+.delivery-attention {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #d8a4a9;
+  border-left: 4px solid var(--color-destructive);
+  border-radius: 10px;
+  background: #fff7f7;
+  color: var(--color-foreground);
+}
+
+.delivery-attention--pending {
+  border-color: #d8c397;
+  border-left-color: #866018;
+  background: #fffaf0;
+}
+
+.attention-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.attention-heading > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-destructive);
+}
+
+.brief .attention-heading h2 {
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.attention-heading p {
+  margin-top: 4px;
+  color: var(--color-body);
+}
+
+.attention-item {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid #ead2d5;
+  overflow-wrap: anywhere;
+}
+
+.attention-item-heading,
+.attention-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.brief .attention-item h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.attention-badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: #fae6e8;
+  color: #8c2833;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.attention-badge--checking,
+.attention-badge--unverified {
+  background: #f5ead0;
+  color: #705014;
+}
+
+.attention-evidence > summary {
+  width: fit-content;
+  padding: 4px 0;
+  cursor: pointer;
+  color: var(--color-body);
+}
+
+.attention-evidence ul {
+  display: grid;
+  gap: 8px;
+  padding-left: 20px;
+}
+
+.attention-actions a,
+.attention-actions button {
+  min-height: 32px;
+  font-weight: 550;
+}
+
+.req-row .row-side {
+  flex-wrap: wrap;
+}
+
+@media (width <= 720px) {
+  .delivery-attention {
+    padding: 16px;
+  }
+
+  .feature-summary > .attention-badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
