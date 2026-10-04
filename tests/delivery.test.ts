@@ -96,7 +96,12 @@ function pr(job: CodingJob, state: 'OPEN' | 'CLOSED' | 'MERGED' = 'MERGED') {
 async function waitJob(engine: Engine, projectId: string): Promise<CodingJob> {
   for (let i = 0; i < 100; i++) {
     const job = (await codingJobs(engine, projectId))[0];
-    if (job && job.status !== 'running' && !codingActive(engine, job.id)) return job;
+    if (job && !codingActive(engine, job.id)) {
+      // The job may finish while the first read is in flight. Read its final saved state only
+      // after observing it inactive, so a pre-validation snapshot cannot look settled.
+      const finished = (await codingJobs(engine, projectId)).find((saved) => saved.id === job.id);
+      if (finished && finished.status !== 'running') return finished;
+    }
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
   throw new Error('Job did not settle');
