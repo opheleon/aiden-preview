@@ -35,7 +35,7 @@ export async function desktopFixture() {
   delete env.ANTHROPIC_API_KEY;
   delete env.NODE_OPTIONS;
   let sequence = 0;
-  async function launch(info: TestInfo, overrides: Record<string, string> = {}) {
+  async function launch(info: TestInfo, overrides: Record<string, string> = {}, showGuide = false) {
     const packagedApp = process.env.AIDEN_PACKAGED_APP;
     const app = await electron.launch({
       timeout: 30_000,
@@ -58,6 +58,9 @@ export async function desktopFixture() {
     });
     await app.context().tracing.start({ screenshots: true, snapshots: true });
     const page = await app.firstWindow();
+    await page.locator('[data-guide-ready="true"]').waitFor();
+    if (!showGuide && (await page.getByRole('dialog').isVisible()))
+      await page.getByRole('button', { name: 'Later', exact: true }).click();
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     let closed = false;

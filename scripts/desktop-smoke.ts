@@ -67,6 +67,9 @@ try {
   await app.context().tracing.start({ screenshots: true, snapshots: true });
   tracing = true;
   const page = await app.firstWindow();
+  await page.locator('[data-guide-ready="true"]').waitFor();
+  if (await page.getByRole('dialog').isVisible())
+    await page.getByRole('button', { name: 'Later', exact: true }).click();
   if (packagedApp) {
     await verifyPackagedRuntimes(app);
     updates = await updateFixture(app);

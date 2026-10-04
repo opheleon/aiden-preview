@@ -314,6 +314,8 @@ export function appFixture() {
         listener = undefined;
       };
     },
+    getFirstUseState: vi.fn().mockResolvedValue({ completed: true, issue: null }),
+    completeFirstUse: vi.fn().mockResolvedValue({ completed: true, issue: null }),
     getUpdateStatus: vi.fn().mockResolvedValue({
       state: 'disabled',
       currentVersion: '1.1.0',

@@ -4,6 +4,7 @@ import type {
   WorkerResult,
 } from '../../../packages/contracts/src/api.js';
 import type { RunEvent } from '../../../packages/contracts/src/index.js';
+import type { FirstUseState } from './first-use.js';
 import type { UpdatePreferences, UpdateStatus } from './updater.js';
 /** Narrow preload API; privileged operations are validated again in the main process and worker. */
 export type DesktopBridge = {
@@ -27,6 +28,8 @@ export type DesktopBridge = {
     runId: string;
     file: string;
   }) => Promise<{ type: string; data: ArrayBuffer }>;
+  getFirstUseState: () => Promise<FirstUseState>;
+  completeFirstUse: () => Promise<FirstUseState>;
   getAppVersion: () => Promise<string>;
   getUpdateStatus: () => Promise<UpdateStatus>;
   getUpdatePreferences: () => Promise<UpdatePreferences>;

@@ -8,6 +8,7 @@ import type { RunEvent } from '../../../packages/contracts/src/index.js';
 import { WorkerClient } from '../../../packages/core/src/client.js';
 import { registerFileIpc, registerPreferenceIpc } from './desktop-ipc.js';
 import { LocalDiagnostics } from './diagnostics.js';
+import { registerFirstUseIpc } from './first-use-ipc.js';
 import { DesktopUpdater } from './updater.js';
 import { ProjectWatcher } from './watcher.js';
 import { registerWorkerIpc } from './worker-ipc.js';
@@ -105,6 +106,7 @@ app
       isRunActive: () => activeRuns.size > 0 || activeCodingJobs.size > 0,
     });
     registerPreferenceIpc(authorized, updater);
+    registerFirstUseIpc(authorized, dataRoot);
     registerWorkerIpc(authorized, worker);
     registerFileIpc(authorized, window, worker);
     observeDesktop();

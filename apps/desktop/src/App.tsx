@@ -1,7 +1,9 @@
 import type { JSX } from 'react';
 
+import { FirstUseGuide } from './components/FirstUseGuide';
 import { ProjectSettings } from './components/ProjectSettings';
 import RuntimeSettings from './components/RuntimeSettings';
+import { useFirstUse } from './hooks/useFirstUse';
 import { useWorkspace } from './hooks/useWorkspace';
 import { ApplicationHeader } from './views/ApplicationHeader';
 import { Brief } from './views/Brief';
@@ -19,6 +21,7 @@ const api = window.aiden;
  */
 export default function App(): JSX.Element {
   const workspace = useWorkspace();
+  const guide = useFirstUse(api);
   const { project, setProject, projects, setProjects, diagnostics, busy, area, call, refresh } =
     workspace;
   const saved = projects.some((p) => p.id === project.id);
@@ -42,7 +45,7 @@ export default function App(): JSX.Element {
     />
   );
   return (
-    <div className="app">
+    <div className="app" data-guide-ready={!guide.loading}>
       <ApplicationHeader {...workspace} />
       <WorkspaceSidebar workspace={workspace} />
       <main className={!saved && area !== 'settings' ? 'setup-view' : ''}>
@@ -71,6 +74,7 @@ export default function App(): JSX.Element {
         )}
       </main>
       <WorkspaceDialogs workspace={workspace} />
+      {guide.open && <FirstUseGuide guide={guide} />}
     </div>
   );
 }
