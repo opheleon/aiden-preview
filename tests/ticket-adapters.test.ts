@@ -189,3 +189,16 @@ void test('Linear auto-linked prerequisite URLs compare equally without hiding a
     ticketText(`Prerequisite tickets:\nF-1: [${url}](https://example.com/other)`),
   );
 });
+
+void test('Linear rich issue references normalize only when their ID and destination match a verified ticket', () => {
+  const url = 'https://linear.app/workspace/issue/APP-42/a-feature';
+  const known = [{ issueId: 'APP-42', url }];
+  const mention = `<issue id="11111111-1111-4111-8111-111111111111" href="${url}">APP-42</issue>`;
+  assert.equal(ticketText(`See ${mention}`, known), 'See APP-42');
+  assert.notEqual(ticketText(`See ${mention}`), 'See APP-42');
+  assert.notEqual(ticketText(mention.replace('>APP-42<', '>APP-43<'), known), 'APP-42');
+  assert.notEqual(
+    ticketText(mention.replace('/workspace/', '/another-workspace/'), known),
+    'APP-42',
+  );
+});

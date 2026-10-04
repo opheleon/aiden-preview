@@ -156,9 +156,17 @@ export function searchedTicketIds(payload: unknown): string[] {
     );
   return [...new Set(rows.map(createdTicketId))];
 }
-/** Compare managed content independent of line endings and insignificant whitespace. */
-export function ticketText(value: string): string {
+/** Normalize tracker formatting; rich issue mentions collapse only for already verified ticket IDs and URLs. */
+export function ticketText(
+  value: string,
+  knownTickets: readonly { issueId?: string | undefined; url?: string | undefined }[] = [],
+): string {
   return value
+    .replace(
+      /<issue id="[a-f0-9-]{36}" href="([^"]+)">([^<>]+)<\/issue>/g,
+      (original: string, url: string, id: string) =>
+        knownTickets.some((ticket) => ticket.issueId === id && ticket.url === url) ? id : original,
+    )
     .replace(/\[(https:\/\/[^\]\s]+)\]\(<?\1>?\)/g, '$1')
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/^[-*]\s+/gm, '')

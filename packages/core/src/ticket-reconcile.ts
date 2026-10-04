@@ -16,14 +16,13 @@ import { hash } from './storage.js';
 import { writeTicketState } from './ticket-storage.js';
 
 /** Hash only fields managed by Aiden; remote workflow status and assignees remain human-owned. */
-function contentHash(title: string, description: string): string {
-  return hash([ticketText(title), ticketText(description)]);
+function contentHash(title: string, description: string, records: TicketRecord[]): string {
+  return hash([ticketText(title, records), ticketText(description, records)]);
 }
 /** Retain current tracker observations without equating workflow state with tested completion. */
 function observe(record: TicketRecord, issue: RemoteTicket): void {
   record.issueId = issue.id;
   record.checkedAt = new Date().toISOString();
-  record.observedHash = contentHash(issue.title, issue.description);
   if (issue.url) record.url = issue.url;
   record.remoteStatus = issue.status ?? 'Not supplied';
   if (issue.statusType) record.remoteStatusType = issue.statusType;
@@ -80,7 +79,7 @@ export async function reconcileTicket(
   const settings = state.settings!;
   const title = `${ticket.blocked ? '[Blocked] ' : ''}${ticket.title}`;
   const description = `${ticket.markdown}\n\nAiden identity: ${record.marker}`;
-  const desiredHash = contentHash(title, description);
+  const desiredHash = contentHash(title, description, state.records);
   record.title = title;
   if (!record.issueId) {
     const found = await recoverIssue(engine, settings, record.marker);
@@ -103,7 +102,8 @@ export async function reconcileTicket(
     }
   }
   let issue = await getIssue(engine, settings, record);
-  let currentHash = contentHash(issue.title, issue.description);
+  let currentHash = contentHash(issue.title, issue.description, state.records);
+  record.observedHash = currentHash;
   if (currentHash === record.pendingHash) {
     record.contentHash = currentHash;
     delete record.pendingHash;
@@ -123,7 +123,8 @@ export async function reconcileTicket(
       description,
     });
     issue = await getIssue(engine, settings, record);
-    currentHash = contentHash(issue.title, issue.description);
+    currentHash = contentHash(issue.title, issue.description, state.records);
+    record.observedHash = currentHash;
   }
   if (currentHash !== desiredHash) {
     record.state = 'conflict';

@@ -4,7 +4,11 @@ import test from 'node:test';
 
 import { commitBaseline } from '../packages/core/src/baseline.js';
 import { atomic } from '../packages/core/src/storage.js';
-import { readTicketState, saveTicketSettings } from '../packages/core/src/ticket-storage.js';
+import {
+  readTicketState,
+  saveTicketSettings,
+  writeTicketState,
+} from '../packages/core/src/ticket-storage.js';
 import { syncTickets } from '../packages/core/src/ticket-sync.js';
 import { ticketFixture } from './ticket-fixture.js';
 
@@ -153,6 +157,40 @@ void test('tool changes and scope mismatch stop writes; disabling works offline;
       }),
       /disabled/,
     );
+  } finally {
+    await f.close();
+  }
+});
+
+void test('rich mention read-back recovers pending writes for known tickets and preserves altered destinations', async () => {
+  const f = await ticketFixture();
+  try {
+    await f.enable();
+    const first = await syncTickets(f.engine, f.project.id);
+    const known = first.records[0]!;
+    f.product.deliveryPlan![1]!.outcome += ` Follow ${known.issueId}.`;
+    await commitBaseline(f.store, f.project.id, f.product, f.project.context);
+    const written = await syncTickets(f.engine, f.project.id);
+    const record = written.records[1]!;
+    record.pendingHash = record.contentHash!;
+    delete record.contentHash;
+    record.state = 'conflict';
+    await writeTicketState(f.store, f.project.id, written);
+    const issue = f.issues.get('issue-2')!;
+    const mention = `<issue id="11111111-1111-4111-8111-111111111111" href="${known.url}">${known.issueId}</issue>`;
+    issue.description = issue.description.replace(`Follow ${known.issueId}.`, `Follow ${mention}.`);
+    const recovered = await syncTickets(f.engine, f.project.id);
+    assert.equal(recovered.records[1]!.state, 'synced');
+    assert.equal(recovered.records[1]!.pendingHash, undefined);
+    assert.equal(recovered.records[1]!.contentHash, recovered.records[1]!.observedHash);
+    issue.description = issue.description.replace(
+      known.url!,
+      'https://linear.app/another/issue/OTHER-1',
+    );
+    const edited = issue.description;
+    assert.equal((await syncTickets(f.engine, f.project.id)).records[1]!.state, 'conflict');
+    assert.equal(issue.description, edited);
+    assert.equal(f.issues.size, 2);
   } finally {
     await f.close();
   }
