@@ -15,9 +15,17 @@ const entities: Record<string, string> = {
 };
 const badges = { pass: 'Verified', fail: 'Failed', unverified: "Couldn't verify" } as const;
 
-/** Replace em dashes from model or page text with ordinary punctuation for user-facing copy. */
+/** Replace em dashes in untrusted text in linear time, trimming only adjacent whitespace. */
 export function plainText(value: string): string {
-  return value.replace(/\s*—\s*/g, ', ');
+  const parts = value.split('\u2014');
+  if (parts.length === 1) return value;
+  return parts
+    .map((part, index) => {
+      if (index === 0) return part.trimEnd();
+      if (index === parts.length - 1) return part.trimStart();
+      return part.trim();
+    })
+    .join(', ');
 }
 
 /** Escape untrusted page and model text for HTML text and attribute positions. */

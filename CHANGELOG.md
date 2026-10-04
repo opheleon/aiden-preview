@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Prevent excessive CPU use when formatting untrusted page or model text containing long whitespace sequences.
+
 - Record project outcome acceptance with a note, preserving automated evidence and decision history. Close projects to pause monitoring and ticket syncing; reopen them from Closed projects.
 
 - Align the introduction and user docs with Aiden’s marketing: your first autonomous project manager. Organize onboarding around setting the intent, making the calls, and accepting the outcome.

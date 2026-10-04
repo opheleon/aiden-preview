@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import test from 'node:test';
+import { promisify } from 'node:util';
 
 import type {
   CriterionOutcome,
@@ -304,4 +306,43 @@ void test('reports escape page text, drop em dashes, and never label fixtures as
     /Codex \(API key\), model default/,
   );
   assert.equal(plainText('a — b'), 'a, b');
+});
+
+void test('punctuation normalization preserves text and whitespace away from em dashes', () => {
+  for (const [input, expected] of [
+    ['', ''],
+    ['  unchanged\t\n', '  unchanged\t\n'],
+    ['  a\t\u2014\n b  ', '  a, b  '],
+    ['\u2014', ', '],
+    ['\u2014\u2014', ', , '],
+    ['a\u2014 \u2014b', 'a, , b'],
+    ['a\u00a0\u2014\ufeffb\u2028\u2014\u2003c', 'a, b, c'],
+    [' \u2014 middle \u2014 ', ', middle, '],
+    ['a-b\u2013c', 'a-b\u2013c'],
+  ]) {
+    assert.equal(plainText(input!), expected);
+  }
+});
+
+void test('untrusted whitespace cannot stall punctuation normalization', async () => {
+  // A child-process deadline can stop a synchronous CPU stall without hanging the test runner.
+  await promisify(execFile)(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      '--input-type=module',
+      '--eval',
+      `import assert from 'node:assert/strict';
+       import { plainText } from './packages/verification/src/report.ts';
+       const spaces = ' '.repeat(1_000_000);
+       assert.equal(plainText(spaces), spaces);
+       assert.equal(plainText('a' + spaces + 'b'), 'a' + spaces + 'b');
+       assert.equal(plainText('a' + spaces + '\\u2014' + spaces + 'b'), 'a, b');
+       assert.equal(plainText('a\\u2014b' + spaces + 'c'), 'a, b' + spaces + 'c');
+       const repeated = ('a \\u2014 ').repeat(100_000);
+       assert.equal(plainText(repeated), ('a, ').repeat(100_000));`,
+    ],
+    { cwd: process.cwd(), timeout: 15_000 },
+  );
 });
