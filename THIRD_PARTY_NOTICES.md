@@ -9,6 +9,7 @@ Aiden's original source is Apache-2.0. Dependencies, fonts, provider binaries, a
 | Instrument Sans, Instrument Serif, JetBrains Mono                                       | SIL Open Font License 1.1; retain the font licenses and reserved-name restrictions        |
 | Claude Agent SDK and bundled Claude executable                                          | Anthropic commercial terms; preserve the unmodified binary and applicable notices         |
 | Chromium and other components bundled with Electron                                     | Retain Electron's LICENSE and LICENSES.chromium.html from the actual runtime distribution |
+| Playwright and its downloaded Chromium build (browser verification prototype)           | Apache-2.0 for Playwright; retain the browser build's bundled license notices             |
 
 The installed Claude Agent SDK is governed by [Anthropic's terms](https://code.claude.com/docs/en/legal-and-compliance#can-customers-offer-claude-code-in-their-products). These describe running the unmodified Claude Code binary in third-party products with each user authenticating through Anthropic's own flow and paying for their own usage. Aiden uses the official SDK and the user's local Claude Code sign-in. Packaging must preserve the binary and its authentication methods; Aiden must not collect subscription tokens or resell usage.
 

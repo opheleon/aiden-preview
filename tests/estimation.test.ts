@@ -6,12 +6,9 @@ import type { HistoryIssue, RequirementEstimate } from '../packages/contracts/sr
 import { Engine } from '../packages/core/src/engine.js';
 import { Store } from '../packages/core/src/storage.js';
 import {
-  addWorkingDays,
   buildForecast,
   defaultOverrides,
   durationSummary,
-  historicalWeeklyRate,
-  workingDayDifference,
 } from '../packages/estimation/src/index.js';
 import { FixtureRuntime } from './fixture-runtime.js';
 import { fixture } from './helpers.js';
@@ -32,16 +29,9 @@ const issue = (id: string, days: number, points = 2): HistoryIssue => ({
   scopeShape: 'bounded_change',
 });
 
-void test('historical duration, throughput, capacity, weekends, and DST-safe date arithmetic match the shared rules', () => {
+void test('historical duration uses observed variation with no time conversion', () => {
   const history = [issue('1', 1), issue('2', 5), issue('3', 2), issue('4', 10), issue('5', 3)];
   assert.deepEqual(durationSummary(history), { count: 5, median: 3, p10: 1, p90: 10 });
-  assert.equal(historicalWeeklyRate(history, true), (10 * 7) / 90);
-  assert.equal(historicalWeeklyRate(history.slice(0, 2), true), null);
-  assert.equal(historicalWeeklyRate(history, false), null);
-  assert.equal(addWorkingDays('2026-03-06', 1), '2026-03-09');
-  assert.equal(addWorkingDays('2026-11-01', 5), '2026-11-06');
-  assert.equal(workingDayDifference('2026-03-06', '2026-03-09'), 1);
-  assert.equal(workingDayDifference('2026-03-09', '2026-03-06'), -1);
 });
 
 void test('forecast counts only implemented requirements and withholds completion when coverage is unknown', () => {
@@ -100,7 +90,9 @@ void test('forecast counts shared work once across requirements', () => {
   });
   assert.equal(forecast.totalPoints, 3);
   assert.equal(forecast.remainingPoints, 3);
-  assert.equal(forecast.remainingWorkingDays, 5);
+  assert.equal(forecast.remainingWorkingDays, null);
+  assert.equal(forecast.weeklyRate, null);
+  assert.equal(forecast.forecastFinish, null);
 });
 
 void test('model estimates use one artifact contract and remain independently publishable', async () => {
@@ -118,6 +110,20 @@ void test('model estimates use one artifact contract and remain independently pu
     const estimate = await engine.getEstimate(f.project.id);
     assert.equal(estimate?.baselineId, baseline.id);
     assert.equal(estimate?.reportId, reportRun.runId);
+    assert.ok(estimate);
+    const { estimationMarkdown } = await import('../packages/reporting/src/index.js');
+    const legacy = {
+      ...estimate,
+      estimatorVersion: '1' as const,
+      requirements: estimate.requirements.map((row) => ({
+        ...row,
+        durationDays: 123,
+        durationOverridden: true,
+      })),
+    };
+    assert.doesNotMatch(estimationMarkdown(legacy), /123 calendar days/);
+    assert.match(estimationMarkdown(legacy), /Historical median: unavailable/);
+
     assert.deepEqual(
       estimate?.requirements.map((row) => row.points),
       [2, 3],
@@ -208,7 +214,7 @@ void test('estimation uses approved context tools but rejects interactive clarif
           (
             await client.callTool({
               name: 'request_clarification',
-              arguments: { question: 'Synthetic question' },
+              arguments: { question: 'Synthetic question', assumption: 'Synthetic assumption' },
             })
           ).isError,
           true,
@@ -236,7 +242,7 @@ void test('estimation uses approved context tools but rejects interactive clarif
     await engine.wait(estimated.runId);
     assert.equal((await engine.getEstimate(f.project.id))?.id, estimated.runId);
     assert.equal(reads, 1);
-    assert.ok(progress.includes('Using repo inventory'));
+    assert.ok(progress.includes('Listed the repositories and their branches'));
     const receipts = await json<{ connectionId: string }[]>(
       path.join(store.run(f.project.id, estimated.runId), 'external-reads.json'),
     );

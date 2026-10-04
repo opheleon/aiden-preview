@@ -2,6 +2,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline';
 
 import { Runtimes } from '../../runtimes/src/index.js';
+import { appPorts } from '../../verification/src/index.js';
 import { Engine } from './engine.js';
 import { Store } from './storage.js';
 import { createMethods } from './worker-methods.js';
@@ -14,6 +15,8 @@ function send(value: unknown): void {
   process.stdout.write(JSON.stringify(value) + '\n');
 }
 const engine = new Engine(store, runtimes, (event) => send({ event }));
+const ports = appPorts(process.env.AIDEN_APP_PORTS);
+if (ports) engine.discover = { ports };
 export const methods = createMethods(engine, runtimes);
 const input = createInterface({ input: process.stdin });
 input.on('line', (line) => {

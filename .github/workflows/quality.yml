@@ -29,6 +29,8 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install verification browser and system dependencies
+        run: pnpm exec playwright install --with-deps chromium
       - run: pnpm check
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()

@@ -4,6 +4,7 @@ import {
   type AccountInfo,
   type Options,
   query,
+  type SDKMessage,
   type SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 
@@ -40,12 +41,42 @@ function executionOptions(
   binary: string,
   controller: AbortController,
 ): Options {
+  if (r.coding)
+    return {
+      cwd: r.cwd,
+      env: {
+        ...env,
+        GIT_CONFIG_COUNT: '3',
+        GIT_CONFIG_KEY_0: 'core.hooksPath',
+        GIT_CONFIG_VALUE_0: '/dev/null',
+        GIT_CONFIG_KEY_1: 'core.fsmonitor',
+        GIT_CONFIG_VALUE_1: 'false',
+        GIT_CONFIG_KEY_2: 'protocol.ext.allow',
+        GIT_CONFIG_VALUE_2: 'never',
+      },
+      pathToClaudeCodeExecutable: binary,
+      abortController: controller,
+      ...(r.config.model ? { model: r.config.model } : {}),
+      ...(r.config.effort ? { effort: r.config.effort } : {}),
+      sessionId: r.coding.sessionId,
+      persistSession: true,
+      tools: { type: 'preset', preset: 'claude_code' },
+      permissionMode: 'auto',
+      settingSources: [],
+      plugins: [],
+      strictMcpConfig: true,
+      mcpServers: {},
+      systemPrompt: { type: 'preset', preset: 'claude_code' },
+      outputFormat: { type: 'json_schema', schema: r.schema },
+      stderr: () => {},
+    };
   return {
     cwd: r.cwd,
     env,
     pathToClaudeCodeExecutable: binary,
     abortController: controller,
     ...(r.config.model ? { model: r.config.model } : {}),
+    ...(r.config.effort ? { effort: r.config.effort } : {}),
     tools: [],
     allowedTools: ['mcp__aiden__*'],
     permissionMode: 'dontAsk',
@@ -179,6 +210,21 @@ function executionError(code: string, subscription: boolean): Error {
   );
 }
 
+/** Observe external progress while preserving the analyst tool boundary and sanitized provider errors. */
+function observeMessage(r: RuntimeRequest, message: SDKMessage, subscription: boolean): void {
+  if (
+    message.type === 'system' &&
+    message.subtype === 'init' &&
+    !r.coding &&
+    message.tools.some((tool) => !tool.startsWith('mcp__aiden__') && tool !== 'StructuredOutput')
+  )
+    throw new Error('Claude exposed unexpected tools; Aiden stopped the run.');
+  if (message.type === 'assistant') {
+    if (r.coding) r.progress('Claude Code is working. Local tests are owned by Claude Code.');
+    if (message.error) throw executionError(message.error, subscription);
+  }
+}
+
 /** Execute one isolated Claude turn after confirming the requested billing mode; always close its stream. */
 export async function runClaude(
   r: RuntimeRequest,
@@ -230,11 +276,8 @@ export async function runClaude(
       r.signal.throwIfAborted();
       if (message.type === 'system' && message.subtype === 'init') {
         actualModel = message.model;
-        if (message.tools.some((t) => !t.startsWith('mcp__aiden__') && t !== 'StructuredOutput'))
-          throw new Error('Claude exposed unexpected tools; Aiden stopped the run.');
       }
-      if (message.type === 'assistant' && message.error)
-        throw executionError(message.error, subscription);
+      observeMessage(r, message, subscription);
       if (message.type === 'result') {
         if (message.subtype !== 'success')
           throw new Error(
@@ -307,7 +350,17 @@ export async function claudeModels(
     const account = await bounded(stream.accountInfo(), controller.signal, 15000);
     verifyAccount(account, config.auth === 'subscription');
     const models = await bounded(stream.supportedModels(), controller.signal, 15000);
-    return models.map((model) => ({ id: model.value, label: model.displayName }));
+    return models.map((model) => ({
+      id: model.value,
+      label: model.displayName,
+      isDefault: model.value === 'default',
+      ...(model.resolvedModel ? { resolvedModel: model.resolvedModel } : {}),
+      ...(model.supportedEffortLevels
+        ? { supportedEfforts: model.supportedEffortLevels }
+        : model.supportsEffort === false
+          ? { supportedEfforts: [] }
+          : {}),
+    }));
   } finally {
     clearTimeout(timer);
     controller.abort();

@@ -67,7 +67,7 @@ async function isolatedConfig(
     agents: { enabled: false },
     web_search: 'disabled',
     project_doc_max_bytes: 0,
-    model_reasoning_effort: 'medium',
+    model_reasoning_effort: request.config.effort ?? 'medium',
   };
 }
 
@@ -94,7 +94,7 @@ async function selectModel(
   return model;
 }
 
-/** Refuse execution unless Aiden’s evidence reader is available and no other server exposes tools. */
+/** Refuse execution unless Aiden’s server exposes tools and no other server exposes any. */
 async function verifyTools(client: RpcClient, threadId: string): Promise<void> {
   let cursor: string | undefined;
   let hasAiden = false;
@@ -106,9 +106,7 @@ async function verifyTools(client: RpcClient, threadId: string): Promise<void> {
     if (status.data.some((server) => server.name !== 'aiden' && Object.keys(server.tools).length))
       throw new Error('Unexpected MCP tools are enabled. Aiden stopped before analysis.');
     hasAiden ||= status.data.some(
-      (server) =>
-        server.name === 'aiden' &&
-        Object.keys(server.tools).some((tool) => tool.includes('repo_read')),
+      (server) => server.name === 'aiden' && Object.keys(server.tools).length > 0,
     );
     cursor = status.nextCursor ?? undefined;
     if (cursor && (seen.has(cursor) || seen.size >= 10))

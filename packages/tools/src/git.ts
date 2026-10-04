@@ -105,6 +105,21 @@ export async function syncRepository(repo: Repository, signal?: AbortSignal): Pr
     );
   }
 }
+/** Commits checked out in the repository's other worktrees, where in-progress work often lives. */
+async function worktreeHeads(
+  repo: Repository,
+  head: string,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  try {
+    const listing = await git(repo.path, ['worktree', 'list', '--porcelain'], signal);
+    const heads = [...listing.matchAll(/^HEAD ([0-9a-f]{40,64})$/gm)].map((m) => m[1]!);
+    return [...new Set(heads)].filter((sha) => sha !== head).slice(0, 4);
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    return [];
+  }
+}
 /** List bounded recent refs and HEAD without fetching; missing remote defaults remain explicitly unknown. */
 export async function inventory(
   repo: Repository,
@@ -147,6 +162,7 @@ export async function inventory(
     head,
     defaultBranch,
     refs,
+    worktrees: await worktreeHeads(repo, head, signal),
     warnings: [
       'PR metadata and deployment-run evidence are unavailable in the local Git prototype.',
       ...(refs.length >= 150 ? ['Branch inventory is limited to 150 recent refs.'] : []),
@@ -231,5 +247,9 @@ export interface RepositoryInventory {
   head: string;
   defaultBranch: string;
   refs: { repositoryId: string; branch: string; sha: string }[];
+  /** Commits checked out in other worktrees of this repository; older inventories omit it. */
+  worktrees?: string[];
+  /** Fresh monitored-branch observation; legacy field name retained for saved inventories. */
+  remoteDefault?: { remote: string; branch: string; sha: string; checkedAt: string };
   warnings: string[];
 }

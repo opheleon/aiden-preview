@@ -17,8 +17,10 @@ function desktop() {
   const unsubscribe = vi.fn();
   const request = vi.fn((method: string) => {
     if (['diagnostics', 'projects', 'integrations'].includes(method)) return Promise.resolve([]);
-    if (method === 'state') return Promise.resolve({ project, baseline: null, runs: [] });
-    if (method === 'estimation') return Promise.resolve(null);
+    if (method === 'state')
+      return Promise.resolve({ project, baseline: null, runs: [], activeRunIds: [] });
+    if (['calls', 'activity'].includes(method)) return Promise.resolve([]);
+    if (method === 'verification') return Promise.resolve(null);
     if (method === 'discoverRepositories')
       return Promise.resolve({
         rootPath: '/synthetic',
@@ -47,22 +49,29 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-test('project loading restores saved artifacts without relaunching analysis, then validates explicit preparation', async () => {
+test('project loading restores what Aiden knows without starting work, then validates the handoff', async () => {
   const f = desktop();
   const { result } = renderHook(() => useWorkspace());
   await act(() => result.current.load(project.id));
   expect(result.current.project).toEqual(project);
-  expect(result.current.showGoalStarter).toBe(false);
-  expect(result.current.step).toBe(0);
-  expect(f.request).not.toHaveBeenCalledWith('report', expect.anything());
-  await act(() => result.current.prepare());
-  expect(f.request).toHaveBeenCalledWith('prepare', { project });
+  expect(result.current.busy).toBe(false);
+  expect(f.request).toHaveBeenCalledWith('calls', { projectId: project.id });
+  expect(f.request).toHaveBeenCalledWith('activity', { projectId: project.id });
+  expect(f.request).not.toHaveBeenCalledWith('look', expect.anything());
+  await act(() => result.current.start());
+  expect(f.request).toHaveBeenCalledWith('prepare', {
+    project: { ...project, name: 'Users can list books' },
+    autoAccept: true,
+  });
   expect(result.current.activeRun).toBe('fixture-run');
   expect(result.current.busy).toBe(true);
-  act(() => result.current.setProject({ ...project, context: '' }));
-  await act(() => result.current.prepare());
-  expect(result.current.error).toContain('Add a project name');
+  act(() => result.current.setProject({ ...project, context: ' ' }));
+  await act(() => result.current.start());
+  expect(result.current.error).toContain('Tell Aiden what you are building');
   expect(result.current.busy).toBe(false);
+  act(() => result.current.setProject({ ...project, name: ' ', repositories: [] }));
+  await act(() => result.current.start());
+  expect(result.current.error).toContain('Choose the project folder');
 });
 
 test('repository rescans retain notes and cancelling folder selection leaves inputs intact', async () => {
@@ -84,24 +93,7 @@ test('repository rescans retain notes and cancelling folder selection leaves inp
   expect(result.current.scanning).toBe(false);
 });
 
-test('changed source inputs block analysis until another requirements review', async () => {
-  const f = desktop();
-  const { result } = renderHook(() => useWorkspace());
-  act(() => result.current.setProject({ ...project, context: 'Changed requirements' }));
-  await act(() => result.current.analyze());
-  expect(result.current.step).toBe(1);
-  expect(result.current.error).toContain('inputs have changed');
-  expect(f.request).not.toHaveBeenCalledWith('report', expect.anything());
-  act(() => result.current.setProject(project));
-  await act(() => result.current.analyze());
-  expect(f.request).toHaveBeenCalledWith('updateRuntime', {
-    projectId: project.id,
-    runtime: project.runtime,
-  });
-  expect(f.request).toHaveBeenCalledWith('report', { projectId: project.id });
-});
-
-test('worker progress, clarification, review, cancellation, and background outcomes update only their intended state', async () => {
+test('worker progress, activity, cancellation, and background outcomes update only their intended state', async () => {
   const f = desktop();
   const { result } = renderHook(() => useWorkspace());
   act(() => result.current.setProject(project));
@@ -109,28 +101,24 @@ test('worker progress, clarification, review, cancellation, and background outco
   act(() =>
     f.emit({ type: 'progress', projectId: project.id, runId: 'run', message: 'Inspecting' }),
   );
-  expect(result.current.log).toEqual(['Inspecting']);
+  expect(result.current.live).toBe('Inspecting');
   expect(result.current.busy).toBe(true);
-  act(() =>
-    f.emit({
-      type: 'clarification',
-      projectId: project.id,
-      runId: 'run',
-      questionId: 'question',
-      question: 'Which branch?',
-    }),
-  );
-  expect(result.current.question?.question).toBe('Which branch?');
-  act(() =>
-    f.emit({
-      type: 'review',
-      projectId: project.id,
-      runId: 'run',
-      product: { overview: 'Books', requirements: [], milestones: [] },
-    }),
-  );
-  expect(result.current.reviewRun).toBe('run');
-  expect(result.current.step).toBe(2);
+  const ask = {
+    at: '2026-09-29T09:00:00.000Z',
+    runId: 'run',
+    kind: 'ask' as const,
+    summary: 'Asked you: Which branch?',
+    reason: 'Going ahead assuming: main',
+  };
+  await act(async () => {
+    f.emit({ type: 'activity', projectId: project.id, runId: 'run', activity: ask });
+    f.emit({ type: 'activity', projectId: project.id, runId: 'run', activity: ask });
+    f.emit({ type: 'activity', projectId: project.id, runId: 'run' });
+    await Promise.resolve();
+  });
+  expect(result.current.activity).toEqual([ask]);
+  expect(result.current.live).toBe('Asked you: Which branch?');
+  expect(f.request).toHaveBeenCalledWith('calls', { projectId: project.id });
   await act(async () => {
     f.emit({
       type: 'cancelled',
@@ -140,11 +128,28 @@ test('worker progress, clarification, review, cancellation, and background outco
     });
     await Promise.resolve();
   });
-  expect(result.current.question).toBeUndefined();
   expect(result.current.busy).toBe(false);
   expect(result.current.error).toBe('Cancelled by user');
   act(() => f.emit({ type: 'completed', projectId: 'other', runId: 'other-run' }));
-  expect(result.current.notice).toContain('background run finished');
+  expect(result.current.notice).toContain('another project');
+});
+
+test('answering a call while Aiden works keeps the answer until the current work finishes', async () => {
+  const f = desktop();
+  f.request.mockImplementation(((method: string) => {
+    if (method === 'answerCall') return Promise.resolve({ call: {}, runId: null });
+    if (['diagnostics', 'projects', 'integrations', 'calls', 'activity'].includes(method))
+      return Promise.resolve([]);
+    return Promise.resolve({ runId: 'fixture-run' });
+  }) as never);
+  const { result } = renderHook(() => useWorkspace());
+  act(() => result.current.setProject(project));
+  await act(() => result.current.answerCall('call', 'Yes'));
+  expect(result.current.notice).toContain('current work finishes');
+  expect(result.current.busy).toBe(false);
+  f.request.mockRejectedValueOnce(new Error('This call is no longer open.'));
+  await act(() => result.current.answerCall('call', 'Yes'));
+  expect(result.current.error).toBe('This call is no longer open.');
 });
 
 test('update persistence errors surface and subscriptions clean up', async () => {
@@ -160,7 +165,7 @@ test('update persistence errors surface and subscriptions clean up', async () =>
   expect(f.unsubscribe).toHaveBeenCalled();
 });
 
-test('pending estimate continuations are cancelled when the renderer unmounts', async () => {
+test('a completed look never starts another run on its own', async () => {
   const f = desktop();
   const { result, unmount } = renderHook(() => useWorkspace());
   act(() => result.current.setProject(project));
@@ -175,7 +180,47 @@ test('pending estimate continuations are cancelled when the renderer unmounts', 
     });
     await Promise.resolve();
   });
-  unmount();
   await vi.advanceTimersByTimeAsync(300);
+  expect(result.current.busy).toBe(false);
   expect(f.request).not.toHaveBeenCalledWith('estimate', expect.anything());
+  expect(f.request).not.toHaveBeenCalledWith('look', expect.anything());
+  unmount();
+});
+
+test('progress from another project never holds this project as busy', async () => {
+  const f = desktop();
+  const { result } = renderHook(() => useWorkspace());
+  act(() => result.current.setProject(project));
+  await waitFor(() => expect(f.api.onEvent).toHaveBeenCalled());
+  act(() =>
+    f.emit({ type: 'progress', projectId: 'other', runId: 'other-run', message: 'Elsewhere' }),
+  );
+  expect(result.current.busy).toBe(false);
+  expect(result.current.live).not.toBe('Elsewhere');
+});
+
+test('a first progress event fetches the newly started run without changing projects', async () => {
+  const f = desktop();
+  const { result } = renderHook(() => useWorkspace());
+  act(() => result.current.setProject(project));
+  const run = {
+    id: 'new-run',
+    projectId: project.id,
+    project,
+    kind: 'estimate',
+    status: 'running',
+    stage: 'estimate',
+    createdAt: new Date().toISOString(),
+  };
+  f.request.mockImplementation((method: string) =>
+    Promise.resolve(
+      method === 'state' ? { project, runs: [run], activeRunIds: ['new-run'] } : ([] as any),
+    ),
+  );
+  await act(async () => {
+    f.emit({ type: 'progress', projectId: project.id, runId: 'new-run', message: 'Sizing' });
+    await Promise.resolve();
+  });
+  expect(result.current.runs).toEqual([run]);
+  expect(result.current.activeRuns).toEqual(['new-run']);
 });

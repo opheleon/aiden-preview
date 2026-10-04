@@ -133,7 +133,8 @@ export function RepositorySetup(props: RepositorySetupProps): React.JSX.Element 
       <div className="inline-note">
         <ShieldCheck size={16} />
         <span>
-          Clean branches sync automatically. Local changes are preserved and excluded from analysis.
+          Checks read the monitored remote branch. Local changes are preserved and excluded from
+          analysis.
         </span>
       </div>
     </section>

@@ -4,6 +4,7 @@ import { type JSX, useCallback, useEffect, useRef, useState } from 'react';
 import type { RuntimeDiagnostic, RuntimeModel } from '../../../../packages/contracts/src/api';
 import type { RuntimeConfig } from '../../../../packages/contracts/src/index';
 import type { DesktopBridge } from '../bridge';
+import { EffortSelector } from './EffortSelector';
 
 /** Provider controls and callbacks scoped to a project's chosen authentication profile. */
 interface RuntimeSettingsProps {
@@ -97,7 +98,7 @@ function RuntimeProfile({
         </div>
         <div>
           <h2>Model runtime</h2>
-          <p>Provider, authentication, and model for this project.</p>
+          <p>Provider, authentication, model, and effort for this project.</p>
         </div>
       </div>
       <CodexInstallation provider={provider} status={status} api={api} action={action} />
@@ -296,7 +297,9 @@ function ModelSelector({
           aria-label="Model"
           disabled={disabled}
           value={selected}
-          onChange={(event) => onChange({ ...runtime, model: event.target.value || undefined })}
+          onChange={(event) =>
+            onChange({ ...runtime, model: event.target.value || undefined, effort: undefined })
+          }
         >
           <option value="">
             Provider default
@@ -312,6 +315,7 @@ function ModelSelector({
           {custom && <option value={selected}>{selected} · saved/custom</option>}
         </select>
       </label>
+      <EffortSelector runtime={runtime} models={models} onChange={onChange} disabled={disabled} />
       <details>
         <summary>Enter a model ID</summary>
         <label>
@@ -321,7 +325,9 @@ function ModelSelector({
             disabled={disabled}
             placeholder="Provider default"
             value={selected}
-            onChange={(e) => onChange({ ...runtime, model: e.target.value.trim() || undefined })}
+            onChange={(e) =>
+              onChange({ ...runtime, model: e.target.value.trim() || undefined, effort: undefined })
+            }
           />
         </label>
       </details>

@@ -9,12 +9,57 @@ import type {
   ReadReceipt,
   Snapshot,
 } from '../../contracts/src/index.js';
-import { safeRelative } from '../../contracts/src/index.js';
+import { edgeCaseId, requirementId, safeRelative } from '../../contracts/src/index.js';
 import { atomic, boundedPath } from '../../core/src/storage.js';
 import { files, git, readSnapshot, syncRepository } from './git.js';
 import { defineTool, type ToolDefinition } from './tool-definition.js';
 
 const rid = z.string();
+
+/** A decision with an explicit blocking classification; omitted classification blocks safely. */
+export const ClarificationRequestSchema = z
+  .object({
+    question: z.string().trim().min(1).max(400),
+    blocking: z.boolean().optional(),
+    assumption: z.string().trim().min(1).max(300),
+    options: z.array(z.string().trim().min(1).max(160)).max(4).optional(),
+    requirementId: requirementId.optional(),
+    edgeCaseId: edgeCaseId.optional(),
+  })
+  .strict();
+/** Validated arguments of the `request_clarification` tool. */
+export type ClarificationRequest = z.infer<typeof ClarificationRequestSchema>;
+
+/**
+ * A plain description of one tool call for the run's live history, such as "Read aiden/src/app.ts
+ * lines 1 to 120". Arguments are already validated; names come from the person's own folders.
+ */
+export function describeToolCall(
+  name: string,
+  input: Record<string, unknown>,
+  names: Map<string, string>,
+): string {
+  /** A string or number argument as text, or the fallback. */
+  const text = (value: unknown, fallback: string): string =>
+    typeof value === 'string' || typeof value === 'number' ? String(value) : fallback;
+  const id = text(input.repositoryId, '');
+  const repo = names.get(id) ?? id;
+  const prefix = text(input.prefix, '');
+  const steps: Record<string, () => string> = {
+    repo_read: () => `Read ${repo}/${text(input.path, '')} from line ${text(input.startLine, '1')}`,
+    repo_files: () => `Listed files in ${repo}${prefix ? `/${prefix}` : ''}`,
+    repo_search: () => `Searched ${repo} for "${text(input.query, '')}"`,
+    repo_history: () => `Read the commit history of ${repo}`,
+    repo_diff: () => `Compared two commits in ${repo}`,
+    repo_inventory: () => 'Listed the repositories and their branches',
+    artifact_write: () => 'Updated its working notes',
+    artifact_read: () => 'Updated its working notes',
+    artifact_validate: () => 'Checked its answer against the expected format',
+    external_read: () => `Read from ${text(input.tool, 'a connected tool')}`,
+    request_clarification: () => 'Wrote down a question for you',
+  };
+  return steps[name]?.() ?? `Used ${name.replaceAll('_', ' ')}`;
+}
 const sha = z.string().regex(/^[a-f0-9]{40,64}$/);
 const location = { repositoryId: rid, sha };
 
@@ -32,7 +77,7 @@ export class ToolBroker {
     public project: Project,
     public artifacts: string,
     public receiptsFile: string,
-    public clarify: (question: string) => Promise<string>,
+    public clarify: (request: ClarificationRequest) => Promise<string>,
     public progress: (message: string) => void = () => {},
     public externalCall?: (
       connectionId: string,
@@ -40,7 +85,11 @@ export class ToolBroker {
       args: Record<string, unknown>,
       signal?: AbortSignal,
     ) => Promise<{ result: unknown; receipt: ExternalReadReceipt }>,
-  ) {}
+  ) {
+    this.names = new Map(project.repositories.map((r) => [r.id, path.basename(r.path)]));
+  }
+  /** Folder names for repository IDs, kept from the real checkouts for readable progress. */
+  private names: Map<string, string>;
   /** Resolve only repositories explicitly selected by the saved project. */
   repo(id: string): Project['repositories'][number] {
     const r = this.project.repositories.find((r) => r.id === id);
@@ -279,16 +328,16 @@ export class ToolBroker {
       }),
     ];
   }
-  /** Await user clarification and allow only project-selected external connections. */
+  /** Record non-blocking calls and allow only project-selected external connections. */
   private contextTools(): ToolDefinition[] {
     const externalCall = this.externalCall;
     return [
       defineTool({
         name: 'request_clarification',
         description:
-          'Ask a concise question only when material ambiguity blocks the task. Await the user answer.',
-        schema: z.object({ question: z.string().min(1).max(1500) }).strict(),
-        run: async (a) => ({ answer: await this.clarify(a.question) }),
+          'Record an unresolved human decision after investigating available context. Set blocking true for unknown core behavior, permissions, data policy, or prerequisites. Pause affected work and dependents; continue only independent work. Set blocking false only for low-impact reversible choices grounded in conventions. For a blocker, assumption describes what is paused and what the answer unlocks.',
+        schema: ClarificationRequestSchema,
+        run: async (a) => ({ recorded: true, instruction: await this.clarify(a) }),
       }),
       ...(externalCall
         ? [
@@ -350,7 +399,7 @@ export class ToolBroker {
     const d = this.definitions().find((t) => t.name === name);
     if (!d) throw new Error('Tool is not allowed.');
     const parsed = d.schema.parse(input);
-    this.progress(`Using ${name.replaceAll('_', ' ')}`);
+    this.progress(describeToolCall(name, parsed as Record<string, unknown>, this.names));
     const result = await d.run(parsed);
     this.signal?.throwIfAborted();
     return result;

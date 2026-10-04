@@ -1,2 +1,10 @@
 @import url('./styles/project-overview.css');
 @import url('./styles/requirement-estimates.css');
+@import url('./styles/requirement-status.css');
+@import url('./styles/brief.css');
+@import url('./styles/activity.css');
+@import url('./styles/delivery-plan.css');
+@import url('./styles/project-summary.css');
+@import url('./styles/delivery-attention.css');
+@import url('./styles/first-use.css');
+@import url('./styles/project-outcome.css');

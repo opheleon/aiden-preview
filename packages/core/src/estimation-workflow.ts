@@ -13,6 +13,7 @@ import {
 import { buildForecast, defaultOverrides } from '../../estimation/src/index.js';
 import { ToolBroker } from '../../tools/src/broker.js';
 import { serveTools } from '../../tools/src/mcp.js';
+import { requireDefinedScope } from './blockers.js';
 import { collectEstimationHistory, type EstimationHistory } from './estimation-history.js';
 import {
   buildRequirementEstimates,
@@ -33,6 +34,7 @@ export async function executeEstimate(
   workspace: string,
 ): Promise<void> {
   const baseline = run.baseline!;
+  await requireDefinedScope(context.store, run.projectId, baseline.product);
   const report = run.estimateReportId
     ? await context.getReport(run.projectId, run.estimateReportId)
     : null;
@@ -66,7 +68,7 @@ export async function executeEstimate(
     const complexity = await originalEstimates(modelStage, baseline);
     const collected = await collectEstimationHistory(context, run, signal, dir);
     const history = await historicalEstimates(modelStage, collected.rows);
-    const remaining = await remainingEstimates(modelStage, baseline, report, context, run);
+    const remaining = await remainingEstimates(modelStage, baseline, report, context, run, history);
     const overrides =
       (await optionalJson<EstimateOverrides>(
         path.join(context.store.project(run.projectId), 'estimate-overrides.json'),
@@ -104,7 +106,7 @@ function estimateSnapshot(
 ): EstimationSnapshot {
   const snapshot: EstimationSnapshot = EstimationSnapshotSchema.parse({
     schemaVersion: '1.0',
-    estimatorVersion: '1',
+    estimatorVersion: '2',
     id: run.id,
     projectId: run.projectId,
     baselineId: baseline.id,
@@ -148,6 +150,7 @@ async function publishEstimate(
   report: Report | null,
 ): Promise<void> {
   signal.throwIfAborted();
+  await requireDefinedScope(context.store, run.projectId, baseline.product);
   const current = await json<Baseline>(
     path.join(context.store.project(run.projectId), 'baseline.json'),
   );

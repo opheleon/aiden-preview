@@ -18,7 +18,7 @@ const summary = JSON.parse(
   await readFile('coverage/backend/coverage-summary.json', 'utf8'),
 ) as Record<string, FileCoverage>;
 const critical =
-  /^(packages\/(tools\/src\/|contracts\/src\/|integrations\/src\/(credentials|oauth|tool-policy)|core\/src\/(storage|engine|report-workflow|report-analysis|clarification|estimation-workflow|estimation-history|estimation-stages|history-normalization|estimate-overrides|model-stage)))/;
+  /^(packages\/(tools\/src\/|contracts\/src\/|integrations\/src\/(credentials|oauth|tool-policy)|core\/src\/(storage|engine|report-workflow|report-analysis|clarification|ask-why|confirmations|run-lifecycle|baseline|activity|calls|understanding|triage|look|verification-settings|estimation-workflow|estimation-history|estimation-stages|history-normalization|estimate-overrides|model-stage)))/;
 const floors = { lines: 90, statements: 90, functions: 90, branches: 85 } as const;
 const errors: string[] = [];
 let checked = 0;

@@ -1,11 +1,13 @@
 import { randomBytes } from 'node:crypto';
-import { createServer, type Server } from 'node:http';
 import path from 'node:path';
 
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import {
+  StreamableHTTPClientTransport,
+  StreamableHTTPError,
+} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 
 import {
@@ -15,9 +17,20 @@ import {
   McpConnectionSchema,
   type McpTool,
 } from '../../contracts/src/index.js';
+import type { TicketSettings, TicketTools } from '../../contracts/src/tickets.js';
+import { trackerConnection, trackerUrl } from '../../contracts/src/tracker-connections.js';
 import { atomic, hash, optionalJson, uid } from '../../core/src/storage.js';
 import { SecretVault } from './credentials.js';
+import { type LinearOperation, linearOperation } from './linear-projects.js';
 import { StoredOAuthProvider } from './oauth.js';
+import { type OAuthCallback, oauthCallback } from './oauth-callback.js';
+import { ticketPayload } from './ticket-results.js';
+import {
+  ticketArguments,
+  type TicketOperationInput,
+  ticketTools,
+  validateTicketArguments,
+} from './ticket-tools.js';
 import { assessTool, toolFingerprint } from './tool-policy.js';
 export { assessTool, toolFingerprint } from './tool-policy.js';
 
@@ -28,14 +41,15 @@ export class ConnectionManager {
   private file: string;
   private vault: SecretVault;
   private active = new Map<string, Active>();
-  private callbacks = new Map<string, Server>();
+  private callbacks = new Map<string, OAuthCallback>();
+  private presets = new Map<string, Promise<McpConnection>>();
   /** Use the application data root; tests may opt out of the operating-system credential store. */
   constructor(
     public root: string,
-    options: { keyring?: boolean } = {},
+    options: { keyring?: boolean; vault?: SecretVault } = {},
   ) {
     this.file = path.join(root, 'integrations', 'connections.json');
-    this.vault = new SecretVault(options.keyring !== false);
+    this.vault = options.vault ?? new SecretVault(options.keyring !== false);
   }
   /** Load saved connection metadata; malformed storage is surfaced to the caller. */
   async list(): Promise<McpConnection[]> {
@@ -55,6 +69,27 @@ export class ConnectionManager {
     const value = (await this.list()).find((row) => row.id === id);
     if (!value) throw new Error('MCP connection not found.');
     return value;
+  }
+  /** Reuse a preset connection, coalescing double clicks without merging unrelated credentials. */
+  preset(provider: 'linear' | 'jira'): Promise<McpConnection> {
+    const pending = this.presets.get(provider);
+    if (pending) return pending;
+    const result = this.ensurePreset(provider).finally(() => this.presets.delete(provider));
+    this.presets.set(provider, result);
+    return result;
+  }
+  /** Keep read-only legacy entries separate; publishing requires the explicit read/write preset. */
+  private async ensurePreset(provider: 'linear' | 'jira'): Promise<McpConnection> {
+    const existing = trackerConnection(await this.list(), provider);
+    return (
+      existing ??
+      this.add({
+        name: provider === 'linear' ? 'Linear' : 'Jira',
+        provider: provider === 'linear' ? 'linear' : 'custom',
+        url: trackerUrl(provider),
+        auth: 'oauth',
+      })
+    );
   }
   /** Save a new disconnected connection, keeping bearer credentials exclusively in the vault. */
   async add(input: {
@@ -77,6 +112,7 @@ export class ConnectionManager {
       transport: 'streamable-http',
       status: 'disconnected',
       secureStorage: input.auth === 'none' ? 'none' : 'session',
+      ...(input.sessionOnly === undefined ? {} : { sessionOnly: input.sessionOnly }),
       approvedTools: [],
       createdAt: now,
       updatedAt: now,
@@ -138,28 +174,27 @@ export class ConnectionManager {
     const client = new Client({ name: 'aiden', version: '0.1.0' }, { capabilities: {} });
     const transport = await this.transport(connection, oauth);
     this.active.set(connection.id, { client, transport, ...(oauth ? { provider: oauth } : {}) });
-    await client.connect(transport);
-    return client;
+    try {
+      await client.connect(transport);
+      return client;
+    } catch (error) {
+      // Retain OAuth's pending transport only while its browser callback can finish authorization.
+      if (!(error instanceof UnauthorizedError && oauth?.authorizationUrl)) {
+        await client.close().catch(() => {});
+        this.active.delete(connection.id);
+      }
+      throw error;
+    }
   }
-  /** Start a state-checked loopback callback that expires after five minutes without retrying auth. */
+  /** Replace an old browser attempt and bind its completion to this exact connection. */
   private async startCallback(connection: McpConnection, state: string): Promise<string> {
-    const server = createServer((request, response) => {
-      void (async () => {
-        const url = new URL(request.url ?? '/', `http://${request.headers.host}`);
-        if (url.pathname !== '/oauth/callback') {
-          response.writeHead(404).end('Not found');
-          return;
-        }
-        const code = url.searchParams.get('code');
-        if (!code || url.searchParams.get('state') !== state) {
-          response
-            .writeHead(400, { 'content-type': 'text/plain' })
-            .end('Aiden rejected this authorization response. You can close this window.');
-          return;
-        }
+    this.callbacks.get(connection.id)?.close();
+    const callback = await oauthCallback(
+      state,
+      async (code) => {
         try {
           const active = this.active.get(connection.id);
-          if (!active || !active.provider || !('finishAuth' in active.transport))
+          if (!active?.provider || !('finishAuth' in active.transport))
             throw new Error('Authorization session expired.');
           await (active.transport as StreamableHTTPClientTransport | SSEClientTransport).finishAuth(
             code,
@@ -168,54 +203,29 @@ export class ConnectionManager {
           connection.status = 'connected';
           connection.message =
             'Connected. Review the available read tools before using this server.';
-          connection.updatedAt = new Date().toISOString();
           await this.refreshTools(connection);
-          response
-            .writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-            .end(
-              '<!doctype html><title>Aiden connected</title><p>Connection complete. You can return to Aiden.</p>',
-            );
-        } catch (error) {
+        } catch {
           connection.status = 'failed';
-          connection.message = error instanceof Error ? error.message : 'OAuth completion failed.';
+          connection.message = 'Could not finish sign-in. Reconnect this server to try again.';
           connection.updatedAt = new Date().toISOString();
           await this.save(connection);
-          response
-            .writeHead(500, { 'content-type': 'text/plain' })
-            .end('Aiden could not complete this connection. Return to Aiden for details.');
+          throw new Error(connection.message);
         } finally {
-          clearTimeout(timer);
-          server.close();
           this.callbacks.delete(connection.id);
         }
-      })();
-    });
-    await new Promise<void>((resolve, reject) => {
-      server.once('error', reject);
-      server.listen(0, '127.0.0.1', () => resolve());
-    });
-    this.callbacks.set(connection.id, server);
-    const timer = setTimeout(
-      () => {
-        server.close();
-        this.callbacks.delete(connection.id);
-        void (async () => {
-          const current = await this.get(connection.id).catch(() => null);
-          if (current?.status === 'authorization_required') {
-            current.status = 'failed';
-            current.message = 'Browser authorization expired. Select Connect / test to try again.';
-            current.updatedAt = new Date().toISOString();
-            await this.save(current);
-          }
-        })();
       },
-      5 * 60 * 1000,
+      async () => {
+        this.callbacks.delete(connection.id);
+        const current = await this.get(connection.id);
+        if (current.status !== 'authorization_required') return;
+        current.status = 'failed';
+        current.message = 'Browser authorization expired. Reconnect to try again.';
+        current.updatedAt = new Date().toISOString();
+        await this.save(current);
+      },
     );
-    timer.unref();
-    const address = server.address();
-    if (!address || typeof address === 'string')
-      throw new Error('Could not start the OAuth callback.');
-    return `http://127.0.0.1:${address.port}/oauth/callback`;
+    this.callbacks.set(connection.id, callback);
+    return callback.url;
   }
   /** Test a connection, returning a browser URL when OAuth requires user interaction. */
   async connect(id: string): Promise<{ connection: McpConnection; authUrl: string | undefined }> {
@@ -236,6 +246,8 @@ export class ConnectionManager {
       connection.message = 'Connected. Review the available read tools before using this server.';
       connection.updatedAt = new Date().toISOString();
       await this.refreshTools(connection);
+      this.callbacks.get(id)?.close();
+      this.callbacks.delete(id);
       return { connection, authUrl: undefined };
     } catch (error) {
       if (provider?.authorizationUrl && error instanceof UnauthorizedError) {
@@ -255,6 +267,8 @@ export class ConnectionManager {
             'Connected through the legacy HTTP/SSE transport. Review the available read tools.';
           connection.updatedAt = new Date().toISOString();
           await this.refreshTools(connection);
+          this.callbacks.get(id)?.close();
+          this.callbacks.delete(id);
           return { connection, authUrl: undefined };
         } catch {
           connection.transport = 'streamable-http';
@@ -273,10 +287,10 @@ export class ConnectionManager {
   async refreshTools(connectionOrId: McpConnection | string): Promise<McpTool[]> {
     const connection =
       typeof connectionOrId === 'string' ? await this.get(connectionOrId) : connectionOrId;
-    let client = this.active.get(connection.id)?.client;
-    if (!client) client = await this.connectClient(connection);
-    const result = await client.listTools();
-    const tools = result.tools.map((tool) => assessTool(tool, connection.approvedTools));
+    const inventory = await this.inventory(connection);
+    connection.secureStorage =
+      this.active.get(connection.id)?.provider?.secureStorage ?? connection.secureStorage;
+    const tools = inventory.map((tool) => assessTool(tool, connection.approvedTools));
     const fingerprint = toolFingerprint(tools);
     if (connection.toolFingerprint && connection.toolFingerprint !== fingerprint) {
       connection.approvedTools = [];
@@ -292,6 +306,51 @@ export class ConnectionManager {
       ...tool,
       approved: connection.approvedTools.includes(tool.name) && tool.readOnly,
     }));
+  }
+  /** Restore saved sessions on demand and retry only tool discovery after a lost HTTP session. */
+  private async inventory(
+    connection: McpConnection,
+  ): Promise<Awaited<ReturnType<Client['listTools']>>['tools']> {
+    try {
+      return await this.listInventory(connection);
+    } catch (error) {
+      if (error instanceof StreamableHTTPError && error.code === 404) {
+        await this.connectClient(connection);
+        return this.listInventory(connection);
+      }
+      if (error instanceof UnauthorizedError) {
+        await this.active
+          .get(connection.id)
+          ?.client.close()
+          .catch(() => {});
+        this.active.delete(connection.id);
+        connection.status = 'failed';
+        connection.message =
+          'Your tracker sign-in expired. Reconnect the existing connection to continue.';
+        connection.updatedAt = new Date().toISOString();
+        await this.save(connection);
+        throw new Error(connection.message, { cause: error });
+      }
+      throw error;
+    }
+  }
+  /** Read the entire advertised inventory before accepting its fingerprint. */
+  private async listInventory(
+    connection: McpConnection,
+  ): Promise<Awaited<ReturnType<Client['listTools']>>['tools']> {
+    const client = this.active.get(connection.id)?.client ?? (await this.connectClient(connection));
+    const inventory = [];
+    const cursors = new Set<string>();
+    let cursor: string | undefined;
+    do {
+      const page = await client.listTools(cursor ? { cursor } : {});
+      inventory.push(...page.tools);
+      cursor = page.nextCursor;
+      if (cursor && (cursors.has(cursor) || cursors.size >= 50))
+        throw new Error('MCP tool inventory pagination did not complete.');
+      if (cursor) cursors.add(cursor);
+    } while (cursor);
+    return inventory;
   }
   /** Grant consent only to reviewed read tools whose definitions still match the displayed fingerprint. */
   async approve(id: string, names: string[], expectedFingerprint: string): Promise<McpConnection> {
@@ -345,6 +404,58 @@ export class ConnectionManager {
     };
     return { result, receipt };
   }
+  /** Execute one scoped ticket operation using the project's reviewed contract; analysts cannot access this path. */
+  async ticketOperation(
+    settings: TicketSettings,
+    operation: keyof TicketTools,
+    input: TicketOperationInput,
+  ): Promise<unknown> {
+    if (!settings.enabled) throw new Error('Automatic tickets are disabled.');
+    const connection = await this.get(settings.destination.connectionId);
+    if (!['connected', 'needs_review'].includes(connection.status))
+      throw new Error('Reconnect the ticket tracker before syncing.');
+    const tools = await this.refreshTools(connection);
+    if (connection.toolFingerprint !== settings.fingerprint)
+      throw new Error('Tracker tools changed. Review ticket settings again.');
+    const supported = ticketTools(settings.destination.provider, tools);
+    if (supported[operation] !== settings.tools[operation])
+      throw new Error('The saved ticket capability does not match this server.');
+    const tool = tools.find((item) => item.name === supported[operation])!;
+    const args = ticketArguments(settings, operation, input);
+    validateTicketArguments(tool, args);
+    const client = this.active.get(connection.id)!.client;
+    const result = await client.callTool({ name: tool.name, arguments: args }, undefined, {
+      timeout: 30_000,
+    });
+    if (JSON.stringify(result).length > 5_000_000)
+      throw new Error('Ticket result exceeded the 5 MB limit.');
+    return ticketPayload(result, `Ticket ${operation}`);
+  }
+  /** Execute a bounded Linear setup read or explicitly authorized project creation with pinned contracts. */
+  async linearOperation(
+    id: string,
+    input: LinearOperation,
+    fingerprint?: string,
+  ): Promise<unknown> {
+    const connection = await this.get(id);
+    if (!['connected', 'needs_review'].includes(connection.status))
+      throw new Error('Connect Linear before choosing a team or publishing.');
+    const tools = await this.refreshTools(connection);
+    if (
+      (fingerprint && connection.toolFingerprint !== fingerprint) ||
+      (input.kind === 'create' && !fingerprint)
+    )
+      throw new Error('Linear tools changed. Review publishing settings again.');
+    const operation = linearOperation(tools, input);
+    const result = await this.active
+      .get(id)!
+      .client.callTool({ name: operation.name, arguments: operation.args }, undefined, {
+        timeout: 30_000,
+      });
+    if (JSON.stringify(result).length > 5_000_000)
+      throw new Error('Linear result exceeded the 5 MB limit.');
+    return ticketPayload(result, `Linear project ${input.kind}`);
+  }
   /** Close active transports and callbacks, preserving credentials for a later explicit connection. */
   async disconnect(id: string): Promise<McpConnection> {
     const active = this.active.get(id);
@@ -368,9 +479,19 @@ export class ConnectionManager {
     await this.vault.remove(id);
     return { removed: true };
   }
-  /** Best-effort shutdown of active sessions when the worker exits. */
+  /** Release transports on exit without revoking saved connection intent or reusable credentials. */
   async dispose(): Promise<void> {
-    for (const id of [...this.active.keys()]) await this.disconnect(id).catch(() => {});
+    for (const active of this.active.values()) await active.client.close().catch(() => {});
+    this.active.clear();
+    for (const server of this.callbacks.values()) server.close();
+    this.callbacks.clear();
+    for (const connection of await this.list())
+      if (
+        connection.status === 'authorization_required' ||
+        connection.status === 'connecting' ||
+        (connection.auth !== 'none' && connection.secureStorage === 'session')
+      )
+        await this.disconnect(connection.id).catch(() => {});
   }
 }
 

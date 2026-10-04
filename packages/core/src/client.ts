@@ -7,17 +7,19 @@ import { z } from 'zod/v3';
 
 import type { WorkerMethod, WorkerParams, WorkerResult } from '../../contracts/src/api.js';
 import {
+  ActivityEntrySchema,
   EstimationSnapshotSchema,
   ProductSchema,
   ReportSchema,
+  VerificationSummarySchema,
 } from '../../contracts/src/index.js';
 
 const eventSchema = z
   .object({
-    type: z.enum(['progress', 'clarification', 'review', 'completed', 'failed', 'cancelled']),
+    type: z.enum(['progress', 'activity', 'review', 'completed', 'failed', 'cancelled', 'coding']),
+    codingActive: z.boolean().optional(),
     runId: z.string(),
     projectId: z.string().optional(),
-    trigger: z.literal('scheduled').optional(),
     stage: z
       .enum([
         'understand',
@@ -28,15 +30,16 @@ const eventSchema = z
         'summary',
         'report',
         'estimate',
+        'verify',
         'complete',
       ])
       .optional(),
     message: z.string().optional(),
-    questionId: z.string().optional(),
-    question: z.string().optional(),
+    activity: ActivityEntrySchema.optional(),
     product: ProductSchema.optional(),
     report: ReportSchema.optional(),
     estimation: EstimationSnapshotSchema.optional(),
+    verification: VerificationSummarySchema.optional(),
   })
   .strict();
 const responseSchema = z

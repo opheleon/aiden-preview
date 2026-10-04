@@ -1,0 +1,157 @@
+.first-use-guide {
+  width: min(580px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 24px 90px #17152b30;
+  overflow: auto;
+}
+
+.first-use-guide::backdrop {
+  background: #17152b66;
+  backdrop-filter: blur(3px);
+}
+
+.guide-header,
+.guide-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+}
+
+.guide-header {
+  border-bottom: 1px solid var(--border);
+  color: var(--body);
+}
+
+.guide-header > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+}
+
+.guide-header img {
+  width: 24px;
+  height: 24px;
+}
+
+.guide-content {
+  padding: 26px 28px;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.guide-progress {
+  color: var(--brand-dark);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.guide-content h1 {
+  font: 500 27px/1.25 var(--font-sans);
+  margin-bottom: 12px;
+}
+
+.guide-summary {
+  color: var(--body);
+}
+
+.guide-content ul {
+  margin: 22px 0;
+  padding-left: 20px;
+}
+
+.guide-content li + li {
+  margin-top: 12px;
+}
+
+.guide-content details {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.guide-content summary {
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--brand-dark);
+}
+
+.guide-content details p {
+  margin-top: 12px;
+  color: var(--body);
+  font-size: 14px;
+}
+
+.guide-footer {
+  border-top: 1px solid var(--border);
+  background: var(--paper);
+  position: sticky;
+  bottom: 0;
+}
+
+.guide-notice,
+.guide-error {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--paper);
+  font-size: 14px;
+}
+
+.guide-error {
+  color: var(--color-destructive);
+}
+
+@media (width <= 480px) {
+  .guide-content {
+    padding: 20px;
+  }
+
+  .guide-header,
+  .guide-footer {
+    padding: 14px 16px;
+  }
+}
+
+.guide-content h1:focus {
+  outline: none;
+}
+
+.guide-doc-link {
+  margin-top: 18px;
+  color: var(--brand-dark);
+}
+
+.guide-doc-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0 28px;
+}
+
+.guide-doc-topics [aria-pressed='true'] {
+  border-color: var(--brand-dark);
+  color: var(--brand-dark);
+}
+
+.guide-docs h2 {
+  font-size: 22px;
+  margin-bottom: 16px;
+}
+
+.guide-docs h3 {
+  font-size: 17px;
+  margin: 24px 0 8px;
+}
+
+.guide-docs p + p {
+  margin-top: 14px;
+}

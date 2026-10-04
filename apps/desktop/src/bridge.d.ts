@@ -4,12 +4,10 @@ import type {
   WorkerResult,
 } from '../../../packages/contracts/src/api.js';
 import type { RunEvent } from '../../../packages/contracts/src/index.js';
-import type { ProjectSchedule, ScheduleConfig } from './scheduler.js';
+import type { FirstUseState } from './first-use.js';
 import type { UpdatePreferences, UpdateStatus } from './updater.js';
 /** Narrow preload API; privileged operations are validated again in the main process and worker. */
 export type DesktopBridge = {
-  getSchedules: () => Promise<ProjectSchedule[]>;
-  setSchedule: (projectId: string, config: ScheduleConfig) => Promise<ProjectSchedule>;
   request: <K extends WorkerMethod>(
     method: K,
     params?: WorkerParams<K>,
@@ -23,6 +21,15 @@ export type DesktopBridge = {
     format: 'json' | 'markdown';
     includeEstimates?: boolean;
   }) => Promise<boolean>;
+  openVerificationReport: (params: { projectId: string; runId: string }) => Promise<void>;
+  /** Read a recording or screenshot named by a saved browser check, for in-app playback. */
+  verificationMedia: (params: {
+    projectId: string;
+    runId: string;
+    file: string;
+  }) => Promise<{ type: string; data: ArrayBuffer }>;
+  getFirstUseState: () => Promise<FirstUseState>;
+  completeFirstUse: () => Promise<FirstUseState>;
   getAppVersion: () => Promise<string>;
   getUpdateStatus: () => Promise<UpdateStatus>;
   getUpdatePreferences: () => Promise<UpdatePreferences>;

@@ -27,7 +27,15 @@ void test('Claude discovery uses selected authentication, no prompts or tools, a
       prompt = input.prompt;
       return {
         accountInfo: () => Promise.resolve(account),
-        supportedModels: () => Promise.resolve([{ value: 'model-id', displayName: 'Model label' }]),
+        supportedModels: () =>
+          Promise.resolve([
+            {
+              value: 'model-id',
+              displayName: 'Model label',
+              resolvedModel: 'fixture-opus',
+              supportedEffortLevels: ['high', 'max'],
+            },
+          ]),
         close: () => closed++,
       };
     },
@@ -41,7 +49,15 @@ void test('Claude discovery uses selected authentication, no prompts or tools, a
         'sk-explicit-test',
         deps,
       ),
-      [{ id: 'model-id', label: 'Model label' }],
+      [
+        {
+          id: 'model-id',
+          label: 'Model label',
+          isDefault: false,
+          resolvedModel: 'fixture-opus',
+          supportedEfforts: ['high', 'max'],
+        },
+      ],
     );
     assert.equal(options.env.ANTHROPIC_API_KEY, undefined);
     assert.deepEqual(options.tools, []);

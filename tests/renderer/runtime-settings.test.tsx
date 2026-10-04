@@ -197,3 +197,43 @@ test('missing Codex installation is explained in both billing modes and cannot s
   expect(screen.getByText(/Install the Codex CLI/)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Check connection' })).toBeEnabled();
 });
+
+test('model effort uses advertised choices and changing the model clears stale effort', async () => {
+  const onChange = vi.fn();
+  const request = vi.fn().mockResolvedValue([
+    {
+      id: 'opus',
+      label: 'Opus',
+      supportedEfforts: ['low', 'high', 'max'],
+      resolvedModel: 'fixture-opus',
+    },
+    { id: 'sonnet', label: 'Sonnet', supportedEfforts: ['low', 'high'] },
+  ]);
+  render(
+    <RuntimeSettings
+      runtime={{ provider: 'claude', auth: 'subscription', model: 'opus', effort: 'max' }}
+      diagnostics={[
+        { provider: 'claude', installed: true, ready: true, subscription: true, apiKey: false },
+      ]}
+      api={{ request } as unknown as DesktopBridge}
+      onChange={onChange}
+      onRefresh={async () => {}}
+    />,
+  );
+  await screen.findByText('Model ID: fixture-opus');
+  expect(screen.getByLabelText('Reasoning effort')).toHaveValue('max');
+  await userEvent.selectOptions(screen.getByLabelText('Reasoning effort'), 'high');
+  expect(onChange).toHaveBeenLastCalledWith({
+    provider: 'claude',
+    auth: 'subscription',
+    model: 'opus',
+    effort: 'high',
+  });
+  await userEvent.selectOptions(screen.getByLabelText('Model'), 'sonnet');
+  expect(onChange).toHaveBeenLastCalledWith({
+    provider: 'claude',
+    auth: 'subscription',
+    model: 'sonnet',
+    effort: undefined,
+  });
+});

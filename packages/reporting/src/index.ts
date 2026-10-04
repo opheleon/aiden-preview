@@ -38,35 +38,37 @@ export function estimationMarkdown(e: EstimationSnapshot): string {
       const remaining =
         requirement.remainingPoints === null ? 'unknown' : `${requirement.remainingPoints} points`;
       const duration =
-        requirement.durationDays === null
+        requirement.durationDays === null ||
+        requirement.durationOverridden ||
+        e.estimatorVersion === '1'
           ? 'unavailable'
           : `${requirement.durationDays} calendar days`;
-      const comparisons = requirement.comparisons.map((id) => history.get(id)).filter(Boolean);
+      const comparisons =
+        e.estimatorVersion === '1'
+          ? []
+          : requirement.comparisons.map((id) => history.get(id)).filter(Boolean);
       const days = comparisons
         .map((issue) => issue!.observedCalendarDays)
         .filter((value): value is number => value !== null)
         .sort((a, b) => a - b);
       const range =
         days.length >= 3
-          ? ` Historical p10–p90: ${days[Math.max(0, Math.ceil(days.length * 0.1) - 1)]}–${days[Math.max(0, Math.ceil(days.length * 0.9) - 1)]} calendar days.`
+          ? ` Observed range: ${days[Math.max(0, Math.ceil(days.length * 0.1) - 1)]}–${days[Math.max(0, Math.ceil(days.length * 0.9) - 1)]} calendar days.`
           : '';
       const links = comparisons.length
-        ? `\n\nComparisons (${comparisons.length}, collected ${e.historyCollectedAt ?? 'unavailable'}):\n${comparisons.map((issue) => `- ${issue!.url ? `[${issue!.identifier}](${issue!.url})` : issue!.identifier}: ${issue!.title}`).join('\n')}`
+        ? `\n\nComparisons (${comparisons.length}, collected ${e.historyCollectedAt ?? 'unavailable'}):\n${comparisons.map((issue) => `- ${issue!.url ? `[${issue!.identifier}](${issue!.url})` : issue!.identifier}: ${issue!.title} · ${issue!.observedCalendarDays ?? 'unavailable'} calendar days. ${requirement.remaining?.comparisonMatches?.find((match) => match.id === issue!.id)?.reasoning ?? issue!.reasoning ?? ''}`).join('\n')}`
         : '';
-      return `### ${requirement.requirementId} · ${requirement.points} points (${requirement.original.size})\n\n${requirement.original.reasoning}\n\nRemaining: ${remaining}. Historical duration: ${duration}.${range}${links}`;
+      return `### ${requirement.requirementId} · ${requirement.points} points (${requirement.original.size})\n\n${requirement.original.reasoning}\n\nRemaining: ${remaining}. ${requirement.remaining?.reasoning ?? ''} Historical median: ${duration}.${range}${links}`;
     }),
-    '## Forecast',
+    '## Scope summary',
     `Reference date: ${forecast.referenceDate}`,
     `Implemented scope: ${forecast.implementedPercent === null ? 'unavailable because assessment coverage is incomplete' : `${forecast.implementedPercent}% (${forecast.implementedPoints}/${forecast.totalPoints} points)`}`,
     `Remaining scope: ${forecast.remainingPoints === null ? 'unknown' : `${forecast.remainingPoints} points`}`,
-    `Weekly rate: ${forecast.weeklyRate === null ? 'unavailable' : `${forecast.weeklyRate.toFixed(2)} points (${forecast.rateSource})`}`,
-    `Forecast finish: ${forecast.forecastFinish ?? 'unavailable'}`,
-    `Target variance: ${forecast.targetVarianceWorkingDays === null ? 'unavailable' : `${forecast.targetVarianceWorkingDays} working days`}`,
     ...forecast.limitations.map((value) => `- ${value}`),
     '## Historical calibration',
     e.history.length
       ? `${e.history.length} completed records collected. ${e.historyComplete ? 'Collection reported complete.' : 'Collection was incomplete.'}`
-      : 'Historical calibration unavailable; manual duration and weekly-rate inputs remain available.',
+      : 'Time estimates are unavailable until a ticket source provides at least three comparable completed issues with start and finish dates.',
     ...e.historyLimitations.map((value) => `- ${value}`),
     'Estimation artifacts are structurally validated against the reviewed baseline, accepted assessment, and recorded source reads. Model judgments remain estimates.',
   ].join('\n\n');

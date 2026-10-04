@@ -2,13 +2,21 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 
 import type { DesktopBridge } from './bridge.js';
 const bridge: DesktopBridge = {
-  getSchedules: () => ipcRenderer.invoke('schedules:list'),
-  setSchedule: (projectId, config) => ipcRenderer.invoke('schedules:set', projectId, config),
-  request: (method, params) => ipcRenderer.invoke('aiden:request', method, params),
+  request: (method, params) =>
+    ipcRenderer.invoke('aiden:request', method, params).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : 'The request failed. Try again.';
+      throw new Error(
+        message.replace(/^Error invoking remote method 'aiden:request': Error: /, ''),
+      );
+    }),
   chooseProjectFolder: () => ipcRenderer.invoke('aiden:chooseProjectFolder'),
   chooseContext: () => ipcRenderer.invoke('aiden:chooseContext'),
   openExternal: (url) => ipcRenderer.invoke('aiden:openExternal', url),
   saveExport: (params) => ipcRenderer.invoke('aiden:export', params),
+  openVerificationReport: (params) => ipcRenderer.invoke('aiden:openVerificationReport', params),
+  verificationMedia: (params) => ipcRenderer.invoke('aiden:verificationMedia', params),
+  getFirstUseState: () => ipcRenderer.invoke('guide:state'),
+  completeFirstUse: () => ipcRenderer.invoke('guide:complete'),
   getAppVersion: () => ipcRenderer.invoke('app:get-version'),
   getUpdateStatus: () => ipcRenderer.invoke('updates:get-status'),
   getUpdatePreferences: () => ipcRenderer.invoke('updates:get-preferences'),

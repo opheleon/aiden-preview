@@ -11,7 +11,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { schemaFor } from '../../contracts/src/index.js';
-import type { ToolBroker } from './broker.js';
+import type { ToolDefinition } from './tool-definition.js';
 
 /** One ephemeral loopback endpoint; its bearer token grants access only to this run’s broker. */
 export interface LocalToolServer {
@@ -20,8 +20,46 @@ export interface LocalToolServer {
   close(): Promise<void>;
 }
 
+/** Any allowlisted, schema-validated tool set; the repository broker and browser session both qualify. */
+export interface ToolProvider {
+  definitions(): ToolDefinition[];
+  call(name: string, input: unknown): Promise<unknown>;
+}
+
+/** Tools for turns that only reason over their input, such as planning checks or answering why. */
+export const noTools: ToolProvider = {
+  definitions: () => [],
+  call: () => Promise.reject(new Error('No tools are available for this turn.')),
+};
+
+/** Screenshot bytes returned to multimodal providers as MCP image content. */
+export interface ToolImage {
+  data: string;
+  mimeType: 'image/png' | 'image/jpeg';
+}
+
+/** A tool result that carries page screenshots next to its text observation. */
+export class ToolObservation {
+  /** Keep the text and base64 images together so both reach the model in one tool result. */
+  constructor(
+    readonly text: string,
+    readonly images: readonly ToolImage[] = [],
+  ) {}
+}
+
+/** Serialize ordinary results as JSON text; observations keep their screenshots as image blocks. */
+function toolContent(
+  result: unknown,
+): ({ type: 'text'; text: string } | ({ type: 'image' } & ToolImage))[] {
+  if (!(result instanceof ToolObservation)) return [{ type: 'text', text: JSON.stringify(result) }];
+  return [
+    { type: 'text', text: result.text },
+    ...result.images.map((image) => ({ type: 'image' as const, ...image })),
+  ];
+}
+
 /** Register only schema-validated broker operations; tools never accept arbitrary commands. */
-function toolServer(broker: ToolBroker): Server {
+function toolServer(broker: ToolProvider): Server {
   const server = new Server(
     { name: 'aiden-local-tools', version: '0.1.0' },
     { capabilities: { tools: {} } },
@@ -31,7 +69,9 @@ function toolServer(broker: ToolBroker): Server {
       name: definition.name,
       description: definition.description,
       annotations: {
-        readOnlyHint: !['artifact_write', 'repo_sync', 'repo_fetch'].includes(definition.name),
+        readOnlyHint:
+          definition.readOnly ??
+          !['artifact_write', 'repo_sync', 'repo_fetch'].includes(definition.name),
         destructiveHint: false,
         openWorldHint: false,
       },
@@ -41,12 +81,7 @@ function toolServer(broker: ToolBroker): Server {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
       return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(await broker.call(request.params.name, request.params.arguments)),
-          },
-        ],
+        content: toolContent(await broker.call(request.params.name, request.params.arguments)),
       };
     } catch (error) {
       return {
@@ -78,7 +113,7 @@ function authorized(request: IncomingMessage, response: ServerResponse, expected
 
 /** Serve a stateless authenticated MCP request and release its transport when the response closes. */
 async function handleRequest(
-  broker: ToolBroker,
+  broker: ToolProvider,
   request: IncomingMessage,
   response: ServerResponse,
   connections: Set<StreamableHTTPServerTransport>,
@@ -98,7 +133,7 @@ async function handleRequest(
 }
 
 /** Bind only loopback with a new token; callers must close the server when their run ends. */
-export async function serveTools(broker: ToolBroker): Promise<LocalToolServer> {
+export async function serveTools(broker: ToolProvider): Promise<LocalToolServer> {
   const token = randomBytes(32).toString('hex');
   const expected = Buffer.from(`Bearer ${token}`);
   const connections = new Set<StreamableHTTPServerTransport>();

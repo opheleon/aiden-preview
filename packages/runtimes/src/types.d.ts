@@ -2,6 +2,8 @@ import type { RuntimeConfig } from '../../contracts/src/index.js';
 
 /** One isolated provider turn; cancellation must interrupt execution without retrying paid work. */
 export type RuntimeRequest = {
+  /** External Claude Code owns tools and its coding loop when explicitly dispatched. */
+  coding?: { sessionId: string };
   config: RuntimeConfig;
   prompt: string;
   schema: Record<string, unknown>;

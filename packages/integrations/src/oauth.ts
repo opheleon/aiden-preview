@@ -17,6 +17,10 @@ export class StoredOAuthProvider implements OAuthClientProvider {
     public redirectUrl: string,
     private oauthState: string,
   ) {}
+  /** Report actual storage after token rotation so connection metadata reflects vault fallback. */
+  get secureStorage(): McpConnection['secureStorage'] {
+    return this.connection.secureStorage;
+  }
   /** Describe the public desktop client and its current loopback redirect. */
   get clientMetadata(): OAuthClientMetadata {
     return {
@@ -40,10 +44,10 @@ export class StoredOAuthProvider implements OAuthClientProvider {
   /** Persist registration without replacing tokens or PKCE state; vault failures propagate. */
   async saveClientInformation(value: OAuthClientInformationMixed): Promise<void> {
     const current = await this.vault.read(this.connection.id);
-    await this.vault.write(
+    this.connection.secureStorage = await this.vault.write(
       this.connection.id,
       { ...current, clientInformation: value },
-      this.connection.secureStorage === 'session',
+      this.connection.sessionOnly === true,
     );
   }
   /** Read tokens only from the configured vault or session fallback. */
@@ -56,7 +60,7 @@ export class StoredOAuthProvider implements OAuthClientProvider {
     const storage = await this.vault.write(
       this.connection.id,
       { ...current, tokens },
-      this.connection.secureStorage === 'session',
+      this.connection.sessionOnly === true,
     );
     this.connection.secureStorage = storage;
   }
@@ -67,10 +71,10 @@ export class StoredOAuthProvider implements OAuthClientProvider {
   /** Retain the PKCE verifier with this connection’s credentials until callback completion. */
   async saveCodeVerifier(verifier: string): Promise<void> {
     const current = await this.vault.read(this.connection.id);
-    await this.vault.write(
+    this.connection.secureStorage = await this.vault.write(
       this.connection.id,
       { ...current, verifier },
-      this.connection.secureStorage === 'session',
+      this.connection.sessionOnly === true,
     );
   }
   /** Recover the PKCE verifier; an expired session requires explicit reconnection. */
@@ -88,10 +92,10 @@ export class StoredOAuthProvider implements OAuthClientProvider {
     if (scope === 'tokens') delete current.tokens;
     if (scope === 'client') delete current.clientInformation;
     if (scope === 'verifier') delete current.verifier;
-    await this.vault.write(
+    this.connection.secureStorage = await this.vault.write(
       this.connection.id,
       current,
-      this.connection.secureStorage === 'session',
+      this.connection.sessionOnly === true,
     );
   }
 }

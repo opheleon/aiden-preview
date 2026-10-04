@@ -36,14 +36,16 @@ const provider = process.argv.includes('--claude') ? 'claude' : 'codex';
 const root = await mkdtemp(path.join(tmpdir(), `aiden-real-${specification.id}-`));
 const store = new Store(path.join(root, 'data'));
 const runtime = new Runtimes(path.join(root, 'providers'));
+// Calls never block a run: the model records its assumption and proceeds, so no answers are needed.
 const engine = new Engine(store, runtime, (event) => {
-  console.log(JSON.stringify({ type: event.type, stage: event.stage, runId: event.runId }));
-  if (event.type === 'clarification')
-    void engine.answer(
-      event.runId,
-      event.questionId!,
-      'Assess only the two reviewed runtime configuration requirements against the selected commit. No additional requirements or constraints. If something cannot be established from code, mark it unknown.',
-    );
+  console.log(
+    JSON.stringify({
+      type: event.type,
+      stage: event.stage,
+      runId: event.runId,
+      ...(event.activity?.kind === 'ask' ? { ask: event.activity.summary } : {}),
+    }),
+  );
 });
 const results: {
   phase: 'base' | 'head';

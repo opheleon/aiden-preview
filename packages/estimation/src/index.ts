@@ -53,69 +53,50 @@ export function durationSummary(
   };
 }
 
-/** Honor explicit comparison IDs or match size and scope, preferring work type with sufficient samples. */
+/** Validate the model’s analogous remaining-work matches against size, work type, and scope.
+ * Only dated completed issues qualify. Saved selection may narrow these candidates, never bypass eligibility.
+ * Collection already limits history to 90 days; the five most recent matches keep explanations inspectable.
+ */
 export function selectComparisons(
   requirement: RequirementEstimate,
   history: HistoryIssue[],
   overrideIds?: string[],
 ): HistoryIssue[] {
-  if (overrideIds) return history.filter((issue) => overrideIds.includes(issue.id));
-  const sameSizeAndScope = history.filter(
-    (issue) =>
-      issue.points === requirement.points &&
-      issue.scopeShape === requirement.original.scopeShape &&
-      issue.observedCalendarDays !== null,
-  );
-  const sameType = sameSizeAndScope.filter(
-    (issue) => issue.workType === requirement.original.workType,
-  );
-  return sameType.length >= 3 ? sameType : sameSizeAndScope;
-}
-
-/** Anchor a calendar-only date at UTC noon to avoid local DST changes in arithmetic. */
-function utcDate(value: string) {
-  return new Date(`${value}T12:00:00.000Z`);
-}
-/** Format a UTC calendar date independently of the machine’s local time zone. */
-function isoDate(value: Date) {
-  return value.toISOString().slice(0, 10);
-}
-/** Advance by weekdays only; holidays are intentionally not modeled. */
-export function addWorkingDays(referenceDate: string, workingDays: number): string {
-  const date = utcDate(referenceDate);
-  let remaining = workingDays;
-  while (remaining > 0) {
-    date.setUTCDate(date.getUTCDate() + 1);
-    const day = date.getUTCDay();
-    if (day !== 0 && day !== 6) remaining--;
-  }
-  return isoDate(date);
-}
-
-/** Count signed weekdays between calendar dates, excluding the starting date. */
-export function workingDayDifference(from: string, to: string): number {
-  if (from === to) return 0;
-  const direction = from < to ? 1 : -1;
-  const date = utcDate(from);
-  const end = utcDate(to);
-  let days = 0;
-  while (date.getTime() !== end.getTime()) {
-    date.setUTCDate(date.getUTCDate() + direction);
-    const day = date.getUTCDay();
-    if (day !== 0 && day !== 6) days += direction;
-  }
-  return days;
-}
-
-/** Calibrate points per week from complete 90-day history with at least three completed issues. */
-export function historicalWeeklyRate(
-  history: HistoryIssue[],
-  historyComplete: boolean,
-): number | null {
-  if (!historyComplete) return null;
-  const completed = history.filter((issue) => issue.completedAt && issue.points !== null);
-  if (completed.length < 3) return null;
-  return (completed.reduce((sum, issue) => sum + issue.points!, 0) * 7) / 90;
+  const scope = requirement.remaining;
+  if (!scope?.comparisonMatches) return [];
+  const matched = new Set(scope.comparisonMatches.map((match) => match.id));
+  const points = requirement.remainingPoints;
+  if (
+    !points ||
+    !scope.workType ||
+    scope.workType === 'unknown' ||
+    !scope.scopeShape ||
+    scope.scopeShape === 'unknown'
+  )
+    return [];
+  const seen = new Set<string>();
+  return history
+    .filter((issue) => {
+      if (seen.has(issue.id)) return false;
+      seen.add(issue.id);
+      return (
+        matched.has(issue.id) &&
+        issue.points === points &&
+        issue.workType === scope.workType &&
+        issue.scopeShape === scope.scopeShape &&
+        issue.startedAt !== null &&
+        issue.completedAt !== null &&
+        Number.isFinite(Date.parse(issue.startedAt)) &&
+        Number.isFinite(Date.parse(issue.completedAt)) &&
+        issue.startedAt <= issue.completedAt &&
+        issue.observedCalendarDays !== null &&
+        Number.isFinite(issue.observedCalendarDays) &&
+        issue.observedCalendarDays >= 0 &&
+        (!overrideIds || overrideIds.includes(issue.id))
+      );
+    })
+    .sort((a, b) => b.completedAt!.localeCompare(a.completedAt!) || a.id.localeCompare(b.id))
+    .slice(0, 5);
 }
 
 /** Fall back to aggregate points when an older estimate has no detailed work-item breakdown. */
@@ -169,29 +150,7 @@ function deduplicatedPoints(
   return Math.round(total * 100) / 100;
 }
 
-/** Describe the missing inputs and calendar assumptions that constrain a forecast. */
-function forecastLimitations(
-  hasReport: boolean,
-  completeCoverage: boolean,
-  weeklyRate: number | null,
-  remainingKnown: boolean,
-): string[] {
-  const limitations: string[] = ['Weekends are excluded; holidays are not modeled.'];
-  if (!hasReport) limitations.push('Run a code assessment to estimate remaining work.');
-  if (!completeCoverage)
-    limitations.push('Unknown assessment coverage prevents a complete-project forecast.');
-  if (weeklyRate === null)
-    limitations.push('Add a manual weekly rate or connect complete dated history.');
-  if (!remainingKnown) limitations.push('Remaining work is unknown for at least one requirement.');
-  return limitations;
-}
-
-/** Distinguish explicit velocity overrides from calibrated history and unavailable velocity. */
-function rateSource(manual: number | null, historical: number | null): Forecast['rateSource'] {
-  return manual ? 'manual' : historical === null ? 'unavailable' : 'history';
-}
-
-/** Compute deterministic scope and calendar forecasts from reviewed estimates, history, and manual inputs. */
+/** Retain the saved forecast contract while reporting scope only; retired velocity inputs never produce dates. */
 export function buildForecast(input: {
   requirements: RequirementEstimate[];
   report: Report | null;
@@ -200,7 +159,7 @@ export function buildForecast(input: {
   overrides: EstimateOverrides;
   referenceDate: string;
 }): Forecast {
-  const { requirements, report, history, historyComplete, overrides, referenceDate } = input;
+  const { requirements, report, overrides, referenceDate } = input;
   const statuses = new Map(report?.assessments.map((a) => [a.requirementId, a]) ?? []);
   const completeCoverage = !!report && report.assessments.every((a) => a.status !== 'unknown');
   const implemented = new Set(
@@ -212,25 +171,22 @@ export function buildForecast(input: {
   const totalPoints = deduplicatedPoints(requirements, 'original');
   const remainingKnown = requirements.every((requirement) => requirement.remainingPoints !== null);
   const remainingPoints = remainingKnown ? deduplicatedPoints(requirements, 'remaining') : null;
-  const historyRate = historicalWeeklyRate(history, historyComplete);
-  const weeklyRate =
-    overrides.manualWeeklyRate ??
-    (historyRate === null ? null : historyRate * (overrides.capacityPercent / 100));
-  const workingDays =
-    remainingPoints !== null && weeklyRate ? Math.ceil((remainingPoints / weeklyRate) * 5) : null;
-  const finish = workingDays === null ? null : addWorkingDays(referenceDate, workingDays);
-  const limitations = forecastLimitations(!!report, completeCoverage, weeklyRate, remainingKnown);
+  const limitations = [
+    'Time estimates use comparable completed tickets, including review and waiting time.',
+    'Individual ticket durations are not added into a project finish date: dependencies and parallel work are not scheduled.',
+  ];
+  if (!completeCoverage) limitations.push('Assessment coverage is incomplete.');
+  if (!remainingKnown) limitations.push('Remaining work is unknown for at least one requirement.');
   return {
     referenceDate,
     targetDate: overrides.targetDate,
-    weeklyRate,
-    rateSource: rateSource(overrides.manualWeeklyRate, historyRate),
+    weeklyRate: null,
+    rateSource: 'unavailable',
     capacityPercent: overrides.capacityPercent,
     remainingPoints,
-    remainingWorkingDays: workingDays,
-    forecastFinish: finish,
-    targetVarianceWorkingDays:
-      finish && overrides.targetDate ? workingDayDifference(overrides.targetDate, finish) : null,
+    remainingWorkingDays: null,
+    forecastFinish: null,
+    targetVarianceWorkingDays: null,
     implementedPoints,
     totalPoints,
     implementedPercent:

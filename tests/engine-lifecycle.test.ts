@@ -38,7 +38,15 @@ void test('idle project updates preserve runtime selection and reset only histor
   const f = await lifecycleFixture();
   try {
     assert.equal((await f.engine.projects()).length, 1);
-    assert.deepEqual(await f.engine.candidate(f.project.id, f.prepared.runId), f.product);
+    const candidate = await f.engine.candidate(f.project.id, f.prepared.runId);
+    assert.deepEqual(
+      { ...candidate, deliveryPlan: undefined },
+      { ...f.product, title: 'A book project', deliveryPlan: undefined },
+    );
+    assert.deepEqual(
+      candidate.deliveryPlan?.[0]?.requirementIds,
+      f.product.requirements.map((r) => r.id),
+    );
     await f.engine.updateRuntime(f.project.id, {
       provider: 'claude',
       auth: 'apiKey',
@@ -81,7 +89,6 @@ void test('idle project updates preserve runtime selection and reset only histor
       /Generate an estimate/,
     );
     assert.throws(() => f.engine.cancel('inactive'), /not active/);
-    assert.throws(() => f.engine.answer('inactive', 'question', 'answer'), /no longer/);
     await f.engine.wait('inactive');
     await assert.rejects(f.engine.resume(f.project.id, f.prepared.runId), /finished/);
     await assert.rejects(f.engine.updateRuntime(f.project.id, { provider: 'invalid' } as any));
@@ -145,7 +152,8 @@ void test('estimate overrides retain suggested values and stale pointers cannot 
     assert.equal(revised.requirements[0]?.points, 8);
     assert.equal(revised.requirements[0]?.suggestedPoints, 2);
     assert.equal(revised.requirements[0]?.remainingPoints, 5);
-    assert.equal(revised.requirements[0]?.durationDays, 7);
+    assert.equal(revised.requirements[0]?.durationDays, null);
+    assert.equal(revised.forecast.forecastFinish, null);
     assert.equal(revised.requirements[0]?.pointsOverridden, true);
     assert.equal(revised.requirements[1]?.pointsOverridden, false);
     assert.deepEqual(await json(path.join(f.folder, 'estimate-overrides.json')), overrides);
@@ -211,11 +219,14 @@ void test('empty, corrupt, and abandoned project state is handled without automa
 void test('standalone estimate overrides preserve historical suggestions and derive durations from selected comparisons', async () => {
   const f = await lifecycleFixture();
   try {
+    const selection = { ...f.project.runtime, model: 'synthetic', effort: 'high' as const };
+    await f.engine.updateRuntime(f.project.id, selection);
     const run = await f.engine.estimate(f.project.id);
     await f.engine.wait(run.runId);
     const original = await f.engine.getEstimate(f.project.id);
     assert.ok(original);
     assert.equal(original.reportId, null);
+    assert.deepEqual(original.runtime, selection);
     // Synthetic accepted history exercises recomputation without a hosted account or provider call.
     const history = [1, 3, 5].map((days, index) => ({
       connectionId: 'synthetic-history',
@@ -242,10 +253,11 @@ void test('standalone estimate overrides preserve historical suggestions and der
       comparisons: { 'REQ-1': history.map((issue) => issue.id) },
     });
     assert.equal(revised.reportId, null);
+    assert.deepEqual(revised.runtime, selection);
     assert.equal(revised.history[0]?.points, 3);
     assert.equal(revised.history[1]?.points, 2);
-    assert.equal(revised.requirements[0]?.durationDays, 3);
-    assert.equal(revised.requirements[0]?.suggestedDurationDays, 3);
+    assert.equal(revised.requirements[0]?.durationDays, null);
+    assert.equal(revised.requirements[0]?.suggestedDurationDays, null);
     assert.equal(revised.requirements[0]?.durationOverridden, false);
     assert.deepEqual(
       revised.requirements[0]?.comparisonOverrides,

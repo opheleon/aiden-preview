@@ -1,5 +1,7 @@
 import { z } from 'zod/v3';
 
+import { RuntimeSchema } from './runtime.js';
+
 export const SizeSchema = z.enum(['XS', 'S', 'M', 'L', 'XL']);
 export const WorkTypeSchema = z.enum([
   'ui',
@@ -34,10 +36,20 @@ export const ComplexityOutputSchema = z
   .object({ requirements: z.array(ComplexitySchema).min(1) })
   .strict();
 
+const ComparisonMatchSchema = z
+  .object({
+    id: z.string().min(1),
+    reasoning: z.string().min(1),
+  })
+  .strict();
+
 export const RemainingEstimateSchema = z
   .object({
     requirementId: z.string().regex(/^REQ-[1-9]\d*$/),
     estimable: z.boolean(),
+    comparisonMatches: z.array(ComparisonMatchSchema).max(5).optional(),
+    workType: WorkTypeSchema.optional(),
+    scopeShape: ScopeShapeSchema.optional(),
     size: SizeSchema.nullable(),
     points: z
       .union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(5), z.literal(8)])
@@ -48,7 +60,17 @@ export const RemainingEstimateSchema = z
   })
   .strict();
 export const RemainingOutputSchema = z
-  .object({ requirements: z.array(RemainingEstimateSchema).min(1) })
+  .object({
+    requirements: z
+      .array(
+        RemainingEstimateSchema.extend({
+          comparisonMatches: z.array(ComparisonMatchSchema).max(5),
+          workType: WorkTypeSchema,
+          scopeShape: ScopeShapeSchema,
+        }),
+      )
+      .min(1),
+  })
   .strict();
 
 export const HistoryIssueSchema = z
@@ -59,6 +81,7 @@ export const HistoryIssueSchema = z
     identifier: z.string().min(1),
     title: z.string().min(1),
     description: z.string(),
+    reasoning: z.string().optional(),
     url: z.string().url().optional(),
     startedAt: z.string().datetime().nullable(),
     completedAt: z.string().datetime().nullable(),
@@ -142,18 +165,12 @@ export const ForecastSchema = z
 export const EstimationSnapshotSchema = z
   .object({
     schemaVersion: z.literal('1.0'),
-    estimatorVersion: z.literal('1'),
+    estimatorVersion: z.enum(['1', '2']),
     id: z.string().min(1),
     projectId: z.string().min(1),
     baselineId: z.string().min(1),
     reportId: z.string().nullable(),
-    runtime: z
-      .object({
-        provider: z.enum(['codex', 'claude']),
-        auth: z.enum(['subscription', 'apiKey']),
-        model: z.string().optional(),
-      })
-      .strict(),
+    runtime: RuntimeSchema,
     runtimeVersion: z.string(),
     sourceSelectionHash: z.string().regex(/^[a-f0-9]{64}$/),
     generatedAt: z.string().datetime(),

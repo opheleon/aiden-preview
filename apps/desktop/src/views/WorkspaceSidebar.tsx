@@ -1,88 +1,41 @@
-import { ExternalLink, FileText, Layers, MessageCircle, Plus, Settings2 } from 'lucide-react';
-import React from 'react';
+import { BookOpen, ExternalLink, MessageCircle, Plus, Settings2 } from 'lucide-react';
+import type { JSX } from 'react';
 
-import type {
-  WorkerMethod,
-  WorkerParams,
-  WorkerResult,
-} from '../../../../packages/contracts/src/api.js';
-import type {
-  Baseline,
-  EstimationSnapshot,
-  Product,
-  Project,
-  Report,
-  RunManifest,
-} from '../../../../packages/contracts/src/index';
-import type { DesktopBridge } from '../bridge';
+import { scopeName } from '../../../../packages/contracts/src/project-name';
+import type { Workspace } from '../hooks/useWorkspace';
+import { newProject } from '../renderer/project-state';
+const api = window.aiden;
+const slackInviteUrl =
+  'https://join.slack.com/t/aidenbyopheleon/shared_invite/zt-4apsg5d7p-FDO9ae0imxj~KgauP8lpsw';
 
-interface WorkspaceSidebarProps {
-  busy: boolean;
-  setArea: React.Dispatch<React.SetStateAction<'projects' | 'drafts' | 'settings'>>;
-  setProject: React.Dispatch<React.SetStateAction<Project>>;
-  newProject: () => Project;
-  setBaseline: React.Dispatch<React.SetStateAction<Baseline | undefined>>;
-  setProduct: React.Dispatch<React.SetStateAction<Product | undefined>>;
-  setReport: React.Dispatch<React.SetStateAction<Report | undefined>>;
-  setEstimation: React.Dispatch<React.SetStateAction<EstimationSnapshot | undefined>>;
-  setContextConnectionIds: React.Dispatch<React.SetStateAction<string[]>>;
-  setHistoryDraft: React.Dispatch<
-    React.SetStateAction<{
-      connectionId: string;
-      sourceId: string;
-      sourceLabel: string;
-      historyTool: string;
-      sourceArgument: string;
-    }>
-  >;
-  setRuns: React.Dispatch<React.SetStateAction<RunManifest[]>>;
-  setStep: React.Dispatch<React.SetStateAction<number>>;
-  setError: React.Dispatch<React.SetStateAction<string>>;
-  setReviewRun: React.Dispatch<React.SetStateAction<string>>;
-  setShowGoalStarter: React.Dispatch<React.SetStateAction<boolean>>;
-  projects: Project[];
-  project: Project;
-  load: (id: string) => Promise<void>;
-  reviewRun: string;
-  area: 'projects' | 'drafts' | 'settings';
-  runs: RunManifest[];
-  terminalRuns: RunManifest[];
-  action: (fn: () => Promise<void>) => Promise<void>;
-  call: <K extends WorkerMethod>(method: K, params?: WorkerParams<K>) => Promise<WorkerResult<K>>;
-  api: DesktopBridge | undefined;
-  slackInviteUrl: 'https://join.slack.com/t/aidenbyopheleon/shared_invite/zt-4apsg5d7p-FDO9ae0imxj~KgauP8lpsw';
+/** Open a blank project. Runs keep going in the worker; this window just stops following them. */
+function startNewProject(workspace: Workspace): void {
+  workspace.setBusy(false);
+  workspace.setActiveRun('');
+  workspace.setActiveRuns([]);
+  workspace.setLiveByRun({});
+  workspace.setOpenRun('');
+  workspace.setLive('');
+  workspace.setVerification(null);
+  workspace.setArea('projects');
+  workspace.setProject(newProject());
+  workspace.setBaseline(undefined);
+  workspace.setReport(undefined);
+  workspace.setRuns([]);
+  workspace.setActivity([]);
+  workspace.setCalls([]);
+  workspace.setError('');
 }
 
-/** Navigate saved projects, drafts, and recent workflow runs. */
-export function WorkspaceSidebar(props: WorkspaceSidebarProps): React.JSX.Element {
-  const {
-    busy,
-    setArea,
-    setProject,
-    newProject,
-    setBaseline,
-    setProduct,
-    setReport,
-    setEstimation,
-    setContextConnectionIds,
-    setHistoryDraft,
-    setRuns,
-    setStep,
-    setError,
-    setReviewRun,
-    setShowGoalStarter,
-    projects,
-    project,
-    load,
-    reviewRun,
-    area,
-    runs,
-    terminalRuns,
-    action,
-    call,
-    api,
-    slackInviteUrl,
-  } = props;
+/** Projects Aiden is running, plus settings and support. */
+export function WorkspaceSidebar({
+  workspace,
+  onGettingStarted,
+}: {
+  workspace: Workspace;
+  onGettingStarted: () => void;
+}): JSX.Element {
+  const { projects, project, area, setArea, action } = workspace;
   return (
     <aside className="sidebar">
       <div className="sidebar-heading">
@@ -91,92 +44,28 @@ export function WorkspaceSidebar(props: WorkspaceSidebarProps): React.JSX.Elemen
           className="sidebar-add"
           aria-label="Create project"
           title="New project"
-          disabled={busy}
-          onClick={() => {
-            setArea('projects');
-            setProject(newProject());
-            setBaseline(undefined);
-            setProduct(undefined);
-            setReport(undefined);
-            setEstimation(undefined);
-            setContextConnectionIds([]);
-            setHistoryDraft({
-              connectionId: '',
-              sourceId: '',
-              sourceLabel: '',
-              historyTool: '',
-              sourceArgument: 'team',
-            });
-            setRuns([]);
-            setStep(0);
-            setError('');
-            setReviewRun('');
-            setShowGoalStarter(true);
-          }}
+          onClick={() => startNewProject(workspace)}
         >
           <Plus size={14} />
         </button>
       </div>
       <nav className="project-nav">
-        {projects.map((p) => (
-          <button
-            key={p.id}
-            disabled={busy}
-            className={p.id === project.id ? 'selected' : ''}
-            aria-current={p.id === project.id ? 'page' : undefined}
-            onClick={() => void load(p.id)}
+        <ProjectLinks workspace={workspace} closed={false} />
+        {projects.some((p) => p.lifecycle?.status === 'closed') && (
+          <details
+            className="closed-projects"
+            open={project.lifecycle?.status === 'closed' || undefined}
           >
-            <span className="project-dot" aria-hidden="true" />
-            <span>{p.name}</span>
-          </button>
-        ))}
-      </nav>
-      {reviewRun && (
-        <section className="draft-section" aria-label="Draft chats">
-          <div className="workspace-label">Draft chats</div>
-          <button
-            className={area === 'drafts' ? 'draft-row selected' : 'draft-row'}
-            onClick={() => setArea('drafts')}
-          >
-            <FileText size={13} />
-            <span>{project.name || 'Project draft'}</span>
-          </button>
-        </section>
-      )}
-      <div className="workspace-nav">
-        <div className="workspace-label">Workspace</div>
-        {project.name && (
-          <button
-            className={area === 'projects' ? 'workspace-overview selected' : 'workspace-overview'}
-            onClick={() => setArea('projects')}
-          >
-            <Layers size={14} />
-            <span>{reviewRun ? 'Prepare project' : 'Overview'}</span>
-          </button>
-        )}
-        {runs.length > 0 && (
-          <details className="workflow-history">
-            <summary>Workflow history</summary>
-            {terminalRuns.slice(0, 6).map((run) => (
-              <button
-                key={run.id}
-                onClick={() =>
-                  void action(async () => {
-                    if (run.status !== 'completed') return;
-                    setReport(await call('result', { projectId: project.id, runId: run.id }));
-                    setArea('projects');
-                    setStep(3);
-                  })
-                }
-              >
-                <span className={`run-dot ${run.status}`} />
-                <span>{run.kind === 'report' ? 'Code assessment' : run.kind}</span>
-              </button>
-            ))}
+            <summary>Closed projects</summary>
+            <ProjectLinks workspace={workspace} closed />
           </details>
         )}
-      </div>
+      </nav>
       <div className="sidebar-bottom">
+        <button className="sidebar-section" data-guide-trigger onClick={onGettingStarted}>
+          <BookOpen size={17} />
+          <span>Help / Getting started</span>
+        </button>
         <button
           className={area === 'settings' ? 'sidebar-section selected' : 'sidebar-section'}
           onClick={() => setArea('settings')}
@@ -186,7 +75,7 @@ export function WorkspaceSidebar(props: WorkspaceSidebarProps): React.JSX.Elemen
         </button>
         <button
           className="sidebar-section"
-          title="Join Aiden by Opheleon on Slack (opens in your browser)"
+          title="Report a problem, suggest a feature, or get help on Slack."
           onClick={() =>
             void action(async () => {
               await api?.openExternal(slackInviteUrl);
@@ -194,10 +83,67 @@ export function WorkspaceSidebar(props: WorkspaceSidebarProps): React.JSX.Elemen
           }
         >
           <MessageCircle size={17} />
-          <span>Contact us</span>
+          <span>Feedback &amp; support</span>
           <ExternalLink size={13} aria-hidden="true" />
         </button>
       </div>
     </aside>
+  );
+}
+
+/** Separate active and closed projects while retaining access to their saved runs. */
+function ProjectLinks({
+  workspace,
+  closed,
+}: {
+  workspace: Workspace;
+  closed: boolean;
+}): JSX.Element {
+  const { projects, project, load, area, setArea } = workspace;
+  return (
+    <>
+      {projects
+        .filter((p) => (p.lifecycle?.status === 'closed') === closed)
+        .map((p) => (
+          <div key={p.id}>
+            <button
+              className={p.id === project.id && area === 'projects' ? 'selected' : ''}
+              aria-current={p.id === project.id ? 'page' : undefined}
+              onClick={() => void load(p.id)}
+            >
+              <span className="project-dot" aria-hidden="true" />
+              <span
+                className="project-name"
+                title={
+                  p.id === project.id
+                    ? scopeName(project.context, workspace.baseline?.product)
+                    : p.name
+                }
+              >
+                {p.id === project.id
+                  ? scopeName(project.context, workspace.baseline?.product)
+                  : p.name}
+              </span>
+            </button>
+            {p.id === project.id && (
+              <button
+                className={area === 'runs' ? 'project-sub selected' : 'project-sub'}
+                onClick={() => {
+                  workspace.setOpenRun('');
+                  setArea('runs');
+                }}
+              >
+                <span>Runs</span>
+                {workspace.activeRuns.length > 0 && (
+                  <span
+                    className="live-dot"
+                    aria-label={`${workspace.activeRuns.length} running`}
+                  />
+                )}
+              </button>
+            )}
+          </div>
+        ))}
+    </>
   );
 }

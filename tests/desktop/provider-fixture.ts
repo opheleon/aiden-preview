@@ -20,6 +20,7 @@ async function turn(params: any) {
   const control = JSON.parse(readFileSync(controlPath!, 'utf8'));
   const runtime = new FixtureRuntime(f);
   runtime.clarification = !!control.clarification;
+  runtime.clarificationBlocking = !!control.blocking;
   runtime.pause = !!control.pause;
   const pending = runtime.run({
     config: { provider: 'codex', auth: 'subscription' },

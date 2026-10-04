@@ -7,8 +7,14 @@ import { atomic, optionalJson } from '../../../packages/core/src/storage.js';
 const recordSchema = z
   .object({
     at: z.string().datetime(),
-    component: z.enum(['startup', 'worker', 'renderer']),
-    code: z.enum(['startup_failed', 'worker_stopped', 'renderer_crashed', 'renderer_unresponsive']),
+    component: z.enum(['startup', 'worker', 'renderer', 'watcher']),
+    code: z.enum([
+      'startup_failed',
+      'worker_stopped',
+      'renderer_crashed',
+      'renderer_unresponsive',
+      'check_failed',
+    ]),
   })
   .strict();
 /** Diagnostic inputs deliberately cannot contain messages, payloads, or private paths. */

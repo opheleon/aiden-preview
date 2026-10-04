@@ -1,7 +1,7 @@
 import { type McpTool } from '../../contracts/src/index.js';
 import { hash } from '../../core/src/storage.js';
 const WRITE_PATTERN =
-  /(^|[_\-.])(create|update|delete|remove|write|set|add|edit|move|archive|restore|comment|assign|upload|send|publish)([_\-.]|$)/i;
+  /(^|[_\-.])(create|update|delete|remove|write|set|save|add|edit|move|archive|restore|comment|assign|upload|send|publish)([_\-.]|$)/i;
 const READ_PATTERN = /(^|[_\-.])(get|list|search|find|read|lookup|query|fetch|view)([_\-.]|$)/i;
 
 /** Classify tool metadata conservatively; write hints override read claims and approval. */
@@ -15,7 +15,9 @@ export function assessTool(
   },
   approved: string[] = [],
 ): McpTool {
-  const writeLike = WRITE_PATTERN.test(tool.name) || tool.annotations?.destructiveHint === true;
+  const writeLike =
+    WRITE_PATTERN.test(tool.name.replace(/([a-z])([A-Z])/g, '$1_$2')) ||
+    tool.annotations?.destructiveHint === true;
   const declaredRead = tool.annotations?.readOnlyHint === true;
   const recognizedRead = READ_PATTERN.test(tool.name);
   const readOnly = !writeLike && (declaredRead || recognizedRead);
