@@ -41,7 +41,7 @@ export function DeliveryAttention({
               ? `Delivery at risk · ${deviations} ${deviations === 1 ? 'deviation' : 'deviations'}`
               : 'Delivery needs verification'}
           </h2>
-          <p>Resolve these findings before treating the affected work as delivered.</p>
+          <p>Review the findings and verification gaps below.</p>
         </div>
       </header>
       {items.map((item) => (

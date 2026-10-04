@@ -74,7 +74,7 @@ export function deliveryAttention(input: AttentionInput): DeliveryAttention[] {
           evidence: finding.affected.map((id) => evidenceSummary(input, id, finding.readiness)),
           impact: downstream.length
             ? `Delivery of ${downstream.join(', ')} depends on this step.`
-            : 'This delivery step cannot be accepted yet.',
+            : 'This delivery step has unresolved verification findings.',
           next:
             finding.kind === 'deviation'
               ? 'Review the evidence and complete the remaining work. If the ticket is marked Done, reopen it for correction.'
