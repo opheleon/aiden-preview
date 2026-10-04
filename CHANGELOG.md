@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.2.0
+
 - Hide new Jira and custom MCP setup while they are experimental. Preserve saved connections and project links, with clear Experimental labels.
 
 - Prevent excessive CPU use when formatting untrusted page or model text containing long whitespace sequences.
