@@ -62,9 +62,12 @@ before(async () => {
 });
 
 after(async () => {
-  await browser.close();
-  server.closeAllConnections();
-  await new Promise((resolve) => server.close(resolve));
+  try {
+    await browser?.close();
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
 
 /** Open a recorded session on the fixture page with test-only overrides. */

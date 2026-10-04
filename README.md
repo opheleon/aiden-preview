@@ -117,6 +117,8 @@ pnpm dev
 
 The dependency policy applies a 14-day release cooldown, rejects provenance downgrades, and denies unreviewed install scripts. Review [dependency security](docs/dependency-security.md) before changing the lockfile or granting an exception.
 
+Before running backend checks on a new machine, install the verification browser and its system dependencies with `pnpm exec playwright install --with-deps chromium`. Repeat this after upgrading Playwright. CI installs the matching browser on both Linux and macOS.
+
 ```sh
 pnpm check             # formatting, lint, types, boundaries, coverage, build
 pnpm test              # deterministic backend tests

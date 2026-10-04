@@ -162,9 +162,11 @@ void test('HTTP verification confines requests, gates writes, hides credentials 
   }
 });
 
-void test('API recording contains actual assertions and sanitized evidence, including failures and limits', async () => {
+void test('API recording contains actual assertions and sanitized evidence, including failures and limits', async (t) => {
   const server = await serverFixture();
+  t.after(() => server.close());
   const browser = await launchBrowser();
+  t.after(() => browser.close());
   const dir = await mkdtemp(path.join(tmpdir(), 'aiden-api-recording-'));
   const progress: string[] = [];
   const session = await ApiSession.open(
@@ -236,8 +238,6 @@ void test('API recording contains actual assertions and sanitized evidence, incl
     assert.equal(await session.close(), video);
   } finally {
     await session.close();
-    await browser.close();
-    server.close();
   }
 });
 
