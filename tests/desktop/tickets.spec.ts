@@ -20,7 +20,10 @@ test('an existing plan can connect later, publish, and resync its linked tickets
     await expect(page.getByRole('button', { name: 'Connect Jira', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Add server', exact: true })).toHaveCount(0);
     await expect(page.getByText(/Jira and custom MCP are experimental/)).toBeVisible();
-    await page.screenshot({ path: info.outputPath('linear-only-integrations.png'), fullPage: true });
+    await page.screenshot({
+      path: info.outputPath('linear-only-integrations.png'),
+      fullPage: true,
+    });
     // Seed a synthetic Linear account through the real worker. New custom-server setup is hidden.
     await page.evaluate(
       async ({ url, token }) => {
