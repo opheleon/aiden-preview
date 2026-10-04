@@ -159,6 +159,7 @@ export function searchedTicketIds(payload: unknown): string[] {
 /** Compare managed content independent of line endings and insignificant whitespace. */
 export function ticketText(value: string): string {
   return value
+    .replace(/\[(https:\/\/[^\]\s]+)\]\(<?\1>?\)/g, '$1')
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/^[-*]\s+/gm, '')
     .replace(/\s+/g, ' ')

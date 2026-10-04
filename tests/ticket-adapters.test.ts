@@ -174,3 +174,18 @@ void test('flat Linear issue UUID fields verify the project while preserving Don
   assert.equal(result.statusType, 'completed');
   assert.throws(() => remoteTicket({ ...raw, projectId: 'foreign-uuid' }, destination), /outside/);
 });
+
+void test('Linear auto-linked prerequisite URLs compare equally without hiding a changed label or destination', () => {
+  const url = 'https://linear.app/workspace/issue/APP-42/a-feature';
+  const plain = `Prerequisite tickets:\nF-1: ${url}`;
+  assert.equal(ticketText(plain), ticketText(`Prerequisite tickets:\nF-1: [${url}](<${url}>)`));
+  assert.equal(ticketText(plain), ticketText(`Prerequisite tickets:\nF-1: [${url}](${url})`));
+  assert.notEqual(
+    ticketText(plain),
+    ticketText(`Prerequisite tickets:\nF-1: [changed label](${url})`),
+  );
+  assert.notEqual(
+    ticketText(plain),
+    ticketText(`Prerequisite tickets:\nF-1: [${url}](https://example.com/other)`),
+  );
+});
