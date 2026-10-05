@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import type { RunEvent } from '../../../../packages/contracts/src/index';
+import type { RunEvent, RunManifest, Stage } from '../../../../packages/contracts/src/index';
 import type { DesktopBridge } from '../bridge';
 import type { WorkspaceState } from './useWorkspaceState';
 
@@ -26,8 +26,21 @@ type EventContext = EventState & {
   projectId: string;
   call: DesktopBridge['request'];
   seen: Set<string>;
+  /** Latest stage each run reported, newer than any refresh that is still in flight. */
+  stages: Map<string, Stage>;
   current: () => boolean;
 };
+
+/** Apply the latest reported stage to running runs, since a refresh can resolve after newer events. */
+function withLiveStages(runs: RunManifest[], stages: Map<string, Stage>): RunManifest[] {
+  const stale = runs.some(
+    (r) => r.status === 'running' && stages.has(r.id) && stages.get(r.id) !== r.stage,
+  );
+  if (!stale) return runs;
+  return runs.map((r) =>
+    r.status === 'running' && stages.has(r.id) ? { ...r, stage: stages.get(r.id)! } : r,
+  );
+}
 
 /** Report a failed refresh through the normal error banner. */
 function failed(state: EventContext, fallback: string): (error: unknown) => void {
@@ -124,6 +137,32 @@ function activity(state: EventContext, event: RunEvent): void {
       .catch(failed(state, 'Could not load calls.'));
 }
 
+/** Follow a running run: its stage, live line, and any criterion a verification just finished. */
+function progress(state: EventContext, event: RunEvent): void {
+  // Keep the run's stage tracker in step with the worker between full refreshes.
+  if (event.stage) state.stages.set(event.runId, event.stage);
+  if (!state.seen.has(event.runId)) {
+    state.seen.add(event.runId);
+    void state
+      .call('state', { projectId: state.projectId })
+      .then((saved) => {
+        if (state.current()) state.setRuns(withLiveStages(saved.runs, state.stages));
+      })
+      .catch(failed(state, 'Could not refresh runs.'));
+  }
+  if (event.stage) state.setRuns((runs) => withLiveStages(runs, state.stages));
+  state.setActiveRuns((ids) => (ids.includes(event.runId) ? ids : [...ids, event.runId]));
+  state.setBusy(true);
+  state.setActiveRun(event.runId);
+  if (event.message) {
+    state.setLive(event.message);
+    const message = event.message;
+    state.setLiveByRun((runs) => ({ ...runs, [event.runId]: message }));
+  }
+  // A completed criterion inside a still-running verification: let Watch show it now.
+  if (event.verification) refreshVerification(state, event.runId);
+}
+
 /** Route current-project events; other projects only get a quiet notice when they finish. */
 function receive(state: EventContext, event: RunEvent): void {
   if (event.projectId && event.projectId !== state.projectId) {
@@ -141,25 +180,7 @@ function receive(state: EventContext, event: RunEvent): void {
       // External jobs have their own delivery view; never mix them into analyst run history.
       break;
     case 'progress':
-      if (!state.seen.has(event.runId)) {
-        state.seen.add(event.runId);
-        void state
-          .call('state', { projectId: state.projectId })
-          .then((saved) => {
-            if (state.current()) state.setRuns(saved.runs);
-          })
-          .catch(failed(state, 'Could not refresh runs.'));
-      }
-      state.setActiveRuns((ids) => (ids.includes(event.runId) ? ids : [...ids, event.runId]));
-      state.setBusy(true);
-      state.setActiveRun(event.runId);
-      if (event.message) {
-        state.setLive(event.message);
-        const message = event.message;
-        state.setLiveByRun((runs) => ({ ...runs, [event.runId]: message }));
-      }
-      // A completed criterion inside a still-running verification: let Watch show it now.
-      if (event.verification) refreshVerification(state, event.runId);
+      progress(state, event);
       break;
     case 'activity':
       activity(state, event);
@@ -205,6 +226,7 @@ export function useWorkspaceEvents(
       projectId,
       call,
       seen: new Set(),
+      stages: new Map(),
       current: () => current,
       setProject,
       setProjects,

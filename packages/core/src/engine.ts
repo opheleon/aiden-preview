@@ -38,6 +38,8 @@ import {
   createRun,
   launchRun,
   type RunExtras,
+  RunStopped,
+  stopReasons,
 } from './run-lifecycle.js';
 import { atomic, hash, json, optionalJson, Store } from './storage.js';
 import { savedProduct } from './understanding.js';
@@ -259,7 +261,7 @@ export class Engine {
   cancel(runId: string): { cancelled: boolean } {
     const active = this.active.get(runId);
     if (!active) throw new Error('Run is not active.');
-    active.controller.abort();
+    active.controller.abort(new RunStopped(stopReasons.you));
     return { cancelled: true };
   }
   /** Create an immutable reviewed baseline after rejecting stale intent and reused retired requirement IDs. */
@@ -352,7 +354,7 @@ export class Engine {
   /** Cancel and await active runs before clearing provider keys and closing integration sessions. */
   async dispose(): Promise<void> {
     await closeCoding(this);
-    for (const a of this.active.values()) a.controller.abort();
+    for (const a of this.active.values()) a.controller.abort(new RunStopped(stopReasons.shutdown));
     await Promise.all([...this.active.values()].map((a) => a.done));
     if (this.runtime instanceof Runtimes) this.runtime.dispose();
     await this.integrations.dispose();

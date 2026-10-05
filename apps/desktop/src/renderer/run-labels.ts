@@ -17,13 +17,17 @@ export const activeTitles: Record<RunManifest['kind'], string> = {
   estimate: 'Sizing the work',
 };
 
-/** A run's title: present tense while it runs, past tense after. */
-export const runTitle = (run: RunManifest, active: boolean): string =>
-  run.beta
-    ? active
-      ? 'Checking beta'
-      : 'Checked beta'
-    : (active ? activeTitles : runTitles)[run.kind];
+/**
+ * A run's title: present tense while it runs, past tense after it finishes, and an explicit
+ * outcome when it stopped or failed. Example: a stopped code check is "Checking the code stopped".
+ */
+export function runTitle(run: RunManifest, active: boolean): string {
+  const ongoing = run.beta ? 'Checking beta' : activeTitles[run.kind];
+  if (active) return ongoing;
+  if (run.status === 'cancelled') return `${ongoing} stopped`;
+  if (run.status === 'failed') return `${ongoing} failed`;
+  return run.beta ? 'Checked beta' : runTitles[run.kind];
+}
 
 /** Why a run started. */
 export const runReasons: Record<LookReason, string> = {

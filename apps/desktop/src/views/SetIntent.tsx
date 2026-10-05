@@ -14,6 +14,7 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
   const { project, setProject, busy, scanning, scanProjectFolder, start, action } = workspace;
   const folder = project.rootPath?.split('/').at(-1) || project.rootPath;
   const repos = project.repositories.length;
+  const missing = scanning ? '' : startHint(!!project.context.trim(), folder, repos);
   return (
     <section className="goal-starter set-intent" aria-label="New project">
       <div className="goal-starter-brand">
@@ -87,12 +88,18 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
           <button
             className="primary goal-starter-create"
             disabled={busy || scanning || !project.context.trim() || !repos}
+            aria-describedby={missing ? 'start-hint' : undefined}
             onClick={() => void start()}
           >
             Hand it to Aiden <ArrowRight size={15} />
           </button>
         </div>
       </div>
+      {missing && (
+        <p className="inline-note" id="start-hint">
+          {missing}
+        </p>
+      )}
       <details>
         <summary>Model and effort</summary>
         <RuntimeSettings
@@ -125,4 +132,18 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
       </div>
     </section>
   );
+}
+
+/**
+ * Say what is still needed before Aiden can start, or nothing when the project is ready.
+ * Example: a folder without Git repositories asks for one that contains a repository.
+ */
+function startHint(hasIntent: boolean, folder: string | undefined, repos: number): string {
+  if (folder && !repos)
+    return `No Git repositories were found in ${folder}. Choose a folder that contains one.`;
+  if (!hasIntent && !folder)
+    return 'To start, describe what you are building and choose the project folder.';
+  if (!hasIntent) return 'To start, describe what you are building.';
+  if (!folder) return 'To start, choose the project folder.';
+  return '';
 }

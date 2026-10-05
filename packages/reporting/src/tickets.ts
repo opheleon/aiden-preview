@@ -1,5 +1,5 @@
 import type { Call, DeliveryFeature, Product, Report } from '../../contracts/src/index.js';
-import { blockerReason, requirementBlockers } from './blockers.js';
+import { blockerReason, blockerSources, waitingReason } from './blockers.js';
 
 /** A local delivery ticket derived from saved scope and evidence, never a claim of an external issue. */
 export interface DeliveryTicket {
@@ -15,7 +15,7 @@ export function deliveryTickets(
   report: Report | undefined,
   calls: Call[],
 ): DeliveryTicket[] {
-  const blockers = requirementBlockers(product, calls);
+  const sources = blockerSources(product, calls);
   const features: DeliveryFeature[] =
     product.deliveryPlan ??
     product.requirements.map((r, i) => ({
@@ -28,11 +28,18 @@ export function deliveryTickets(
       dependsOn: [],
     }));
   return features.map((feature) => {
-    const blocked = [...new Set(feature.requirementIds.flatMap((id) => blockers.get(id) ?? []))];
+    const direct = [
+      ...new Set(feature.requirementIds.flatMap((id) => sources.get(id)?.direct ?? [])),
+    ];
+    const waiting = [
+      ...new Set(feature.requirementIds.flatMap((id) => sources.get(id)?.inherited ?? [])),
+    ].filter((c) => !direct.includes(c));
+    const blocked = [...direct, ...waiting];
+    const pause = pauseSections(product, direct, waiting);
     const lines = [
       `# ${feature.id}: ${feature.title}`,
       '',
-      `Status: ${blocked.length ? 'Blocked, draft scope' : 'Planned, check prerequisites before implementation'}`,
+      `Status: ${pause.status}`,
       'Owner: Unassigned',
       `Dependencies: ${feature.dependsOn.join(', ') || 'None'}`,
       '',
@@ -40,17 +47,11 @@ export function deliveryTickets(
       feature.outcome,
       '',
       `Scope basis: ${report ? `assessment ${report.id}` : 'saved project requirements'}`,
+      ...pause.lines,
     ];
-    if (blocked.length)
-      lines.push(
-        '',
-        '## Decision needed',
-        blockerReason(blocked),
-        'Implementation and dependent work are paused. Resolve these decisions before finalizing acceptance criteria or implementation steps.',
-      );
     lines.push(
       '',
-      blocked.length ? '## Draft scope (not acceptance criteria)' : '## Acceptance criteria',
+      direct.length ? '## Draft scope (not acceptance criteria)' : '## Acceptance criteria',
     );
     for (const id of feature.requirementIds) {
       const requirement = product.requirements.find((r) => r.id === id)!;
@@ -100,4 +101,36 @@ export function deliveryTickets(
       markdown: lines.join('\n'),
     };
   });
+}
+
+/**
+ * Status and pause sections for one feature. Its own open decisions make it draft scope; decisions
+ * on a prerequisite leave its scope agreed but name the prerequisite it waits on.
+ */
+function pauseSections(
+  product: Product,
+  direct: Call[],
+  waiting: Call[],
+): { status: string; lines: string[] } {
+  const lines: string[] = [];
+  if (direct.length)
+    lines.push(
+      '',
+      '## Decision needed',
+      blockerReason(direct),
+      'Implementation and dependent work are paused. Resolve these decisions before finalizing acceptance criteria or implementation steps.',
+    );
+  if (waiting.length)
+    lines.push(
+      '',
+      '## Waiting on a prerequisite decision',
+      waitingReason(product, waiting),
+      'This feature’s scope is agreed. Implementation waits until the prerequisite is decided.',
+    );
+  const status = direct.length
+    ? 'Blocked, draft scope'
+    : waiting.length
+      ? 'Waiting on a prerequisite decision'
+      : 'Planned, check prerequisites before implementation';
+  return { status, lines };
 }

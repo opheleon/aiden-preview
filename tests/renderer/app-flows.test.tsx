@@ -32,7 +32,11 @@ test('setting the intent is one screen, and Aiden starts without a review step',
   expect(screen.getByRole('heading', { name: /What are you building/ })).toBeVisible();
   const start = screen.getByRole('button', { name: /Hand it to Aiden/ });
   expect(start).toBeDisabled();
+  expect(start).toHaveAccessibleDescription(
+    'To start, describe what you are building and choose the project folder.',
+  );
   await userEvent.type(screen.getByLabelText('What are you building?'), 'List books');
+  expect(start).toHaveAccessibleDescription('To start, choose the project folder.');
   await userEvent.click(screen.getByRole('button', { name: 'Import a file' }));
   expect(screen.getByLabelText('What are you building?')).toHaveValue(
     'List books\n\nImported fixture intent',
@@ -41,6 +45,7 @@ test('setting the intent is one screen, and Aiden starts without a review step',
   await userEvent.click(screen.getByRole('button', { name: 'Choose the project folder' }));
   expect(await screen.findByRole('button', { name: 'synthetic · 1 repository' })).toBeVisible();
   expect(screen.getByText('Synthetic discovery warning')).toBeVisible();
+  expect(start).not.toHaveAccessibleDescription();
   await userEvent.selectOptions(screen.getByLabelText('Model provider'), 'claude');
   await userEvent.click(start);
   await waitFor(() =>
@@ -62,6 +67,8 @@ test('a project whose first rewrite is running shows it, and a stopped one says 
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
   expect(await screen.findByText('Aiden is writing the requirements.')).toBeVisible();
+  // Nothing has been checked yet, so there is no outcome to accept.
+  expect(screen.queryByRole('region', { name: 'Project outcome' })).toBeNull();
   await userEvent.click(screen.getByRole('button', { name: 'Stop' }));
   expect(f.request).toHaveBeenCalledWith('cancel', { runId: 'prepare-run' });
   act(() =>
@@ -84,6 +91,7 @@ test('a project whose first rewrite is running shows it, and a stopped one says 
 
 test('the brief keeps only touch points on screen; the rest lives in one menu', async () => {
   await openProject();
+  expect(screen.getByRole('region', { name: 'Project outcome' })).toBeVisible();
   for (const name of ['Refresh status', 'Schedule', 'App URL', 'Markdown', 'Check now'])
     expect(screen.queryByRole('button', { name })).toBeNull();
   await menu('Export Markdown');
@@ -160,7 +168,11 @@ test('action items: PM decisions are answered in place, Dev items copy a prompt,
   expect(items[1]).toHaveTextContent('Tell Aiden where your app runs');
   expect(items[3]).toHaveTextContent('Finish: Users can list books.');
   expect(items[4]).toHaveTextContent('Test by hand: Users can create books.');
-  await userEvent.click(within(actions).getByRole('button', { name: 'Block duplicates' }));
+  const choice = within(actions).getByRole('button', { name: 'Block duplicates' });
+  await userEvent.click(choice);
+  expect(choice).toHaveAttribute('aria-pressed', 'true');
+  expect(f.request).not.toHaveBeenCalledWith('answerCall', expect.anything());
+  await userEvent.click(within(items[0]!).getByRole('button', { name: 'Answer' }));
   expect(f.request).toHaveBeenCalledWith('answerCall', {
     projectId: report.projectId,
     callId: 'call-1',

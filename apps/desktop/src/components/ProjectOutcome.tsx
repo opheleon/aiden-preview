@@ -101,12 +101,22 @@ function OutcomeDialog({
   );
 }
 
+/**
+ * Offer acceptance once a check has produced evidence to accept, or when the project already has
+ * an acceptance or closure decision to show. A brand-new project has nothing to accept yet.
+ */
+function outcomeReady(workspace: Workspace): boolean {
+  const lifecycle = workspace.project.lifecycle;
+  return !!workspace.report || lifecycle?.status === 'closed' || !!lifecycle?.history.length;
+}
+
 /** Keep the person's outcome decision separate from automated progress, with reversible project closure. */
-export function ProjectOutcome({ workspace }: { workspace: Workspace }): JSX.Element {
+export function ProjectOutcome({ workspace }: { workspace: Workspace }): JSX.Element | null {
   const [mode, setMode] = useState<'accept' | 'close'>();
   const lifecycle = workspace.project.lifecycle;
   const closed = lifecycle?.status === 'closed';
   const accepted = lifecycle?.acceptanceCurrent;
+  if (!outcomeReady(workspace)) return null;
   /** Reopening restores the existing monitoring configuration without changing the evidence. */
   async function reopen(): Promise<void> {
     const project = await workspace.call('reopenProject', { projectId: workspace.project.id });

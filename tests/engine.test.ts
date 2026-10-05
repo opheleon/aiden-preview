@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import type { RunEvent, RunManifest } from '../packages/contracts/src/index.js';
+import { readRunLog } from '../packages/core/src/activity.js';
 import { readCalls } from '../packages/core/src/calls.js';
 import { Engine } from '../packages/core/src/engine.js';
 import { json, optionalJson, Store } from '../packages/core/src/storage.js';
@@ -99,10 +100,15 @@ void test('reversible calls allow a run to proceed; cancellation and project loc
     await assert.rejects(e.report(f.project.id), /active operation/);
     e.cancel(r.runId);
     await e.wait(r.runId);
+    const stopped = await json<RunManifest>(
+      path.join(store.run(f.project.id, r.runId), 'manifest.json'),
+    );
+    assert.equal(stopped.status, 'cancelled');
+    assert.equal(stopped.error, 'Stopped by you.');
+    // The stop is the run's last step, so its elapsed time ends when it stopped.
     assert.equal(
-      (await json<RunManifest>(path.join(store.run(f.project.id, r.runId), 'manifest.json')))
-        .status,
-      'cancelled',
+      (await readRunLog(store, f.project.id, r.runId)).at(-1)?.summary,
+      'Stopped by you.',
     );
     assert.equal(await optionalJson(path.join(store.project(f.project.id), 'latest.json')), null);
   } finally {

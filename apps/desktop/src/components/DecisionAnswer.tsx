@@ -10,8 +10,9 @@ function askText(call: Call): string {
 }
 
 /**
- * Answer an open decision in place: one click on an option, or a typed answer. Blocking work waits
- * for it; the answer is used straight away, or as soon as the current investigation ends.
+ * Answer an open decision in place: choose an option or type an answer, then confirm with Answer.
+ * Choosing never submits, because an answer rewrites scope and starts a new check. Blocking work
+ * waits for it; the answer is used straight away, or as soon as the current investigation ends.
  */
 export function DecisionAnswer({
   call,
@@ -21,12 +22,23 @@ export function DecisionAnswer({
   onAnswer: (callId: string, answer: string) => Promise<void>;
 }): JSX.Element {
   const [other, setOther] = useState('');
+  const [chosen, setChosen] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const answer = chosen ?? other.trim();
   return (
     <>
       <div className="call-options">
         {call.options.map((option) => (
-          <button key={option} className="secondary" onClick={() => void onAnswer(call.id, option)}>
+          <button
+            key={option}
+            type="button"
+            className="secondary"
+            aria-pressed={option === chosen}
+            onClick={() => {
+              setChosen(option === chosen ? null : option);
+              setOther('');
+            }}
+          >
             {option}
           </button>
         ))}
@@ -34,7 +46,11 @@ export function DecisionAnswer({
           className="call-other"
           onSubmit={(event) => {
             event.preventDefault();
-            if (other.trim()) void onAnswer(call.id, other.trim()).then(() => setOther(''));
+            if (answer)
+              void onAnswer(call.id, answer).then(() => {
+                setOther('');
+                setChosen(null);
+              });
           }}
         >
           <input
@@ -42,9 +58,12 @@ export function DecisionAnswer({
             placeholder={call.kind === 'app-url' ? 'http://localhost:3000' : 'Other…'}
             maxLength={2000}
             value={other}
-            onChange={(event) => setOther(event.target.value)}
+            onChange={(event) => {
+              setOther(event.target.value);
+              setChosen(null);
+            }}
           />
-          <button className="primary" disabled={!other.trim()}>
+          <button className="primary" disabled={!answer}>
             Answer
           </button>
         </form>

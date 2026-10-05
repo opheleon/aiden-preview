@@ -8,6 +8,7 @@ import type { CallDraft } from '../packages/contracts/src/index.js';
 import {
   answerCall,
   answeredDecisions,
+  openDecisions,
   readCalls,
   recordCall,
   replaceOpenDecisions,
@@ -81,7 +82,7 @@ void test('rewriting scope keeps re-proposed and same-run calls and drops the re
     );
     const sameRun = await recordCall(store, projectId, draft('Asked by tool?'), 'decision', 'new');
     const app = await recordCall(store, projectId, draft('Where?'), 'app-url', 'old');
-    const created = await replaceOpenDecisions(
+    const { created } = await replaceOpenDecisions(
       store,
       projectId,
       [draft('keep me?'), draft('Brand new?')],
@@ -96,6 +97,68 @@ void test('rewriting scope keeps re-proposed and same-run calls and drops the re
     assert.equal(byId.get(dropped.call.id), 'dropped');
     assert.equal(byId.get(sameRun.call.id), 'open');
     assert.equal(byId.get(app.call.id), 'open', 'app-url calls are not scope decisions');
+  }));
+
+void test('a rewrite closes open blockers it reports as settled and keeps the rest', () =>
+  withStore(async (store) => {
+    const answered = await recordCall(
+      store,
+      projectId,
+      draft('Expire after 30 days?'),
+      'decision',
+      'r1',
+    );
+    await answerCall(store, projectId, answered.call.id, 'Never expire by default');
+    const duplicate = await recordCall(
+      store,
+      projectId,
+      draft('What default expiry policy applies?', { blocking: true }),
+      'decision',
+      'check',
+    );
+    const unrelated = await recordCall(
+      store,
+      projectId,
+      draft('Who may create links?', { blocking: true }),
+      'decision',
+      'check',
+    );
+    const { created, settled } = await replaceOpenDecisions(store, projectId, [], 'rewrite', [
+      '  what default EXPIRY policy applies? ',
+      'A question nobody asked?',
+    ]);
+    assert.deepEqual(created, []);
+    assert.deepEqual(
+      settled.map((c) => c.question),
+      ['What default expiry policy applies?'],
+    );
+    const byId = new Map((await readCalls(store, projectId)).map((c) => [c.id, c.status]));
+    assert.equal(byId.get(duplicate.call.id), 'dropped');
+    assert.equal(byId.get(unrelated.call.id), 'open', 'omitted blockers still survive');
+    assert.equal(byId.get(answered.call.id), 'answered');
+    assert.deepEqual(await openDecisions(store, projectId), [
+      {
+        blocking: true,
+        question: 'Who may create links?',
+        assumption: 'Assuming the default for: Who may create links?',
+        requirementId: null,
+        edgeCaseId: null,
+      },
+    ]);
+  }));
+
+void test('open decisions for prompts exclude app-url calls and treat legacy calls as blocking', () =>
+  withStore(async (store) => {
+    await recordCall(store, projectId, draft('Legacy unclassified?'), 'decision', 'r1');
+    await recordCall(store, projectId, draft('Where?'), 'app-url', 'r1');
+    await recordCall(store, projectId, draft('Minor copy?', { blocking: false }), 'decision', 'r1');
+    assert.deepEqual(
+      (await openDecisions(store, projectId)).map((d) => [d.question, d.blocking]),
+      [
+        ['Legacy unclassified?', true],
+        ['Minor copy?', false],
+      ],
+    );
   }));
 
 void test('answers are recorded once and become prior answers for later stages', () =>

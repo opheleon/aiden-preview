@@ -3,7 +3,7 @@ import { type JSX, type ReactNode, useState } from 'react';
 
 import type { CriterionResult, Product, Report } from '../../../../packages/contracts/src/index';
 import type { TicketState } from '../../../../packages/contracts/src/tickets';
-import { requirementBlockers } from '../../../../packages/reporting/src/blockers';
+import { type BlockerSources, blockerSources } from '../../../../packages/reporting/src/blockers';
 import type { DeliveryTicket as Ticket } from '../../../../packages/reporting/src/tickets';
 import { deliveryTickets } from '../../../../packages/reporting/src/tickets';
 import type { TrackerTickets } from '../hooks/useTrackerTickets';
@@ -13,6 +13,7 @@ import type { DeliveryAttention } from '../renderer/delivery-attention';
 import { type FeatureProgress, featureProgress } from '../renderer/delivery-progress';
 import {
   type Check,
+  type ItemState,
   type RequirementFacts,
   requirementFacts,
   requirementState,
@@ -52,11 +53,8 @@ export function DeliveryPlan({
   const facts = report
     ? requirementFacts(report, check, workspace.calls, workspace.confirmed)
     : new Map<string, RequirementFacts>();
-  const states = new Map([...facts].map(([id, f]) => [id, requirementState(f)]));
-  const blockers = requirementBlockers(product, workspace.calls);
-  for (const [id, calls] of blockers)
-    if (calls.length)
-      states.set(id, { label: 'Blocked', tone: 'partial', how: 'Waiting on a decision.' });
+  const blockers = blockerSources(product, workspace.calls);
+  const states = planStates(facts, blockers);
   const progress = featureProgress(product, states);
   const tickets = deliveryTickets(product, report, workspace.calls);
   const focus = progress.find((f) => !f.complete && !f.blocked && !f.waitingOn.length)?.feature.id;
@@ -80,7 +78,8 @@ export function DeliveryPlan({
           id={id}
           text={item.text}
           attention={discrepancy}
-          blocked={!!blockers.get(id)?.length}
+          blocked={!!blockers.get(id)?.direct.length}
+          waiting={!!blockers.get(id)?.inherited.length}
         >
           {ticket}
         </UncheckedRequirement>
@@ -153,11 +152,10 @@ export function DeliveryPlan({
           onClose={() => setEditing(false)}
         />
       ) : progress.length ? (
-        progress.map((item, index) => (
+        progress.map((item) => (
           <FeatureSection
             key={item.feature.id}
             item={item}
-            index={index}
             product={product}
             focus={focus}
             attention={attention.find((a) => a.featureId === item.feature.id)}
@@ -180,14 +178,12 @@ export function DeliveryPlan({
 /** Explain one feature’s outcome, current position, and dependency links above its requirements. */
 function FeatureSection({
   item,
-  index,
   product,
   focus,
   attention,
   children,
 }: {
   item: FeatureProgress;
-  index: number;
   product: Product;
   focus: string | undefined;
   attention: DeliveryAttention | undefined;
@@ -206,7 +202,7 @@ function FeatureSection({
           <ChevronRight className="feature-chevron" size={20} aria-hidden="true" />
           <span className="feature-heading">
             <h3>
-              {index + 1}. {feature.title}
+              <code className="feature-id">{feature.id}</code> {feature.title}
             </h3>
             <span className="row-sub">
               {done} of {total} requirements complete
@@ -282,17 +278,40 @@ function FeatureTicket({
   ) : null;
 }
 
+/**
+ * Requirement states for the plan, where open decisions outrank assessed code: a requirement's own
+ * decision shows Blocked, and a prerequisite's decision shows Waiting.
+ */
+function planStates(
+  facts: Map<string, RequirementFacts>,
+  blockers: Map<string, BlockerSources>,
+): Map<string, ItemState> {
+  const states = new Map([...facts].map(([id, f]) => [id, requirementState(f)]));
+  for (const [id, { direct, inherited }] of blockers)
+    if (direct.length)
+      states.set(id, { label: 'Blocked', tone: 'partial', how: 'Waiting on a decision.' });
+    else if (inherited.length)
+      states.set(id, {
+        label: 'Waiting',
+        tone: 'partial',
+        how: 'Waiting on a decision for a prerequisite feature.',
+      });
+  return states;
+}
+
 /** Keep a draft requirement and its linked ticket together before any assessment exists. */
 function UncheckedRequirement({
   id,
   text,
   blocked,
+  waiting,
   attention,
   children,
 }: {
   id: string;
   text: string;
   blocked: boolean;
+  waiting: boolean;
   attention: DeliveryAttention | undefined;
   children: ReactNode;
 }): JSX.Element {
@@ -304,7 +323,11 @@ function UncheckedRequirement({
         </span>
         {attention && <AttentionBadge item={attention} />}
         <span className="row-sub">
-          {blocked ? 'Blocked: waiting on a decision' : 'Not checked yet'}
+          {blocked
+            ? 'Blocked: waiting on a decision'
+            : waiting
+              ? 'Waiting on a prerequisite decision'
+              : 'Not checked yet'}
         </span>
       </summary>
       <div className="req-detail">{children}</div>

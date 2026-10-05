@@ -146,3 +146,42 @@ test('local requirements expose connection setup and existing issues expose sync
   await userEvent.click(screen.getByRole('button', { name: 'Sync tickets' }));
   expect(tracker.sync).toHaveBeenCalledOnce();
 });
+
+test('a feature removed from the plan is named with a link to the preserved issue', () => {
+  const f = fixture();
+  const tracker = { state: linked, syncing: false, sync: vi.fn(), saved: vi.fn() };
+  const retired = {
+    ...linked.records[0]!,
+    featureId: 'F-4',
+    title: '[Blocked] Enforce link expiry',
+    state: 'retired' as const,
+    issueId: 'BOOK-4',
+    url: 'https://linear.app/synthetic/issue/BOOK-4',
+  };
+  const { rerender } = render(
+    <TicketPublishing
+      workspace={f.workspace}
+      tracker={{ ...tracker, state: { ...linked, records: [retired] } }}
+    />,
+  );
+  const note = screen.getByText(/Removed from the plan/);
+  expect(note).toHaveTextContent(
+    'Removed from the plan: F-4 Enforce link expiry. Aiden kept BOOK-4 for review; close it in the tracker if the work is no longer needed.',
+  );
+  expect(screen.getByRole('link', { name: 'BOOK-4' })).toHaveAttribute('href', retired.url);
+  const unpublished = {
+    featureId: retired.featureId,
+    title: retired.title,
+    marker: retired.marker,
+    state: retired.state,
+  };
+  rerender(
+    <TicketPublishing
+      workspace={f.workspace}
+      tracker={{ ...tracker, state: { ...linked, records: [unpublished] } }}
+    />,
+  );
+  expect(screen.getByText(/Removed from the plan/)).toHaveTextContent(
+    'Aiden kept its tracker issue',
+  );
+});

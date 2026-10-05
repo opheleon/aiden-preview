@@ -99,7 +99,7 @@ void test('ambiguous creates persist intent and recover with search plus GET wit
   }
 });
 
-void test('blocking unknowns publish only draft scope, including dependent features', async () => {
+void test('blocking unknowns publish draft scope; dependent features name the prerequisite they wait on', async () => {
   const f = await ticketFixture();
   try {
     await f.enable();
@@ -121,10 +121,21 @@ void test('blocking unknowns publish only draft scope, including dependent featu
       },
     ]);
     await syncTickets(f.engine, f.project.id);
-    for (const issue of f.issues.values()) {
+    const issues = [...f.issues.values()];
+    assert.ok(issues.length > 1, 'the fixture plan has a dependent feature');
+    for (const issue of issues) {
       assert.match(issue.title, /^\[Blocked\]/);
       assert.match(issue.description, /Who can see books/);
-      assert.doesNotMatch(issue.description, /## Acceptance criteria|## Known remaining work/);
+      assert.doesNotMatch(issue.description, /## Known remaining work/);
+    }
+    const [direct, ...dependents] = issues;
+    assert.match(direct!.description, /## Decision needed/);
+    assert.doesNotMatch(direct!.description, /## Acceptance criteria/);
+    for (const issue of dependents) {
+      assert.match(issue.description, /Status: Waiting on a prerequisite decision/);
+      assert.match(issue.description, /F-1 .* needs a decision first: Who can see books\?/);
+      assert.match(issue.description, /## Acceptance criteria/);
+      assert.doesNotMatch(issue.description, /## Decision needed|Visibility needs a decision/);
     }
   } finally {
     await f.close();

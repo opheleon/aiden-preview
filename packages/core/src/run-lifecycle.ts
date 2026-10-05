@@ -11,6 +11,7 @@ import type {
 import { scopeName } from '../../contracts/src/project-name.js';
 import { publicError } from '../../runtimes/src/index.js';
 import { withMonitoredBranches } from '../../tools/src/remote-branches.js';
+import { recordStep } from './activity.js';
 import { execute } from './report-workflow.js';
 import { atomic, json, optionalJson, type Store, uid } from './storage.js';
 import type { WorkflowContext } from './workflow-context.js';
@@ -39,6 +40,16 @@ const firstStage: Record<RunManifest['kind'], Stage> = {
 
 /** Longest a single run may execute before it is aborted as timed out. */
 const runTimeoutMs = 30 * 60 * 1000;
+
+/** Why active work stopped, in the words a run's history shows. */
+export const stopReasons = {
+  you: 'Stopped by you.',
+  timeout: 'Stopped after running for 30 minutes.',
+  shutdown: 'Stopped because Aiden closed.',
+} as const;
+
+/** Abort reason that names who or what stopped a run, so its history is not ambiguous. */
+export class RunStopped extends Error {}
 
 /** Acquire a per-project filesystem lock; remove only dead-process locks and release only our own token. */
 export async function acquireProjectLock(
@@ -118,13 +129,21 @@ export function launchRun(
 ): void {
   const controller = new AbortController();
   const timer = setTimeout(
-    () => controller.abort(new Error('Run exceeded 30 minutes.')),
+    () => controller.abort(new RunStopped(stopReasons.timeout)),
     runTimeoutMs,
   );
   const done = execute(context, run, controller.signal)
     .catch(async (e) => {
-      run.status = controller.signal.aborted ? 'cancelled' : 'failed';
-      run.error = controller.signal.aborted ? 'Run cancelled or timed out.' : publicError(e);
+      const aborted = controller.signal.aborted;
+      const reason: unknown = controller.signal.reason;
+      run.status = aborted ? 'cancelled' : 'failed';
+      run.error = aborted
+        ? reason instanceof RunStopped
+          ? reason.message
+          : 'Run cancelled or timed out.'
+        : publicError(e);
+      // The final step records when the run stopped, so its elapsed time is accurate.
+      if (aborted) await recordStep(context, run, run.error);
       await atomic(path.join(context.store.run(run.projectId, run.id), 'manifest.json'), run);
       context.emit({
         type: run.status,
