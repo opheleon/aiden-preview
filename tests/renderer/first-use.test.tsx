@@ -70,6 +70,8 @@ test('completed replay exposes bundled docs without resetting completion or chan
   f.api.getFirstUseState.mockResolvedValue({ completed: true, issue: null });
   render(<App />);
   await waitFor(() => expect(document.querySelector('[data-guide-ready="true"]')).toBeTruthy());
+  // The new-project screen discovers models once diagnostics load; count only what the guide does.
+  await waitFor(() => expect(f.request).toHaveBeenCalledWith('models', expect.anything()));
   const before = f.request.mock.calls.length;
   await userEvent.click(screen.getByRole('button', { name: 'Help / Getting started' }));
   expect(screen.getAllByRole('dialog')).toHaveLength(1);
