@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.2.1
+
 - Make the community invitation easy to find with a “Join our Slack” sidebar link.
 
 - Stop code checks from re-asking an open decision in different words: checks now receive open decisions and cite them instead. When an answer settles a reworded duplicate, the scope rewrite closes it and records why, while blockers the rewrite merely omits stay open.
