@@ -50,8 +50,8 @@ test('planned projects show one ordered work hierarchy and actions remain inside
   const create = screen.getByRole('region', { name: 'Create books' });
   expect(create).toHaveTextContent('Waiting on prerequisites');
   expect(within(browse).getByText('Find a book in the library.')).not.toBeVisible();
-  await userEvent.click(within(browse).getByText('1. Browse books'));
-  await userEvent.click(within(create).getByText('2. Create books'));
+  await userEvent.click(within(browse).getByRole('heading', { name: 'F-1 Browse books' }));
+  await userEvent.click(within(create).getByRole('heading', { name: 'F-2 Create books' }));
   expect(within(create).getByRole('link', { name: 'Browse books' })).toHaveAttribute(
     'href',
     '#feature-F-1',
@@ -186,7 +186,7 @@ test('scope edits retain existing ownership and explicitly place new requirement
   expect(removed.deliveryPlan).toEqual([{ ...second, dependsOn: [] }]);
 });
 
-test('a blocking decision pauses dependent features, removes implementation actions, and yields a copyable blocked ticket', async () => {
+test('a blocking decision pauses its feature, dependents wait on it, and tickets say which', async () => {
   f.reset();
   f.setReport({ ...report, baseline: product });
   f.setCalls([
@@ -211,20 +211,26 @@ test('a blocking decision pauses dependent features, removes implementation acti
   Object.assign(navigator, { clipboard: { writeText: copy } });
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
-  const create = await screen.findByRole('region', { name: 'Create books' });
-  expect(create).toHaveTextContent('Blocked by a decision');
+  const browse = await screen.findByRole('region', { name: 'Browse books' });
+  const create = screen.getByRole('region', { name: 'Create books' });
+  expect(browse).toHaveTextContent('Waiting on 1 decision. This requirement and dependent work');
+  expect(create).toHaveTextContent('Waiting on prerequisites');
+  expect(create).not.toHaveTextContent('Blocked by a decision');
   expect(screen.queryByRole('button', { name: 'Copy work item' })).not.toBeInTheDocument();
   expect(
     screen.getByText('Delivery paused: resolve blocking decisions in Needs you.'),
   ).toBeVisible();
-  await userEvent.click(within(create).getByText('2. Create books'));
-  await userEvent.click(
-    within(create).getByText(/Users can create books/, { selector: '.row-title' }),
-  );
+  await userEvent.click(within(create).getByRole('heading', { name: 'F-2 Create books' }));
+  const row = within(create).getByText(/Users can create books/, { selector: '.row-title' });
+  expect(row.closest('details')).toHaveTextContent('Waiting');
+  await userEvent.click(row);
   await userEvent.click(within(create).getByRole('button', { name: 'Copy ticket' }));
-  expect(copy).toHaveBeenCalledWith(expect.stringContaining('Who can browse this library?'));
-  expect(copy).toHaveBeenCalledWith(expect.stringContaining('Dependencies: F-1'));
-  expect(copy.mock.calls[0]?.[0]).not.toContain('## Known remaining work');
+  const ticket = copy.mock.calls[0]?.[0] as string;
+  expect(ticket).toContain('## Waiting on a prerequisite decision');
+  expect(ticket).toContain('F-1 Browse books needs a decision first: Who can browse this library?');
+  expect(ticket).toContain('Dependencies: F-1');
+  expect(ticket).not.toContain('## Known remaining work');
+  expect(ticket).not.toContain('dependent editing wait');
 });
 
 test('project tabs keep history out of the overview and support keyboard navigation', async () => {
@@ -269,4 +275,33 @@ test('passing local code and manual checks cannot count as merged delivery', () 
     snapshots: local.snapshots.map((s) => ({ ...s, source: undefined, checkedAt: undefined })),
   };
   expect(requirementFacts(legacy, null, []).get('REQ-1')?.remoteVerified).toBe(false);
+});
+
+test('a decision on a later step keeps the current focus and says other steps are waiting', async () => {
+  f.reset();
+  f.setReport({ ...report, baseline: product });
+  f.setCalls([
+    {
+      id: 'later',
+      kind: 'decision',
+      status: 'open',
+      requirementId: 'REQ-2',
+      edgeCaseId: null,
+      question: 'May readers delete books?',
+      assumption: 'Editing waits for the deletion policy.',
+      options: [],
+      owner: 'you',
+      blocking: true,
+      answer: null,
+      askedAt: report.generatedAt,
+      answeredAt: null,
+      runId: report.id,
+    },
+  ]);
+  render(<App />);
+  await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  const status = await screen.findByRole('region', { name: 'Status' });
+  expect(status).toHaveTextContent('Current focus: Browse books.');
+  expect(status).toHaveTextContent('Other steps wait on decisions in Needs you.');
+  expect(status).not.toHaveTextContent('Delivery paused');
 });

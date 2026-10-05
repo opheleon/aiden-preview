@@ -51,7 +51,8 @@ export function appFixture() {
   let connections: McpConnection[] = [];
   let appUrl: string | null = null;
   let verification: WorkerResult<'verification'> = null;
-  let listener: ((event: RunEvent) => void) | undefined;
+  // Like the preload bridge, every subscriber receives each event.
+  const listeners = new Set<(event: RunEvent) => void>();
   // Runs this fixture's worker started; runs added by other processes stay out of activeRunIds.
   let active = new Set<string>();
   /** Record a run the desktop worker is executing and return its start result. */
@@ -118,7 +119,7 @@ export function appFixture() {
     connections = [];
     appUrl = null;
     verification = null;
-    listener = undefined;
+    listeners.clear();
     active = new Set(ready ? [] : ['prepare-run']);
   }
   reset();
@@ -319,9 +320,9 @@ export function appFixture() {
   const api = {
     request,
     onEvent: (callback: (event: RunEvent) => void) => {
-      listener = callback;
+      listeners.add(callback);
       return () => {
-        listener = undefined;
+        listeners.delete(callback);
       };
     },
     getFirstUseState: vi.fn().mockResolvedValue({ completed: true, issue: null }),
@@ -350,7 +351,9 @@ export function appFixture() {
     api,
     request,
     reset,
-    emit: (event: RunEvent) => listener!(event),
+    emit: (event: RunEvent) => {
+      for (const listener of [...listeners]) listener(event);
+    },
     project: () => project,
     /** Add a newer saved run, such as a look that failed after the last brief. */
     addRun: (run: Partial<RunManifest> & Pick<RunManifest, 'id' | 'kind' | 'status'>) => {

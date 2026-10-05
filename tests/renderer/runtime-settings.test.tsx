@@ -237,3 +237,23 @@ test('model effort uses advertised choices and changing the model clears stale e
     effort: undefined,
   });
 });
+
+test('account switching guidance names the selected provider', () => {
+  const props = {
+    diagnostics: [],
+    api: { request: vi.fn().mockResolvedValue(undefined) } as unknown as DesktopBridge,
+    onChange: vi.fn(),
+    onRefresh: () => Promise.resolve(),
+  };
+  const { rerender } = render(
+    <RuntimeSettings runtime={{ provider: 'codex', auth: 'subscription' }} {...props} />,
+  );
+  expect(
+    screen.getByText(/To switch Codex accounts, choose Sign in with Codex again/),
+  ).toBeVisible();
+  expect(screen.queryByText(/Claude accounts/)).toBeNull();
+  rerender(<RuntimeSettings runtime={{ provider: 'claude', auth: 'subscription' }} {...props} />);
+  expect(
+    screen.getByText(/To switch Claude accounts, sign in again through Claude Code/),
+  ).toBeVisible();
+});

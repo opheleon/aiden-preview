@@ -292,6 +292,12 @@
   font-size: 13px;
 }
 
+.call-options button[aria-pressed='true'] {
+  border-color: #8274d4;
+  background: rgb(113 105 194 / 10%);
+  color: #7060c7;
+}
+
 .call-other {
   display: flex;
   flex: 1 1 260px;

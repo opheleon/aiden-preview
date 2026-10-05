@@ -41,16 +41,22 @@ export const UnderstandingSchema = z
     milestones: z.array(z.string()),
     deliveryPlan: DeliveryPlanSchema,
     calls: z.array(CallDraftSchema.extend({ blocking: z.boolean() })).max(8),
+    /**
+     * Exact questions from the input's open calls that prior answers or changed intent now settle,
+     * including reworded duplicates of an answered question. Empty when none are settled.
+     */
+    settledCalls: z.array(z.string().trim().min(1).max(400)).max(8),
     /** IDs of the repositories the intent is about; empty means all of them. */
     repositories: z.array(z.string()).max(100),
   })
   .strict();
 /** Parsed understand-stage output. */
 export type Understanding = z.infer<typeof UnderstandingSchema>;
-/** Older checkpoints may lack a delivery plan; only newly generated output requires one. */
+/** Older checkpoints may lack a delivery plan or settled calls; only new output requires them. */
 const StoredUnderstandingSchema = UnderstandingSchema.partial({
   deliveryPlan: true,
   title: true,
+  settledCalls: true,
 }).extend({
   calls: z.array(CallDraftSchema).max(8),
 });
@@ -58,8 +64,9 @@ const StoredUnderstandingSchema = UnderstandingSchema.partial({
 export type StoredUnderstanding = z.infer<typeof StoredUnderstandingSchema>;
 
 /**
- * Split validated understanding into the product that becomes the baseline and the calls Aiden
- * records. Edge cases proposed while scoping are marked `scope`; empty lists are omitted.
+ * Split validated understanding into the product that becomes the baseline, the calls Aiden
+ * records, and the open questions it reports as settled. Edge cases proposed while scoping are
+ * marked `scope`; empty lists are omitted.
  */
 export function productFromUnderstanding(
   understanding: StoredUnderstanding,
@@ -67,6 +74,7 @@ export function productFromUnderstanding(
 ): {
   product: Product;
   calls: CallDraft[];
+  settledCalls: string[];
 } {
   const chosen = [...new Set(understanding.repositories ?? [])];
   // Choosing every repository is the same as choosing none: the look covers the whole project.
@@ -85,7 +93,7 @@ export function productFromUnderstanding(
         : {}),
     })),
   });
-  return { product, calls: understanding.calls };
+  return { product, calls: understanding.calls, settledCalls: understanding.settledCalls ?? [] };
 }
 
 /**

@@ -14,7 +14,7 @@ import { ToolBroker } from '../../tools/src/broker.js';
 import { serveTools } from '../../tools/src/mcp.js';
 import { appendActivity, counted, recordStep } from './activity.js';
 import { commitBaseline } from './baseline.js';
-import { answeredDecisions, readCalls, replaceOpenDecisions } from './calls.js';
+import { answeredDecisions, openDecisions, readCalls, replaceOpenDecisions } from './calls.js';
 import { requestClarification } from './clarification.js';
 import { executeEstimate } from './estimation-workflow.js';
 import { createModelStage, type ModelStage } from './model-stage.js';
@@ -70,15 +70,7 @@ async function understandIntent(
   const previous = await optionalJson<Baseline>(
     path.join(context.store.project(run.projectId), 'baseline.json'),
   );
-  const openCalls = (await readCalls(context.store, run.projectId))
-    .filter((c) => c.status === 'open' && c.kind === 'decision')
-    .map(({ question, assumption, requirementId, edgeCaseId, blocking }) => ({
-      blocking: blocking ?? true,
-      question,
-      assumption,
-      requirementId,
-      edgeCaseId,
-    }));
+  const openCalls = await openDecisions(context.store, run.projectId);
   const repositoryIds = run.project.repositories.map((r) => r.id);
   const checkpoint = await optionalJson<unknown>(path.join(dir, 'understand.json'));
   // Keep the input revision with the checkpoint. A late answer or restart must not make an old
@@ -100,8 +92,19 @@ async function understandIntent(
     },
     (v) => parseUnderstanding(v, previous, repositoryIds, checkpoint !== null),
   );
-  const { product, calls } = productFromUnderstanding(understanding, repositoryIds);
-  const created = await replaceOpenDecisions(context.store, run.projectId, calls, run.id);
+  const { product, calls, settledCalls } = productFromUnderstanding(understanding, repositoryIds);
+  // Only a new answer or changed intent can settle a blocker; otherwise omission keeps it open.
+  const canSettle =
+    !previous ||
+    previous.decisionsHash !== decisionsHash ||
+    previous.contextHash !== hash(run.project.context);
+  const { created, settled } = await replaceOpenDecisions(
+    context.store,
+    run.projectId,
+    calls,
+    run.id,
+    canSettle ? settledCalls : [],
+  );
   const tickets = deliveryTickets(
     product,
     undefined,
@@ -118,6 +121,13 @@ async function understandIntent(
     summary: `Wrote ${counted(product.requirements.length, 'requirement')} and ${counted(edgeCases, 'edge case')}.`,
     reason: product.overview,
   });
+  for (const call of settled)
+    await appendActivity(context, run, {
+      kind: 'decide',
+      ...(call.requirementId ? { requirementId: call.requirementId } : {}),
+      summary: `Closed a question your answers already settle: ${call.question}`,
+      reason: 'The rewritten scope covers this decision, so it no longer needs an answer.',
+    });
   for (const call of created)
     await appendActivity(context, run, {
       kind: 'ask',

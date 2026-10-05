@@ -2,6 +2,7 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, test } from 'vitest';
 
+import { runTitle } from '../../apps/desktop/src/renderer/run-labels';
 import type { ActivityEntry } from '../../packages/contracts/src/index';
 import { appFixture, openCall } from './app-fixture';
 import { report } from './fixtures';
@@ -95,10 +96,53 @@ test('blocked runs explain the missing information and accept an answer in place
   const decisions = screen.getByRole('region', { name: 'Waiting for information' });
   expect(within(decisions).getByText(/Answering updates the scope/)).toBeVisible();
   await userEvent.click(within(decisions).getByRole('button', { name: 'Block duplicates' }));
+  expect(f.request).not.toHaveBeenCalledWith('answerCall', expect.anything());
+  await userEvent.click(within(decisions).getByRole('button', { name: 'Answer' }));
   expect(f.request).toHaveBeenCalledWith('answerCall', {
     projectId: report.projectId,
     callId: 'call-1',
     answer: 'Block duplicates',
   });
   expect(screen.queryByRole('region', { name: 'Waiting for information' })).toBeNull();
+});
+
+test('the stage tracker follows progress events between full refreshes', async () => {
+  f.startRun({ id: 'live-run', kind: 'report', stage: 'sync' }, [
+    entry('Syncing your repositories'),
+  ]);
+  render(<App />);
+  await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  await userEvent.click(await screen.findByRole('button', { name: /^Runs/ }));
+  const list = await screen.findByRole('region', { name: 'All runs' });
+  await userEvent.click(within(list).getByRole('button', { name: /Checking the code/ }));
+  const stages = await screen.findByRole('list', { name: 'Stages' });
+  expect(within(stages).getByText('Sync repositories').closest('li')).toHaveClass('stage--now');
+  for (const stage of ['discover', 'assess'] as const)
+    await act(async () => {
+      f.emit({
+        type: 'progress',
+        projectId: report.projectId,
+        runId: 'live-run',
+        stage,
+        message: `${stage}…`,
+      });
+      await Promise.resolve();
+    });
+  expect(within(stages).getByText('Choose commits').closest('li')).toHaveClass('stage--done');
+  expect(within(stages).getByText('Check the code').closest('li')).toHaveClass('stage--now');
+});
+
+test('stopped and failed runs are titled by their outcome', () => {
+  const run = { ...report, kind: 'report', status: 'completed', stage: 'complete' } as never;
+  const make = (extra: object) =>
+    ({ ...(run as object), ...extra }) as Parameters<typeof runTitle>[0];
+  expect(runTitle(make({}), false)).toBe('Checked the code');
+  expect(runTitle(make({}), true)).toBe('Checking the code');
+  expect(runTitle(make({ status: 'cancelled' }), false)).toBe('Checking the code stopped');
+  expect(runTitle(make({ status: 'failed', kind: 'prepare' }), false)).toBe(
+    'Writing requirements failed',
+  );
+  expect(
+    runTitle(make({ status: 'cancelled', beta: { revision: 'abc', url: 'https://x' } }), false),
+  ).toBe('Checking beta stopped');
 });

@@ -12,6 +12,8 @@ import { registerFirstUseIpc } from './first-use-ipc.js';
 import { DesktopUpdater } from './updater.js';
 import { ProjectWatcher } from './watcher.js';
 import { registerWorkerIpc } from './worker-ipc.js';
+// Electron otherwise names the macOS app menu after package.json's npm name.
+app.setName('Aiden');
 const dataRoot = process.env.AIDEN_HOME || path.join(app.getPath('home'), '.aiden');
 const diagnostics = new LocalDiagnostics(dataRoot);
 mkdirSync(path.join(dataRoot, 'desktop'), { recursive: true, mode: 0o700 });

@@ -22,8 +22,8 @@ import { validateProjectRepositories } from '../../tools/src/discovery.js';
 import { freezeRepository, inventory, validateRepository } from '../../tools/src/git.js';
 import { fetchMonitoredBranch } from '../../tools/src/remote-branches.js';
 import { appendActivity } from './activity.js';
-import { applyBlockers, blockedRequirements } from './blockers.js';
-import { readCalls } from './calls.js';
+import { applyBlockers, blockerOrigins } from './blockers.js';
+import { openDecisions as readOpenDecisions, readCalls } from './calls.js';
 import type { ModelStage } from './model-stage.js';
 import { atomic, json, optionalJson } from './storage.js';
 import type { WorkflowContext } from './workflow-context.js';
@@ -54,10 +54,11 @@ export async function assessReport(
   if (!saved) await atomic(path.join(dir, 'discover.json'), discovery, signal);
   for (const s of discovery.snapshots) broker.snapshot(s.repositoryId, s.sha);
   broker.snapshots = discovery.snapshots;
-  const blockers = await blockedRequirements(context.store, run.projectId, baseline.product);
+  const origins = await blockerOrigins(context.store, run.projectId, baseline.product);
+  // Requirements waiting only on a prerequisite's decision are defined, so their code is assessed.
   const eligible = {
     ...baseline.product,
-    requirements: baseline.product.requirements.filter((r) => !blockers.get(r.id)?.length),
+    requirements: baseline.product.requirements.filter((r) => !origins.get(r.id)?.direct.length),
   };
   delete eligible.deliveryPlan;
   const assessed: Findings = eligible.requirements.length
@@ -70,6 +71,7 @@ export async function assessReport(
           previousReport: run.latestAtStart
             ? await context.getReport(run.projectId, run.latestAtStart)
             : null,
+          openDecisions: await readOpenDecisions(context.store, run.projectId),
         },
         (v) => validateFindings(v, eligible, discovery.snapshots, broker.reads),
       )

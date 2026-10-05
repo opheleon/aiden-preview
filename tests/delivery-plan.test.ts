@@ -41,6 +41,7 @@ void test('delivery plans round-trip with complete ownership, stable order, and 
     requirements: product.requirements.map((r) => ({ ...r, edgeCases: [] })),
     repositories: [],
     calls: [],
+    settledCalls: [],
   };
   assert.deepEqual(parseUnderstanding(understanding, null).deliveryPlan, [first, second]);
   assert.deepEqual(savedProduct(understanding).deliveryPlan, [first, second]);
@@ -83,6 +84,7 @@ void test('new foundation plans need a test plan while stored baselines remain c
     requirements: product.requirements.map((r) => ({ ...r, edgeCases: [] })),
     deliveryPlan: [foundation, second],
     calls: [],
+    settledCalls: [],
     repositories: [],
   };
   assert.throws(() => parseUnderstanding(understanding, null), /requires a testPlan/);

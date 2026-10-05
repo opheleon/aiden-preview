@@ -95,10 +95,30 @@ function PublishingHealth({ state }: { state: TicketState | null }): JSX.Element
       {state?.records
         .filter((r) => r.state === 'retired')
         .map((r) => (
-          <p key={r.featureId} role="status">
-            {r.featureId}: {r.message}
-          </p>
+          <RetiredTicket key={r.featureId} record={r} />
         ))}
     </>
+  );
+}
+
+/**
+ * Name a feature removed from the plan by its ID and title, and link the preserved tracker issue
+ * so the person can review or close it. Example: "Removed from the plan: F-4 Enforce expiry."
+ */
+function RetiredTicket({ record }: { record: TicketState['records'][number] }): JSX.Element {
+  const title = record.title.replace(/^\[Blocked\]\s*/, '');
+  const issue = record.issueId ?? 'its tracker issue';
+  return (
+    <p role="status">
+      Removed from the plan: {record.featureId} {title}. Aiden kept{' '}
+      {record.url ? (
+        <a href={record.url} target="_blank" rel="noreferrer">
+          {issue}
+        </a>
+      ) : (
+        issue
+      )}{' '}
+      for review; close it in the tracker if the work is no longer needed.
+    </p>
   );
 }

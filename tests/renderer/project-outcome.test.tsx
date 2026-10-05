@@ -18,6 +18,7 @@ function fixture() {
   const workspace = {
     project,
     baseline: {},
+    report: {},
     busy: false,
     call: vi.fn().mockResolvedValue(project),
     setProject: vi.fn(),
@@ -105,4 +106,19 @@ test('current and superseded acceptances stay distinct, with notes in decision h
   view.rerender(<ProjectOutcome workspace={f} />);
   expect(screen.getByRole('button', { name: 'Accept outcome' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Close project' })).toBeDisabled();
+});
+
+test('a brand-new project offers no outcome until a check has run, unless it has decisions', () => {
+  const f = fixture();
+  const { container, rerender } = render(
+    <ProjectOutcome workspace={{ ...f, report: undefined }} />,
+  );
+  expect(container).toBeEmptyDOMElement();
+  const closed = {
+    ...f,
+    report: undefined,
+    project: { ...f.project, lifecycle: { ...f.project.lifecycle!, status: 'closed' as const } },
+  };
+  rerender(<ProjectOutcome workspace={closed} />);
+  expect(screen.getByRole('button', { name: 'Reopen project' })).toBeVisible();
 });

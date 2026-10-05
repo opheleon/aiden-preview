@@ -10,7 +10,11 @@ import { isBlocking } from '../../../../packages/reporting/src/blockers';
 import { remoteDeliveryVerified } from '../../../../packages/reporting/src/delivery-source';
 import { useDeliveryEvidence } from '../hooks/useDeliveryEvidence';
 import type { Workspace } from '../hooks/useWorkspace';
-import { featureProgress, progressChange } from '../renderer/delivery-progress';
+import {
+  type FeatureProgress,
+  featureProgress,
+  progressChange,
+} from '../renderer/delivery-progress';
 import { type ItemState, plural } from '../renderer/requirement-status';
 import { DeliveryStatus } from './DeliveryStatus';
 
@@ -57,26 +61,7 @@ export function DeliveryProgress({
         </p>
       )}
       <p className="row-sub">{verificationSummary(states)}</p>
-      {blocked ? (
-        <p>Delivery paused: resolve blocking decisions in Needs you.</p>
-      ) : job ? (
-        <p className="row-sub">
-          The requirement counts and plan below reflect the last assessment. Agent completion does
-          not mark requirements verified.
-        </p>
-      ) : current ? (
-        <p>
-          <strong>Current focus:</strong>{' '}
-          <a href={`#feature-${current.feature.id}`}>{current.feature.title}</a>.{' '}
-          {plural(current.total - current.done, 'requirement')} still to complete.
-        </p>
-      ) : (
-        <p>
-          {done === total
-            ? 'All planned requirements meet their completion checks.'
-            : 'Aiden is establishing the next delivery step.'}
-        </p>
-      )}
+      <NextStep blocked={blocked} job={!!job} current={current} allDone={done === total} />
       <details className="progress-details">
         <summary>Progress details and estimates</summary>
         <div className="progress-detail-content">
@@ -197,5 +182,46 @@ function verificationSummary(states: Map<string, ItemState>): string {
       .filter(([count]) => count > 0)
       .map(([count, label]) => `${count} ${label}`)
       .join(' · ') || 'No completed verification yet.'
+  );
+}
+
+/**
+ * The next delivery step. Delivery is paused only when no step is ready; otherwise the current
+ * focus stays visible and notes that later steps wait on decisions.
+ */
+function NextStep({
+  blocked,
+  job,
+  current,
+  allDone,
+}: {
+  blocked: boolean;
+  job: boolean;
+  current: FeatureProgress | undefined;
+  allDone: boolean;
+}): JSX.Element {
+  if (blocked && !current) return <p>Delivery paused: resolve blocking decisions in Needs you.</p>;
+  if (job)
+    return (
+      <p className="row-sub">
+        The requirement counts and plan below reflect the last assessment. Agent completion does not
+        mark requirements verified.
+      </p>
+    );
+  if (current)
+    return (
+      <p>
+        <strong>Current focus:</strong>{' '}
+        <a href={`#feature-${current.feature.id}`}>{current.feature.title}</a>.{' '}
+        {plural(current.total - current.done, 'requirement')} still to complete.
+        {blocked && ' Other steps wait on decisions in Needs you.'}
+      </p>
+    );
+  return (
+    <p>
+      {allDone
+        ? 'All planned requirements meet their completion checks.'
+        : 'Aiden is establishing the next delivery step.'}
+    </p>
   );
 }

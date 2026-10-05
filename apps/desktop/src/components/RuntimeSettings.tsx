@@ -136,10 +136,12 @@ function RuntimeProfile({
       </div>
       <ModelSelector runtime={runtime} models={models} onChange={onChange} disabled={disabled} />
       <p className="fine-print">
-        Subscription uses the provider’s currently signed-in account. To switch Claude accounts,
-        sign in again through Claude Code. Check connection refreshes status and models without
-        changing your selection. Aiden never switches authentication methods automatically. Provider
-        limits and charges may apply.
+        Subscription uses the provider’s currently signed-in account.{' '}
+        {runtime.provider === 'claude'
+          ? 'To switch Claude accounts, sign in again through Claude Code.'
+          : 'To switch Codex accounts, choose Sign in with Codex again.'}{' '}
+        Check connection refreshes status and models without changing your selection. Aiden never
+        switches authentication methods automatically. Provider limits and charges may apply.
       </p>
       {onSave && (
         <button

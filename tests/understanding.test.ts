@@ -44,6 +44,7 @@ const understanding: Understanding = {
       owner: 'you',
     },
   ],
+  settledCalls: [],
 };
 
 const previous = {

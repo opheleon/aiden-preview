@@ -113,6 +113,12 @@
   line-height: 1.45;
 }
 
+.feature-heading .feature-id {
+  margin-right: 4px;
+  color: var(--color-muted-foreground);
+  font: 12px var(--font-mono);
+}
+
 .feature-details[open] > summary .feature-chevron {
   transform: rotate(90deg);
 }

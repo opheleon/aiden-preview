@@ -5,7 +5,7 @@ import type {
   Report,
   TriageItem,
 } from '../../../../packages/contracts/src/index';
-import { requirementBlockers } from '../../../../packages/reporting/src/blockers';
+import { blockerSources } from '../../../../packages/reporting/src/blockers';
 import { remoteDeliveryVerified } from '../../../../packages/reporting/src/delivery-source';
 import { reasonLabels } from '../../../../packages/verification/src/verdict';
 
@@ -33,8 +33,10 @@ export interface RequirementFacts {
   edges: CriterionResult[];
   /** How Aiden planned to check the main path. */
   method: TriageItem['method'] | undefined;
-  /** Open decisions tied to this requirement. */
+  /** Open decisions that leave this requirement's own behavior undefined. */
   openCalls: number;
+  /** Open decisions on a prerequisite feature; this requirement is defined but its delivery waits. */
+  waitingCalls?: number;
   /** Includes scoped edge cases that have not produced a result yet. */
   expectedEdges?: number;
   /** Manual confirmations are scoped to this exact accepted report. */
@@ -81,8 +83,8 @@ function codeState(facts: RequirementFacts): ItemState {
 
 /**
  * Pick the one status a requirement shows: Done, In progress, Not started, Failing, Blocked,
- * Needs manual test, or Unverified. What Aiden saw in the app outranks the code reading, because
- * it is what a user gets. Examples: the main path fails in the app is "Failing"; it passes but an
+ * Waiting (on a prerequisite's decision), Needs manual test, or Unverified. What Aiden saw in the
+ * app outranks the code reading, because it is what a user gets. Examples: the main path fails in the app is "Failing"; it passes but an
  * edge case fails is "In progress"; no app verdict and built in the code is "Built" unless the planned check is code-only.
  */
 export function requirementState(facts: RequirementFacts): ItemState {
@@ -91,6 +93,12 @@ export function requirementState(facts: RequirementFacts): ItemState {
       label: 'Blocked',
       tone: 'partial',
       how: `Waiting on ${plural(facts.openCalls, 'decision')}. This requirement and dependent work are paused.`,
+    };
+  if (facts.waitingCalls)
+    return {
+      label: 'Waiting',
+      tone: 'partial',
+      how: `A prerequisite feature is waiting on ${plural(facts.waitingCalls, 'decision')}. This requirement is agreed, and its delivery starts once that is decided.`,
     };
   if (facts.main?.verdict === 'fail')
     return {
@@ -162,7 +170,7 @@ export function requirementFacts(
 ): Map<string, RequirementFacts> {
   const criteria = check?.result.criteria ?? [];
   const triage = check?.result.triage ?? [];
-  const blockers = requirementBlockers(report.baseline, calls);
+  const blockers = blockerSources(report.baseline, calls);
   return new Map(
     report.baseline.requirements.map((r) => [
       r.id,
@@ -181,7 +189,8 @@ export function requirementFacts(
             ),
         ).length,
         method: triage.find((t) => t.requirementId === r.id && !t.edgeCaseId)?.method,
-        openCalls: blockers.get(r.id)?.length ?? 0,
+        openCalls: blockers.get(r.id)?.direct.length ?? 0,
+        waitingCalls: blockers.get(r.id)?.inherited.length ?? 0,
       },
     ]),
   );

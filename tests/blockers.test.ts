@@ -14,7 +14,11 @@ import {
 import { Engine } from '../packages/core/src/engine.js';
 import { prepareAndLook } from '../packages/core/src/look.js';
 import { Store } from '../packages/core/src/storage.js';
-import { requirementBlockers } from '../packages/reporting/src/blockers.js';
+import {
+  blockerSources,
+  requirementBlockers,
+  waitingReason,
+} from '../packages/reporting/src/blockers.js';
 import { deliveryTickets } from '../packages/reporting/src/tickets.js';
 import { FixtureRuntime } from './fixture-runtime.js';
 import { fixture } from './helpers.js';
@@ -60,9 +64,15 @@ void test('legacy blockers propagate through dependencies, while independent tic
     tickets.map((t) => t.blocked),
     [true, true, true, false],
   );
+  assert.match(tickets[0]!.markdown, /## Decision needed/);
+  assert.match(tickets[0]!.markdown, /## Draft scope \(not acceptance criteria\)/);
   assert.match(tickets[1]!.markdown, /Dependencies: F-1/);
   assert.match(tickets[1]!.markdown, /Owner: you/);
-  assert.doesNotMatch(tickets[1]!.markdown, /## Acceptance criteria|## Known remaining work/);
+  assert.match(tickets[1]!.markdown, /## Waiting on a prerequisite decision/);
+  assert.match(tickets[1]!.markdown, /F-1 Feature 1 needs a decision first/);
+  assert.doesNotMatch(tickets[1]!.markdown, /## Decision needed|## Known remaining work/);
+  assert.doesNotMatch(tickets[1]!.markdown, /Provisioning waits/, 'upstream assumption omitted');
+  assert.match(tickets[1]!.markdown, /## Acceptance criteria/);
   assert.match(tickets[3]!.markdown, /## Acceptance criteria/);
   for (const variant of [
     { ...call, requirementId: null },
@@ -81,6 +91,29 @@ void test('legacy blockers propagate through dependencies, while independent tic
     [...requirementBlockers(product, [{ ...call, status: 'answered' }]).values()].every(
       (c) => !c.length,
     ),
+  );
+});
+
+void test('blocker sources separate a requirement’s own decisions from prerequisite waits', () => {
+  const sources = blockerSources(product, [call]);
+  assert.deepEqual(
+    [...sources].map(([id, s]) => [id, s.direct.length, s.inherited.length]),
+    [
+      ['REQ-1', 1, 0],
+      ['REQ-2', 0, 1],
+      ['REQ-3', 0, 1],
+      ['REQ-4', 0, 0],
+    ],
+  );
+  const projectWide = blockerSources(product, [{ ...call, requirementId: null }]);
+  assert.ok([...projectWide.values()].every((s) => s.direct.length === 1 && !s.inherited.length));
+  assert.equal(
+    waitingReason(product, [call]),
+    'F-1 Feature 1 needs a decision first: What isolation behavior is required? Owner: you.',
+  );
+  assert.match(
+    waitingReason({ ...product, deliveryPlan: [] }, [call]),
+    /^A prerequisite feature needs a decision first/,
   );
 });
 
@@ -108,7 +141,20 @@ void test('persisted blockers survive omission, suppress completion and sizing, 
     });
     assert.equal(findings.assessments[0]?.status, 'unknown');
     assert.deepEqual(findings.assessments[0]?.remainingWork, []);
+    // A dependent keeps its code evidence and status but loses executable steps while it waits.
+    assert.equal(findings.assessments[1]?.status, 'implemented');
+    assert.deepEqual(findings.assessments[1]?.remainingWork, []);
+    assert.match(findings.assessments[1]?.unknowns.at(-1) ?? '', /^Waiting: F-1 Feature 1 needs/);
     assert.equal(findings.assessments[3]?.status, 'implemented');
+    assert.deepEqual(findings.assessments[3]?.remainingWork, ['Invented implementation']);
+    const partial = await applyBlockers(store, f.project.id, product, {
+      assessments: [],
+      risks: [],
+      dependencies: [],
+      unknowns: [],
+    });
+    assert.match(partial.assessments[1]!.explanation, /^Waiting:/);
+    assert.match(partial.assessments[3]!.explanation, /Not assessed in this check/);
     await answerCall(store, f.project.id, saved.id, 'Isolate each tenant.');
     await requireDefinedScope(store, f.project.id, product);
   } finally {
@@ -116,7 +162,7 @@ void test('persisted blockers survive omission, suppress completion and sizing, 
   }
 });
 
-void test('automatic planning assesses only independent scope, saves blocked tickets, and skips total sizing', async () => {
+void test('automatic planning assesses defined scope, saves blocked tickets, and skips total sizing', async () => {
   const f = await fixture();
   const runtime = new FixtureRuntime(f);
   runtime.understanding = {
@@ -147,11 +193,24 @@ void test('automatic planning assesses only independent scope, saves blocked tic
     const runs = await engine.history(f.project.id);
     const reportRun = runs.find((r) => r.kind === 'report')!;
     assert.equal(reportRun.status, 'completed', reportRun.error);
-    const input = runtime.inputs[runtime.calls.indexOf('assess')] as { baseline: Product };
+    const input = runtime.inputs[runtime.calls.indexOf('assess')] as {
+      baseline: Product;
+      openDecisions: { question: string; requirementId: string | null; blocking: boolean }[];
+    };
+    // Only the undefined requirement is withheld; prerequisite waits are still assessed.
     assert.deepEqual(
       input.baseline.requirements.map((r) => r.id),
-      ['REQ-4'],
+      ['REQ-2', 'REQ-3', 'REQ-4'],
     );
+    assert.deepEqual(input.openDecisions, [
+      {
+        blocking: true,
+        question: call.question,
+        assumption: call.assumption,
+        requirementId: 'REQ-1',
+        edgeCaseId: null,
+      },
+    ]);
     assert.ok(!runtime.calls.includes('estimate-original'));
     const report = await engine.getReport(f.project.id, reportRun.id);
     assert.match(report.assessments[0]!.explanation, /Blocked/);

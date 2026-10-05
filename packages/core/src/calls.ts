@@ -91,17 +91,27 @@ export function recordCall(
   });
 }
 
+/** New calls a scope rewrite raised, and earlier open calls it closed as already settled. */
+export interface DecisionReplacement {
+  created: Call[];
+  settled: Call[];
+}
+
 /**
  * Replace open scope decisions after Aiden rewrites what done means. Calls re-proposed by the
  * new understanding keep their identity; calls raised during this run are kept; other open
- * non-blocking decisions may be dropped; unresolved blockers survive omission. Returns new calls.
+ * non-blocking decisions may be dropped. Unresolved blockers survive omission unless the rewrite
+ * names them in `settled`, which callers pass only when a new answer or changed intent could have
+ * settled them. Example: answering "Expire after 30 days?" lets the rewrite close a reworded copy
+ * such as "What default expiry policy applies?".
  */
 export function replaceOpenDecisions(
   store: Store,
   projectId: string,
   drafts: CallDraft[],
   runId: string,
-): Promise<Call[]> {
+  settled: string[] = [],
+): Promise<DecisionReplacement> {
   return exclusive(projectId, async () => {
     const calls = await readCalls(store, projectId);
     const created: Call[] = [];
@@ -117,18 +127,39 @@ export function replaceOpenDecisions(
         kept.add(existing.id);
       } else created.push(newCall(draft, 'decision', runId));
     }
-    const updated = calls.map((c) =>
-      c.status === 'open' &&
-      c.kind === 'decision' &&
-      c.blocking === false &&
-      c.runId !== runId &&
-      !kept.has(c.id)
-        ? { ...c, status: 'dropped' as const }
-        : c,
-    );
+    const closed: Call[] = [];
+    const updated = calls.map((c) => {
+      if (c.status !== 'open' || c.kind !== 'decision' || kept.has(c.id)) return c;
+      const isSettled = settled.some((question) => sameQuestion(question, c.question));
+      if (!isSettled && (c.blocking !== false || c.runId === runId)) return c;
+      const dropped = { ...c, status: 'dropped' as const };
+      if (isSettled) closed.push(dropped);
+      return dropped;
+    });
     await writeCalls(store, projectId, [...updated, ...created]);
-    return created;
+    return { created, settled: closed };
   });
+}
+
+/** An open decision as workflow prompts receive it; legacy unclassified calls count as blocking. */
+export type OpenDecision = Pick<
+  Call,
+  'question' | 'assumption' | 'requirementId' | 'edgeCaseId'
+> & {
+  blocking: boolean;
+};
+
+/** Open decisions in the shape workflow prompts receive, so a stage can reuse rather than re-ask them. */
+export async function openDecisions(store: Store, projectId: string): Promise<OpenDecision[]> {
+  return (await readCalls(store, projectId))
+    .filter((c) => c.status === 'open' && c.kind === 'decision')
+    .map(({ question, assumption, requirementId, edgeCaseId, blocking }) => ({
+      blocking: blocking ?? true,
+      question,
+      assumption,
+      requirementId,
+      edgeCaseId,
+    }));
 }
 
 /** Record a person's answer to an open call; answered and dropped calls cannot be answered again. */

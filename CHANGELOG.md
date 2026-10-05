@@ -4,6 +4,18 @@
 
 - Make the community invitation easy to find with a “Join our Slack” sidebar link.
 
+- Stop code checks from re-asking an open decision in different words: checks now receive open decisions and cite them instead. When an answer settles a reworded duplicate, the scope rewrite closes it and records why, while blockers the rewrite merely omits stay open.
+
+- Distinguish a requirement’s own blocking decision from a prerequisite’s. Dependent features show Waiting on prerequisites, keep their agreed acceptance criteria, have their existing code assessed, and name the prerequisite decision they wait on instead of repeating its assumption.
+
+- Show feature IDs in the delivery plan so they match tickets, and name removed features with a link to their preserved issue. Show the current focus when only later steps wait on decisions.
+
+- Choose a decision option, then confirm with Answer, so a stray click cannot rewrite scope. Explain what is missing before a new project can start, hide outcome acceptance until a check has run, and name the selected provider in account-switching guidance.
+
+- Keep the run stage tracker in step with progress, title stopped and failed runs by their outcome, and record whether you, a timeout, or closing Aiden stopped a run, ending its elapsed time at the stop.
+
+- Let the sidebar project list use the full sidebar height, and name the macOS app menu Aiden.
+
 ## 1.2.0
 
 - Hide new Jira and custom MCP setup while they are experimental. Preserve saved connections and project links, with clear Experimental labels.
