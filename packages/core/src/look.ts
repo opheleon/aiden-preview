@@ -128,29 +128,7 @@ export function followWithBrowserCheck(
   );
 }
 
-/**
- * The latest look that stopped before finishing against the current "what done means", if any.
- * Picking it up keeps its checkpoints, so finished paid stages are not repeated.
- */
-async function interruptedLook(engine: Engine, projectId: string): Promise<string | null> {
-  const { baseline, runs } = await engine.state(projectId);
-  const latest = runs.find((r) => r.kind === 'report');
-  if (!latest || !baseline || engine.isActive(latest.id)) return null;
-  const unfinished = latest.status !== 'completed' && latest.status !== 'review';
-  const project = await savedProject(engine, projectId);
-  const sameBranches = latest.project.repositories.every(
-    (repo) =>
-      JSON.stringify(repo.monitoredBranch) ===
-      JSON.stringify(project.repositories.find((r) => r.id === repo.id)?.monitoredBranch),
-  );
-  return unfinished && sameBranches && latest.baseline?.id === baseline.id ? latest.id : null;
-}
-
-/**
- * Look at a project: assess the code against what done means, then check the running app. When
- * a person asks and the last look stopped early, Aiden picks that look up instead of starting
- * over; a look started by new commits always starts fresh because the code changed.
- */
+/** Start a fresh assessment from current code, preserving interrupted runs as history. */
 export async function startLook(
   engine: Engine,
   projectId: string,
@@ -170,12 +148,9 @@ export async function startLook(
             call.answeredAt > baseline.reviewedAt,
         );
   // Recover corrections persisted before a worker restart, including legacy projects. Rewrite
-  // before resuming an old report or starting browser checks against the superseded scope.
+  // before starting a fresh report against the superseded scope.
   if (changed) return prepareAndLook(engine, await savedProject(engine, projectId), 'answer');
-  const resumable = reason === 'you' ? await interruptedLook(engine, projectId) : null;
-  const started = resumable
-    ? await engine.resume(projectId, resumable)
-    : await engine.report(projectId, reason);
+  const started = await engine.report(projectId, reason);
   afterRun(
     engine,
     projectId,

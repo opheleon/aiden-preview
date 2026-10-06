@@ -38,7 +38,7 @@ export const firstUseSteps = [
       'Change the scope as you learn. Aiden checks again and updates where the project stands.',
     ],
     detail:
-      'Start in Overview for progress, what’s left, and what’s in the way. Scope holds what done means, Activity shows what changed, and Runs has check details. While Preview is open, Aiden watches the selected remote branch and ticket status every minute and checks each morning. Use More → Run check now whenever you need a fresh answer. Reconnect an unavailable tracker in Settings → Integrations, then use Sync tickets.',
+      'Start in Overview for progress, what’s left, and what’s in the way. Scope holds what done means, Activity shows what changed, and Runs has check details. While Preview is open, Aiden watches the selected remote branch and ticket status every minute and checks each morning. Use Run check now whenever you need a fresh answer. Reconnect an unavailable tracker in Settings → Integrations, then use Sync tickets.',
   },
   {
     title: 'Accept the outcome',

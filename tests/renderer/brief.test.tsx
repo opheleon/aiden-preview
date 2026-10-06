@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, test, vi } from 'vitest';
 
@@ -396,9 +396,10 @@ test('API evidence opens in Watch and an inconclusive check can be confirmed man
   ).toBe('Failing');
 });
 
-test('Refresh updates delivery across the brief without completing requirements or starting a coding check', async () => {
+test('coding events update delivery automatically without completing requirements or starting a check', async () => {
   const original = f.api.request.getMockImplementation()!;
   let unavailable = false;
+  let saved = false;
   const job: CodingJob = {
     id: 'synthetic-job',
     repositoryId: 'repo',
@@ -417,17 +418,18 @@ test('Refresh updates delivery across the brief without completing requirements 
     pullRequestUrl: 'https://github.com/fixture/repo/pull/1',
   };
   f.api.request.mockImplementation((method, params) => {
-    if (method === 'reconcileDelivery')
+    if (method === 'codingJobs')
       return unavailable
         ? Promise.reject(new Error('Synthetic offline GitHub'))
-        : Promise.resolve([job]);
+        : Promise.resolve(saved ? [job] : []);
     return original(method, params);
   });
   try {
     await openProject();
     const status = screen.getByRole('region', { name: 'Status' });
     expect(status).not.toHaveTextContent('Coding finished');
-    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    saved = true;
+    act(() => f.emit({ type: 'coding', projectId: report.projectId, runId: job.id }));
     await waitFor(() => expect(status).toHaveTextContent('Coding finished. PR open'));
     expect(screen.getByRole('region', { name: 'Requirements' })).not.toHaveTextContent(
       'Coding finished',
@@ -442,14 +444,15 @@ test('Refresh updates delivery across the brief without completing requirements 
     expect(screen.getByRole('progressbar')).toHaveAttribute('value', '0');
     expect(
       f.api.request.mock.calls.some(([method]) =>
-        ['look', 'startCoding', 'verify'].includes(method),
+        ['look', 'startCoding', 'verify', 'reconcileDelivery'].includes(method),
       ),
     ).toBe(false);
     unavailable = true;
-    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not refresh delivery status');
+    act(() => f.emit({ type: 'coding', projectId: report.projectId, runId: job.id }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not read coding jobs');
     expect(status).toHaveTextContent('Coding finished');
-    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run check now' })).toBeEnabled();
   } finally {
     f.api.request.mockImplementation(original);
   }

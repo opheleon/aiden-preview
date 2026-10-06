@@ -8,7 +8,7 @@ import { createProject, desktopFixture, lookAgain } from './journey-fixture.js';
 
 const stoppedNote = /latest check didn't finish, so this is from the one before/;
 
-test('one handoff produces a brief with evidence, exports, restart, cancellation, and pickup', async ({
+test('one handoff produces a brief with evidence, exports, restart, cancellation, and fresh checks', async ({
   browserName,
 }, info) => {
   info.annotations.push({ type: 'browser engine', description: browserName });
@@ -91,12 +91,12 @@ test('one handoff produces a brief with evidence, exports, restart, cancellation
     expect(await fixture.calls()).toEqual(cancelledCalls);
     await writeFile(fixture.control, '{}');
     await lookAgain(page);
-    // The brief stays visible during the resumed look, so wait for the look itself.
+    // The brief stays visible during the fresh look, so wait for the look itself.
     await expect
       .poll(async () => (await fixture.calls()).filter((stage) => stage === 'assess'))
       .toHaveLength(3);
     await expect(page.getByText(stoppedNote)).toHaveCount(0);
-    // Picking the look up reuses its frozen code; what done means is not rewritten.
+    // A fresh code check keeps the reviewed requirements without rewriting them.
     expect((await fixture.calls()).filter((stage) => stage === 'understand')).toHaveLength(1);
     expect(desktop.errors).toEqual([]);
   } finally {
@@ -104,7 +104,7 @@ test('one handoff produces a brief with evidence, exports, restart, cancellation
   }
 });
 
-test('quitting during a look preserves the last brief and waits for an explicit pickup', async ({
+test('quitting during a look preserves the last brief and waits for an explicit new check', async ({
   browserName,
 }, info) => {
   info.annotations.push({ type: 'browser engine', description: browserName });

@@ -34,9 +34,7 @@ test('acceptance preserves progress; closing persists across restart and reopeni
       .click();
     await expect(page.getByRole('button', { name: 'Reopen project' })).toBeVisible();
     await expect(page.locator('.closed-projects')).toContainText('A book project');
-    await page.getByLabel('More', { exact: true }).click();
-    await expect(page.getByRole('menuitem', { name: 'Run check now' })).toBeDisabled();
-    await page.getByLabel('More', { exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Run check now' })).toBeDisabled();
     await page.screenshot({ path: info.outputPath('closed-project.png') });
     await desktop.close();
     desktop = await f.launch(info);
