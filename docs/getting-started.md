@@ -41,3 +41,7 @@ Code on the selected branch, app or API checks, and ticket status each answer a 
 ## Come back whenever you need
 
 Help / Getting started reopens the introduction and these offline docs. Got it on the final step remembers that you’ve finished. Later, close, or Escape brings the introduction back next launch. Replaying it after completion keeps your original confirmation.
+
+## Keep Aiden up to date
+
+Use the update control at the bottom of the sidebar to check for a new version, download it, or restart when it is ready. Downloads show their progress there. Restart waits until active work is finished; updates never install just because you quit. Automatic-download and beta-channel preferences remain under Settings → Desktop app.
