@@ -201,16 +201,20 @@ try {
   await expect(page.getByRole('heading', { name: 'App updates' })).toBeVisible();
   if (updates) {
     await expect(page.getByText(updates.version, { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Check for updates' }).click();
+    // The sidebar footer has its own Check for updates button; this exercises the Settings one.
+    const checkForUpdates = page
+      .getByRole('main')
+      .getByRole('button', { name: 'Check for updates', exact: true });
+    await checkForUpdates.click();
     await expect(page.getByText('You are on the latest version.')).toBeVisible({ timeout: 20000 });
     expect(updates.requests.some((url) => url.split('?')[0]?.endsWith('-mac.yml'))).toBe(true);
     updates.setUnavailable(true);
-    await page.getByRole('button', { name: 'Check for updates' }).click();
+    await checkForUpdates.click();
     await expect(
       page.getByText('The update could not be completed. Check your connection and retry.'),
     ).toBeVisible();
     updates.setUnavailable(false);
-    await page.getByRole('button', { name: 'Check for updates' }).click();
+    await checkForUpdates.click();
     await expect(page.getByText('You are on the latest version.')).toBeVisible();
   } else {
     await expect(
