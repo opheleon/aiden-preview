@@ -92,7 +92,7 @@ test('a project whose first rewrite is running shows it, and a stopped one says 
 test('the brief keeps only touch points on screen; the rest lives in one menu', async () => {
   await openProject();
   expect(screen.getByRole('region', { name: 'Project outcome' })).toBeVisible();
-  for (const name of ['Refresh status', 'Schedule', 'App URL', 'Markdown', 'Check now'])
+  for (const name of ['Refresh', 'Refresh status', 'Schedule', 'App URL', 'Markdown', 'Check now'])
     expect(screen.queryByRole('button', { name })).toBeNull();
   await menu('Export Markdown');
   expect(screen.getByLabelText('More').closest('details')).not.toHaveAttribute('open');
@@ -100,9 +100,11 @@ test('the brief keeps only touch points on screen; the rest lives in one menu', 
   expect(await screen.findByText('Markdown report exported.')).toBeVisible();
   await menu('Export JSON');
   expect(f.api.saveExport).toHaveBeenCalledWith(expect.objectContaining({ format: 'json' }));
-  await menu('Run check now');
+  expect(screen.queryByRole('menuitem', { name: 'Run check now' })).toBeNull();
+  await userEvent.click(screen.getByRole('button', { name: 'Run check now' }));
   expect(f.request).toHaveBeenCalledWith('look', { projectId: report.projectId });
   expect(await screen.findByText('Starting a check…')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Run check now' })).toBeDisabled();
   act(() =>
     f.emit({ type: 'progress', projectId: report.projectId, runId: 'look-run', message: 'Sync…' }),
   );

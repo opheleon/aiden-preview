@@ -224,20 +224,6 @@ small {
   background: var(--tint);
 }
 
-.update-indicator {
-  position: relative;
-}
-
-.update-indicator > span {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  top: 5px;
-  right: 5px;
-  border-radius: 999px;
-  background: var(--brand);
-}
-
 .header-avatar {
   display: grid;
   place-items: center;

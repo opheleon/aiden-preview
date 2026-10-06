@@ -227,7 +227,7 @@ void test('editing what done means commits it and looks; changing the intent rew
   }
 });
 
-void test('asking to look again picks up a stopped look; a commit starts fresh', async () => {
+void test('manual checks capture new local commits after interruption; commit checks also start fresh', async () => {
   const { f, e, runtime, runs, settled } = await setup();
   try {
     const p = await e.prepare(f.project, { autoAccept: true, reason: 'intent' });
@@ -240,11 +240,23 @@ void test('asking to look again picks up a stopped look; a commit starts fresh',
     runtime.pause = false;
     const inventory = path.join(e.store.run(f.project.id, first.runId), 'inventory.json');
     const frozenAt = (await stat(inventory)).mtimeMs;
+    const repo = f.project.repositories[0]!;
+    await g(repo.path, 'checkout', '-b', 'local/new-implementation');
+    await writeFile(path.join(repo.path, 'app.txt'), 'GET /books\nrender updated list\n');
+    await g(repo.path, 'add', 'app.txt');
+    await g(repo.path, 'commit', '-m', 'New local implementation after cancellation');
+    const head = await g(repo.path, 'rev-parse', 'HEAD');
+    f.snapshots[0]!.sha = head;
     const again = await startLook(e, f.project.id, 'you');
-    assert.equal(again.runId, first.runId, 'the stopped look is picked up');
-    await settled(3, 'the resumed look and automatic sizing');
-    assert.equal((await stat(inventory)).mtimeMs, frozenAt, 'finished stages are not redone');
-    assert.equal((await runs()).find((r) => r.id === first.runId)?.status, 'completed');
+    assert.notEqual(again.runId, first.runId, 'manual checks never resume interrupted snapshots');
+    await settled(4, 'the new look and automatic sizing');
+    const freshInventory = await json<{ inventory: { repositoryId: string; head: string }[] }>(
+      path.join(e.store.run(f.project.id, again.runId), 'inventory.json'),
+    );
+    assert.equal(freshInventory.inventory.find((row) => row.repositoryId === repo.id)?.head, head);
+    assert.equal((await stat(inventory)).mtimeMs, frozenAt, 'old evidence stays in history');
+    assert.equal((await runs()).find((r) => r.id === first.runId)?.status, 'cancelled');
+    assert.equal((await runs()).find((r) => r.id === again.runId)?.status, 'completed');
     runtime.pause = true;
     const stopped = await startLook(e, f.project.id, 'you');
     await until(
@@ -256,7 +268,7 @@ void test('asking to look again picks up a stopped look; a commit starts fresh',
     runtime.pause = false;
     const fresh = await startLook(e, f.project.id, 'commit');
     assert.notEqual(fresh.runId, stopped.runId, 'new commits mean a fresh look');
-    await settled(6, 'the fresh look and automatic sizing');
+    await settled(7, 'the fresh look and automatic sizing');
     const heads = await repositoryHeads(e, f.project.id);
     assert.ok(heads.lastLookAt);
   } finally {

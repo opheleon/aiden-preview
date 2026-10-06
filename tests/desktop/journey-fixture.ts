@@ -117,10 +117,9 @@ export async function createProject(
   } else await expectIdle(page);
 }
 
-/** Ask Aiden to look again from the brief's overflow menu. */
+/** Start a new assessment from the project header. */
 export async function lookAgain(page: Page) {
-  await page.getByLabel('More').click();
-  await page.getByRole('menuitem', { name: 'Run check now' }).click();
+  await page.getByRole('button', { name: 'Run check now', exact: true }).click();
 }
 
 /** Wait for automatically chained sizing before a journey requests another operation. */
