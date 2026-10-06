@@ -23,7 +23,6 @@ export function ApplicationHeader(props: ApplicationHeaderProps): React.JSX.Elem
           Projects
         </button>
       </div>
-      <span className="app-nav">{area === 'settings' ? 'Settings' : 'Projects'}</span>
       <div className="header-right">
         <button
           className={area === 'settings' ? 'header-icon active' : 'header-icon'}

@@ -2,9 +2,13 @@
 
 ## Unreleased
 
+## 1.2.2
+
 - Put app update checks, downloads, progress, and explicit restart in the sidebar footer. Keep download and beta-channel preferences in Settings.
 
 - Replace the project Refresh button with Run check now. Each check captures current code instead of resuming interrupted snapshots; coding delivery status updates automatically.
+
+- Remove the duplicate Projects label from the middle of the header. The highlighted Projects button or Settings icon shows where you are.
 
 ## 1.2.1
 
