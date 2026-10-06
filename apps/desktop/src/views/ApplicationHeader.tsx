@@ -26,7 +26,6 @@ export function ApplicationHeader(props: ApplicationHeaderProps): React.JSX.Elem
           Projects
         </button>
       </div>
-      <span className="app-nav">{area === 'settings' ? 'Settings' : 'Projects'}</span>
       <div className="header-right">
         {updateStatus &&
           ['available', 'downloading', 'downloaded'].includes(updateStatus.state) && (

@@ -223,13 +223,8 @@
     gap: 6px;
   }
 
-  .auth-tag,
-  .app-nav {
+  .auth-tag {
     display: none;
-  }
-
-  .app-header {
-    grid-template-columns: 1fr 1fr;
   }
 
   .steps {
