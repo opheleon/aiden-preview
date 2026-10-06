@@ -10,7 +10,7 @@ You set the intent, make the calls, and accept the outcome.
 
 [Download](https://github.com/opheleon/aiden-preview/releases) · [Getting started](docs/getting-started.md) · [Join our Slack](https://join.slack.com/t/aidenbyopheleon/shared_invite/zt-4apsg5d7p-FDO9ae0imxj~KgauP8lpsw)
 
-![Aiden report using synthetic fixture data](docs/screenshots/report-fixture.png)
+![Aiden project overview using synthetic fixture data](docs/screenshots/report-fixture.png)
 
 _Example shown with synthetic fixture data._
 
