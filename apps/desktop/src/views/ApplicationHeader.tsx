@@ -1,19 +1,16 @@
-import { Download, RefreshCw, Settings2 } from 'lucide-react';
+import { Settings2 } from 'lucide-react';
 
 import brandMark from '../assets/brand-mark.svg';
-import type { Area, SettingsTab } from '../hooks/useWorkspaceState';
-import type { UpdateStatus } from '../updater';
+import type { Area } from '../hooks/useWorkspaceState';
 
 interface ApplicationHeaderProps {
   area: Area;
   setArea: React.Dispatch<React.SetStateAction<Area>>;
-  updateStatus: UpdateStatus | undefined;
-  setSettingsTab: React.Dispatch<React.SetStateAction<SettingsTab>>;
 }
 
-/** Navigate projects and settings and surface available application updates. */
+/** Navigate between projects and settings. */
 export function ApplicationHeader(props: ApplicationHeaderProps): React.JSX.Element {
-  const { area, setArea, updateStatus, setSettingsTab } = props;
+  const { area, setArea } = props;
   return (
     <header className="app-header">
       <div className="brand">
@@ -28,37 +25,6 @@ export function ApplicationHeader(props: ApplicationHeaderProps): React.JSX.Elem
       </div>
       <span className="app-nav">{area === 'settings' ? 'Settings' : 'Projects'}</span>
       <div className="header-right">
-        {updateStatus &&
-          ['available', 'downloading', 'downloaded'].includes(updateStatus.state) && (
-            <button
-              className="header-icon update-indicator"
-              aria-label={
-                updateStatus.state === 'downloaded'
-                  ? 'Restart to update'
-                  : updateStatus.state === 'downloading'
-                    ? `Downloading update ${Math.round(updateStatus.progress?.percent ?? 0)}%`
-                    : 'Update available'
-              }
-              title={
-                updateStatus.state === 'downloaded'
-                  ? 'Restart to update'
-                  : updateStatus.state === 'downloading'
-                    ? `Downloading update… ${Math.round(updateStatus.progress?.percent ?? 0)}%`
-                    : 'Update available'
-              }
-              onClick={() => {
-                setArea('settings');
-                setSettingsTab('desktop');
-              }}
-            >
-              {updateStatus.state === 'downloaded' ? (
-                <RefreshCw size={16} />
-              ) : (
-                <Download size={16} />
-              )}
-              <span aria-hidden="true" />
-            </button>
-          )}
         <button
           className={area === 'settings' ? 'header-icon active' : 'header-icon'}
           aria-label="Settings"

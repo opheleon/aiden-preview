@@ -12,7 +12,7 @@ You set the intent, make the calls, and accept the outcome.
 
 ![Aiden project overview using synthetic fixture data](docs/screenshots/report-fixture.png)
 
-_Example shown with synthetic fixture data._
+_Example shown with synthetic project and update data._
 
 ## What Aiden does
 
@@ -35,7 +35,7 @@ shasum -a 256 -c SHA256SUMS.txt --ignore-missing
 gh attestation verify Aiden-VERSION-arm64.dmg --repo opheleon/aiden-preview
 ```
 
-Update preferences are under **Settings → Desktop app**. See the [release guide](docs/macos-release.md) for packaging and verification details.
+Check, download, and restart from the update control at the bottom of the sidebar. Update preferences are under **Settings → Desktop app**. See the [release guide](docs/macos-release.md) for packaging and verification details.
 
 ## Quick start
 

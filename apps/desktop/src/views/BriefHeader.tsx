@@ -11,7 +11,7 @@ const api = window.aiden;
 
 /** The overflow menu: the few things that are not touch points stay one click away. */
 function Overflow({ workspace }: { workspace: Workspace }): JSX.Element {
-  const { project, report, busy, lookNow, action, setNotice, setArea, setSettingsTab } = workspace;
+  const { project, report, action, setNotice, setArea, setSettingsTab } = workspace;
   const menu = useRef<HTMLDetailsElement>(null);
   /** Close the menu, then act, so the next open starts fresh. */
   const choose = (fn: () => void) => () => {
@@ -30,13 +30,6 @@ function Overflow({ workspace }: { workspace: Workspace }): JSX.Element {
         <MoreHorizontal size={16} />
       </summary>
       <div role="menu">
-        <button
-          role="menuitem"
-          disabled={busy || project.lifecycle?.status === 'closed'}
-          onClick={choose(() => void lookNow())}
-        >
-          Run check now
-        </button>
         <button role="menuitem" disabled={!report} onClick={choose(() => exportAs('markdown'))}>
           Export Markdown
         </button>
@@ -160,8 +153,8 @@ export function BriefHeader({
           </p>
         </div>
         <div className="button-row">
-          <button disabled={delivery.refreshing} onClick={() => void delivery.refresh()}>
-            {delivery.refreshing ? 'Refreshing…' : 'Refresh'}
+          <button disabled={workspace.busy || closed} onClick={() => void workspace.lookNow()}>
+            Run check now
           </button>
           <Overflow workspace={workspace} />
         </div>

@@ -10,7 +10,7 @@ Scope holds what you’re building and how you’ll know it works. Refine it as 
 
 Overview shows progress, what’s left, and what needs your attention. Expand a requirement for its checks, linked tickets, and next actions. Activity shows what changed and why. Runs has the details of each check.
 
-While Preview is open, Aiden watches the selected remote branch every minute and checks again when pushed code changes. It also checks each morning if no check has run that day. Use More → Run check now whenever you need a fresh answer or want to pick up a stopped check.
+While Preview is open, Aiden watches the selected remote branch every minute and checks again when pushed code changes. It also checks each morning if no check has run that day. Use Run check now in the project header to start a fresh assessment from current code. Interrupted checks stay in history; this action does not resume their old snapshots.
 
 With automatic tickets enabled, Aiden checks tracker status every minute while the project is idle. A status change prompts a new code assessment, as does the first successful read of an already completed or canceled ticket. Saving scope and finishing an assessment also reconcile tickets. Sync tickets does this on demand.
 

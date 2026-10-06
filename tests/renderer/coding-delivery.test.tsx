@@ -8,12 +8,7 @@ import type { Workspace } from '../../apps/desktop/src/hooks/useWorkspace';
 
 function DeliveryHarness({ workspace }: { workspace: Workspace }) {
   const delivery = useCodingDelivery(workspace);
-  return (
-    <>
-      <button onClick={() => void delivery.refresh()}>Refresh</button>
-      <CodingDelivery workspace={workspace} delivery={delivery} />
-    </>
-  );
+  return <CodingDelivery workspace={workspace} delivery={delivery} />;
 }
 
 function fixture() {
@@ -34,8 +29,6 @@ function fixture() {
     if (method === 'state') return Promise.resolve({ runs: [] });
     if (method === 'codingJobs') return Promise.resolve([]);
     if (method === 'startCoding') return Promise.resolve(job);
-    if (method === 'reconcileDelivery')
-      return Promise.resolve([{ ...job, status: 'verified', message: 'Beta verified' }]);
     if (method === 'betaSettings')
       return Promise.resolve({ enabled: false, intervalMinutes: 60, codingAgentEnabled: true });
     if (method === 'updateBetaSettings') return Promise.resolve(params.settings);
@@ -82,8 +75,7 @@ test('dispatch uses the selected project repository and task, then shows externa
   expect(screen.getByText('Local checks reported by Claude Code')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'View beta check' }));
   expect(f.workspace.setOpenRun).toHaveBeenCalledWith('beta-run');
-  fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
-  expect(await screen.findByText('Beta verified')).toBeInTheDocument();
+  expect(f.call).not.toHaveBeenCalledWith('reconcileDelivery', expect.anything());
 });
 
 test('beta schedule loads project settings and saves explicit opt-in, cadence, and revision URL', async () => {

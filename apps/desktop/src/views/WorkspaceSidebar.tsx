@@ -2,6 +2,7 @@ import { BookOpen, ExternalLink, MessageCircle, Plus, Settings2 } from 'lucide-r
 import type { JSX } from 'react';
 
 import { scopeName } from '../../../../packages/contracts/src/project-name';
+import { SidebarUpdate } from '../components/SidebarUpdate';
 import type { Workspace } from '../hooks/useWorkspace';
 import { newProject } from '../renderer/project-state';
 const api = window.aiden;
@@ -86,6 +87,12 @@ export function WorkspaceSidebar({
           <span>Join our Slack</span>
           <ExternalLink size={13} aria-hidden="true" />
         </button>
+        <SidebarUpdate
+          updateStatus={workspace.updateStatus}
+          setUpdateStatus={workspace.setUpdateStatus}
+          busy={workspace.busy}
+          api={api}
+        />
       </div>
     </aside>
   );
