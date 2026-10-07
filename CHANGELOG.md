@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Publish a fixed-name Mac installer so the marketing download link can always follow the latest stable release.
+
 ## 1.2.2
 
 - Put app update checks, downloads, progress, and explicit restart in the sidebar footer. Keep download and beta-channel preferences in Settings.

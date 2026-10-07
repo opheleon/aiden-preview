@@ -24,6 +24,12 @@ The publish job, which runs no project code, writes `SHA256SUMS.txt`, creates a 
 
 Running the workflow manually from the Actions tab is a dry run: an unsigned build uploaded as a workflow artifact, with nothing published.
 
+### Permanent installer link
+
+Each release also includes `Aiden-arm64.dmg`, an exact copy of its signed and notarized versioned DMG. The alias is included in the checksums and provenance, and publication verifies that the two files match. Versioned installers and automatic-update manifests keep their existing names.
+
+The marketing site can use `https://github.com/opheleon/aiden-preview/releases/latest/download/Aiden-arm64.dmg` to download the latest stable Apple Silicon installer without updating its URL for every release. GitHub excludes pre-releases from `latest`. Before switching the site, publish a stable release containing the alias and verify that the permanent link downloads it; older releases do not contain this filename.
+
 ### Repository secrets
 
 | Secret                         | Value                                                                        |

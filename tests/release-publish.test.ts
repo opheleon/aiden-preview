@@ -15,6 +15,9 @@ const workflow = parse(await readFile('.github/workflows/release.yml', 'utf8')) 
 const script = workflow.jobs.publish.steps.find(
   (step) => step.name === 'Publish GitHub Release',
 )!.run!;
+const aliasScript = workflow.jobs.publish.steps.find(
+  (step) => step.name === 'Create permanent download alias',
+)!.run!;
 
 // This CLI substitute records mutations. It never contacts GitHub or sees a real token.
 const ghFixture = `#!${process.execPath}
@@ -59,9 +62,21 @@ async function publishFixture(mode: string, version = '1.1.1') {
     version.includes('-') ? 'beta-mac.yml' : 'latest-mac.yml',
   ];
   for (const file of files) await writeFile(path.join(assets, file), 'synthetic artifact');
+  await exec('/bin/bash', ['-c', aliasScript], {
+    cwd: assets,
+    env: { ...process.env, GITHUB_REF_NAME: `v${version}` },
+  });
+  assert.deepEqual(
+    await readFile(path.join(assets, 'Aiden-arm64.dmg')),
+    await readFile(path.join(assets, files[0]!)),
+  );
+  files.push('Aiden-arm64.dmg');
+  if (mode === 'different-alias')
+    await writeFile(path.join(assets, 'Aiden-arm64.dmg'), 'different installer');
   const { stdout } = await exec('shasum', ['-a', '256', ...files], { cwd: assets });
   await writeFile(path.join(assets, 'SHA256SUMS.txt'), stdout);
   if (mode === 'missing-local') await rm(path.join(assets, files[0]!));
+  if (mode === 'missing-alias') await rm(path.join(assets, 'Aiden-arm64.dmg'));
   if (mode === 'corrupt')
     await writeFile(path.join(assets, files[0]!), 'changed after attestation');
   // macOS ships shasum rather than GNU sha256sum. Keep the real checksum verification.
@@ -100,7 +115,8 @@ void test('publishing uploads all attested files before publishing the exact cre
     const uploads = requests.filter((args) =>
       args.some((arg) => arg.startsWith('https://uploads.github.com/')),
     );
-    assert.equal(uploads.length, 6);
+    assert.equal(uploads.length, 7);
+    assert.ok(uploads.some((args) => args.includes('Aiden-arm64.dmg')));
     assert.ok(requests.some((args) => args.includes(`prerelease=${version.includes('-')}`)));
     assert.deepEqual(requests.at(-1), [
       'api',
@@ -122,12 +138,23 @@ void test('duplicate tags, partial uploads, and corrupt or missing artifacts can
     'upload-fails',
     'missing-upload',
     'missing-local',
+    'missing-alias',
+    'different-alias',
     'corrupt',
   ]) {
     const { failed, requests } = await publishFixture(mode);
     assert.equal(failed, true, mode);
     assert.ok(!requests.some((args) => args.includes('PATCH')), mode);
-    if (['existing', 'draft', 'missing-local', 'corrupt'].includes(mode)) {
+    if (
+      [
+        'existing',
+        'draft',
+        'missing-local',
+        'missing-alias',
+        'different-alias',
+        'corrupt',
+      ].includes(mode)
+    ) {
       assert.ok(!requests.some((args) => args.includes('POST')), mode);
     }
   }
