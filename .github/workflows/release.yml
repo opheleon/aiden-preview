@@ -129,6 +129,13 @@ jobs:
           name: macos
           path: release
 
+      - name: Create permanent download alias
+        working-directory: release
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          cp -- "Aiden-$version-arm64.dmg" Aiden-arm64.dmg
+
       - name: Write SHA-256 checksums
         working-directory: release
         run: |
@@ -155,13 +162,14 @@ jobs:
           fi
           expected=$(printf '%s\n' "Aiden-$version-arm64.dmg" "Aiden-$version-arm64.dmg.blockmap" \
             "Aiden-$version-arm64.zip" "Aiden-$version-arm64.zip.blockmap" \
-            "$manifest" SHA256SUMS.txt | jq -R . | jq -s sort)
+            Aiden-arm64.dmg "$manifest" SHA256SUMS.txt | jq -R . | jq -s sort)
           actual=$(printf '%s\n' * | jq -R . | jq -s sort)
           if [[ "$actual" != "$expected" ]]; then
             echo "::error::Release artifact set is incomplete or contains unexpected files."
             exit 1
           fi
           sha256sum --check SHA256SUMS.txt
+          cmp -- "Aiden-$version-arm64.dmg" Aiden-arm64.dmg
           # Refuse duplicates and leave prior drafts untouched for explicit recovery.
           existing=$(gh api "$endpoint?per_page=100" --paginate --slurp | \
             jq --arg tag "$GITHUB_REF_NAME" '[.[][] | select(.tag_name == $tag)] | length')
