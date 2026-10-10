@@ -1,12 +1,10 @@
 # Changelog
 
-## Unreleased
+## 1.2.3
 
 - Make the overview readable at a glance: each requirement is one line with one status chip, and opening it shows everything Aiden knows in a pop-up, including its ticket, actions, verification gaps, and evidence. Delivery findings are one line each and open the affected requirement. A feature's outcome, rationale, and test plan sit behind an (i) button, and the chip explains how Aiden knows on hover.
 
 - Move controls off the brief until they are needed: Adjust plan and Tickets open pop-ups, Accept outcome and Close project live in the project menu until there is a decision to show or every requirement is done, and the monitored branch is a hover on the last-checked line once it is configured.
-
-## 1.2.3
 
 - Publish a fixed-name Mac installer so the marketing download link can always follow the latest stable release.
 
