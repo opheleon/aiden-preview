@@ -252,22 +252,8 @@
   font-size: 14px;
 }
 
-.brief .delivery-progress progress {
+.brief .delivery-progress .requirement-progress {
   height: 6px;
-  appearance: none;
-  border: 0;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.brief .delivery-progress progress::-webkit-progress-bar {
-  background: var(--color-paper2);
-  border-radius: 4px;
-}
-
-.brief .delivery-progress progress::-webkit-progress-value {
-  background: var(--color-brand-dark);
-  border-radius: 4px;
 }
 
 /* Details groups its content internally, so card grid gaps do not separate these blocks. */

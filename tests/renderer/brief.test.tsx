@@ -330,7 +330,21 @@ test('statuses follow what Aiden saw, then open decisions, then the code', () =>
   expect(requirementState({ ...base, code: 'missing', method: 'person' }).label).toBe(
     'Needs manual test',
   );
-  expect(requirementState({ ...base, method: 'code' }).how).toMatch(/checked the code/);
+  expect(requirementState({ ...base, method: 'code' })).toMatchObject({
+    label: 'Done',
+    tone: 'verified',
+    basis: 'code',
+    how: expect.stringMatching(/checked the code/),
+  });
+  // A code-only requirement with edge cases is built, not done, until those cases are checked.
+  expect(requirementState({ ...base, method: 'code', expectedEdges: 2 })).toMatchObject({
+    label: 'Built',
+    tone: 'implemented',
+  });
+  expect(requirementState({ ...base, method: 'app' })).toMatchObject({
+    label: 'Built',
+    tone: 'implemented',
+  });
   expect(requirementState({ ...base, main: created }).how).toBe(
     'Built in the code. Synthetic backend-only explanation',
   );

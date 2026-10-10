@@ -20,6 +20,8 @@ export interface ItemState {
   label: string;
   tone: Tone;
   how: string;
+  /** Set to code when the code itself is the evidence, because nothing is visible in the app. */
+  basis?: 'code';
 }
 
 /** Everything the brief knows about one requirement. */
@@ -65,13 +67,20 @@ function unverifiedReason(result: CriterionResult | undefined): string {
 /** Status from the code assessment alone, used when the app gave no verdict. */
 function codeState(facts: RequirementFacts): ItemState {
   if (facts.code === 'implemented' && facts.remoteVerified === false) return mergeUnverified();
+  if (facts.code === 'implemented' && facts.method === 'code' && !facts.expectedEdges)
+    return {
+      label: 'Done',
+      tone: 'verified',
+      basis: 'code',
+      how: 'Built in the code. It is not visible in the app, so Aiden checked the code.',
+    };
   if (facts.code === 'implemented')
     return {
-      label: facts.method === 'code' && !facts.expectedEdges ? 'Done' : 'Built',
+      label: 'Built',
       tone: 'implemented',
       how:
         facts.method === 'code'
-          ? 'Built in the code. It is not visible in the app, so Aiden checked the code.'
+          ? 'Built in the code. Its edge cases still need a check.'
           : `Built in the code. ${unverifiedReason(facts.main)}`,
     };
   if (facts.code === 'partial')
