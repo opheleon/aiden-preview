@@ -140,6 +140,32 @@ void test('Codex rejects mismatched auth, invalid schemas, and unavailable or un
   }
 });
 
+void test('Codex runs reasoning-only turns, such as planning verification checks, without Aiden tools', async () => {
+  const fixture = await codexFixture('missing-tools');
+  try {
+    const result = await fixture.runtime.run({
+      ...fixture.request,
+      tools: { ...fixture.request.tools, toolCount: 0 },
+    });
+    assert.deepEqual(result.value, { fixture: true });
+    assert.match(await readFile(fixture.calls, 'utf8'), /turn\/start/);
+  } finally {
+    await fixture.close();
+  }
+  const foreign = await codexFixture('foreign-tools');
+  try {
+    await assert.rejects(
+      foreign.runtime.run({
+        ...foreign.request,
+        tools: { ...foreign.request.tools, toolCount: 0 },
+      }),
+      /Unexpected MCP/,
+    );
+  } finally {
+    await foreign.close();
+  }
+});
+
 void test('Codex rejects failed turns and malformed output without retrying paid work', async () => {
   for (const mode of ['invalid-json', 'failed-turn', 'bad-event']) {
     const fixture = await codexFixture(mode);
@@ -167,10 +193,11 @@ void test('cancellation closes a Codex turn waiting for its final result', async
     const pending = fixture.runtime.run({ ...fixture.request, signal: controller.signal });
     const rejected = assert.rejects(pending, /interrupted|closed/);
     // Wait for turn submission so this exercises completion, not initialization cancellation.
-    for (let attempt = 0; attempt < 100; attempt++) {
+    // Starting the fake provider can take seconds when the full suite runs under coverage.
+    for (let attempt = 0; attempt < 200; attempt++) {
       const log = await readFile(fixture.calls, 'utf8').catch(() => '');
       if (log.includes('turn/start')) break;
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 25));
     }
     assert.match(await readFile(fixture.calls, 'utf8'), /turn\/start/);
     controller.abort();

@@ -197,6 +197,31 @@ export async function readSnapshot(
   return content;
 }
 
+/**
+ * Refuse a partial clone (made with `git clone --filter`) by name. Its missing file contents make
+ * the evidence copy fail, and Git alone reports that as possible corruption on the remote side.
+ */
+async function rejectPartialClone(repo: Repository, signal?: AbortSignal): Promise<void> {
+  // Current Git marks the remote as a promisor; older Git set extensions.partialClone instead.
+  let settings = '';
+  try {
+    settings = await git(
+      repo.path,
+      ['config', '--get-regexp', '^(extensions\\.partialclone|remote\\..+\\.promisor)$'],
+      signal,
+    );
+  } catch (error) {
+    if ((error as { code?: unknown }).code !== 1) throw error;
+  }
+  const partial = settings
+    .split('\n')
+    .some((line) => /^extensions\.partialclone \S/i.test(line) || /\.promisor true$/i.test(line));
+  if (partial)
+    throw new Error(
+      `${path.basename(repo.path)} is a partial clone (made with --filter), so some file contents were never downloaded and Aiden cannot keep evidence from it. Clone the repository again without --filter and choose that folder.`,
+    );
+}
+
 // Independent objects preserve evidence even if the original checkout or its refs disappear.
 /** Copy required commit objects into an independent bare repository and publish it only after a successful fetch. */
 export async function freezeRepository(
@@ -211,6 +236,7 @@ export async function freezeRepository(
   } catch {
     signal?.throwIfAborted();
   }
+  await rejectPartialClone(repo, signal);
   await rm(destination, { recursive: true, force: true });
   const temporary = destination + '.partial';
   await mkdir(path.dirname(destination), { recursive: true, mode: 0o700 });
@@ -227,6 +253,9 @@ export async function freezeRepository(
         '--no-tags',
         '--no-recurse-submodules',
         '--no-write-fetch-head',
+        // A shallow source otherwise has its refs rejected with only a warning, leaving a copy
+        // whose history walks fail; this keeps the boundary so walks stop where the clone does.
+        '--update-shallow',
         repo.path,
         ...[...new Set(shas)].map((sha) => `${sha}:refs/aiden/${sha}`),
       ],

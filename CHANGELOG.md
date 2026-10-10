@@ -4,6 +4,14 @@
 
 - Publish a fixed-name Mac installer so the marketing download link can always follow the latest stable release.
 
+- Track another team's roadmap from a pasted checklist: each open item becomes its own requirement, items the owners checked off count as done, unchecked items need merged work or an open pull request to show progress, and their undefined scope never becomes a question for you.
+
+- Credit work with receipts: code checks search commit history by date, path, subject, or changed text, look up pull requests on public GitHub repositories without credentials, and resolve pull requests and issues linked in your intent, including their live state. Checks also see your original text, so they flag premises that no longer hold, such as a release your intent still calls beta.
+
+- Run app checks and Ask why with Codex again: reasoning-only steps no longer fail because they use no tools. App checks no longer pass a claim about every item from one example.
+
+- Keep shallow clones usable for code checks, and name a partial clone with how to fix it instead of reporting a generic Git failure.
+
 ## 1.2.2
 
 - Put app update checks, downloads, progress, and explicit restart in the sidebar footer. Keep download and beta-channel preferences in Settings.

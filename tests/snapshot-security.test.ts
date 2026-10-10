@@ -19,6 +19,44 @@ void test('evidence objects survive removal of the original checkout', async () 
   await rm(repo.path, { recursive: true });
   assert.match(await readSnapshot(frozen, required(f.snapshots[0]), 'app.txt'), /GET \/books/);
 });
+void test('a shallow clone freezes as shallow, so history walks stop at its boundary', async () => {
+  const f = await fixture();
+  const source = required(f.project.repositories[0]);
+  for (const n of [1, 2, 3]) {
+    await writeFile(path.join(source.path, 'app.txt'), `GET /books ${n}`);
+    await g(source.path, 'commit', '-am', `Change ${n} (#10${n})`);
+  }
+  const shallow = path.join(f.root, 'shallow');
+  await g(f.root, 'clone', '--quiet', '--depth', '2', `file://${source.path}`, shallow);
+  const sha = await g(shallow, 'rev-parse', 'HEAD');
+  const frozen = await freezeRepository(
+    { ...source, path: shallow },
+    [sha],
+    path.join(f.root, 'snapshot'),
+  );
+  assert.equal(await g(frozen.path, 'rev-parse', '--is-shallow-repository'), 'true');
+  const history = await g(frozen.path, 'log', '--format=%s', '--grep=#101', sha, '--');
+  assert.equal(history, '');
+  assert.equal((await g(frozen.path, 'log', '--format=%s', sha)).split('\n').length, 2);
+});
+void test('a partial clone is refused by name instead of failing as remote corruption', async () => {
+  const f = await fixture();
+  const repo = required(f.project.repositories[0]);
+  const snapshot = path.join(f.root, 'snapshot');
+  const sha = required(f.snapshots[0]).sha;
+  // Current Git marks a promisor remote; older Git sets extensions.partialClone.
+  await g(repo.path, 'config', 'remote.origin.promisor', 'true');
+  await assert.rejects(
+    freezeRepository(repo, [sha], snapshot),
+    /is a partial clone \(made with --filter\).*Clone the repository again without --filter/,
+  );
+  await g(repo.path, 'config', '--unset', 'remote.origin.promisor');
+  await g(repo.path, 'config', 'extensions.partialClone', 'origin');
+  await assert.rejects(freezeRepository(repo, [sha], snapshot), /is a partial clone/);
+  await g(repo.path, 'config', '--unset', 'extensions.partialClone');
+  await g(repo.path, 'config', 'remote.origin.promisor', 'false');
+  assert.ok(await freezeRepository(repo, [sha], snapshot));
+});
 void test('receipts exclude truncated lines and reject an oversized line', async () => {
   const f = await fixture();
   const repo = required(f.project.repositories[0]);
