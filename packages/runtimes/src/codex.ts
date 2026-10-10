@@ -94,8 +94,15 @@ async function selectModel(
   return model;
 }
 
-/** Refuse execution unless Aiden’s server exposes tools and no other server exposes any. */
-async function verifyTools(client: RpcClient, threadId: string): Promise<void> {
+/**
+ * Refuse execution when any other server exposes tools, or when Aiden's server should expose tools
+ * but does not. Reasoning-only turns, such as planning verification checks, serve no tools.
+ */
+async function verifyTools(
+  client: RpcClient,
+  threadId: string,
+  expectAiden: boolean,
+): Promise<void> {
   let cursor: string | undefined;
   let hasAiden = false;
   const seen = new Set<string>();
@@ -113,7 +120,8 @@ async function verifyTools(client: RpcClient, threadId: string): Promise<void> {
       throw new Error('Tool discovery returned repeated or excessive pages.');
     if (cursor) seen.add(cursor);
   } while (cursor);
-  if (!hasAiden) throw new Error('The Aiden MCP server is unavailable; analysis cannot proceed.');
+  if (expectAiden && !hasAiden)
+    throw new Error('The Aiden MCP server is unavailable; analysis cannot proceed.');
 }
 
 /** Await one thread’s final JSON, removing its listener on completion, malformed events, or exit. */
@@ -193,7 +201,7 @@ export async function runCodex(
         selectedCapabilityRoots: [],
       }),
     );
-    await verifyTools(client, thread.thread.id);
+    await verifyTools(client, thread.thread.id, request.tools.toolCount !== 0);
     const completed = completion(client, thread.thread.id);
     // Cancellation can reject completion while turn/start is still pending.
     void completed.catch(() => {});

@@ -9,7 +9,7 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 
 import { validateFindings } from '../packages/contracts/src/index.js';
 import { ToolBroker } from '../packages/tools/src/broker.js';
-import { serveTools } from '../packages/tools/src/mcp.js';
+import { noTools, serveTools } from '../packages/tools/src/mcp.js';
 import { fixture } from './helpers.js';
 import { required } from './required.js';
 void test('evidence requires exact inspected snapshots, coverage and contiguous lines', async () => {
@@ -154,6 +154,10 @@ void test('MCP uses authenticated local HTTP and the same broker', async () => {
     );
     const tools = await client.listTools();
     assert.ok(tools.tools.some((t) => t.name === 'repo_read'));
+    assert.equal(server.toolCount, tools.tools.length);
+    const empty = await serveTools(noTools);
+    assert.equal(empty.toolCount, 0);
+    await empty.close();
     const result: any = await client.callTool({
       name: 'repo_read',
       arguments: { repositoryId: 'frontend', sha: required(f.snapshots[0]).sha, path: 'app.txt' },

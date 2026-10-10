@@ -56,7 +56,8 @@ let resolveRun: (e: RunEvent) => void;
 const events: RunEvent[] = [];
 client.on('event', (e: RunEvent) => {
   events.push(e);
-  if (e.type === 'progress') process.stderr.write(`${e.message}\n`);
+  // Some progress events only carry partial verification results for the desktop Watch view.
+  if (e.type === 'progress' && e.message) process.stderr.write(`${e.message}\n`);
   // Aiden never waits on a call: it records the question and proceeds on its stated assumption.
   if (e.type === 'activity' && e.activity?.kind === 'ask')
     process.stderr.write(`${e.activity.summary}\n  ${e.activity.reason ?? ''}\n`);

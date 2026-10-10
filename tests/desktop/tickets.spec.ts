@@ -14,6 +14,8 @@ test('an existing plan can connect later, publish, and resync its linked tickets
   try {
     const { page, app } = desktop;
     await createProject(app, page, fixture.root);
+    // Publishing lives in the Tickets pop-up, off the brief.
+    await page.getByRole('button', { name: 'Tickets', exact: true }).click();
     await page.getByRole('button', { name: 'Connect tracker', exact: true }).click();
     await page.getByRole('button', { name: 'Manage tracker connections' }).click();
     await expect(page.getByRole('button', { name: 'Connect Linear', exact: true })).toBeVisible();
@@ -47,6 +49,8 @@ test('an existing plan can connect later, publish, and resync its linked tickets
     });
     await page.reload();
     await page.getByRole('button', { name: 'A book project', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Tickets', exact: true }).click();
+    const tickets = page.getByRole('dialog', { name: 'Tickets' });
     await page.getByRole('button', { name: 'Connect tracker', exact: true }).click();
     await page
       .getByRole('combobox', { name: 'MCP connection' })
@@ -88,27 +92,56 @@ test('an existing plan can connect later, publish, and resync its linked tickets
     await expect(page.getByRole('combobox', { name: 'Linear team' })).toContainText('Books');
     await expect(page.getByText('Linked Linear project: A book project')).toBeVisible();
     await page.getByRole('button', { name: 'Close publishing settings', exact: true }).click();
+    await tickets.getByRole('button', { name: 'Close tickets' }).click();
+    await expect(tickets).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Tickets · Linear', exact: true })).toBeVisible();
+    /** The first requirement's pop-up, where its ticket and tracker state are shown. */
+    const sheet = page.getByRole('dialog', { name: 'Requirement REQ-1' });
+    const openSheet = async () => {
+      await page.locator('.req-row .req-open').first().click();
+      await expect(sheet).toBeVisible();
+    };
+    const closeSheet = async () => {
+      await sheet.getByRole('button', { name: 'Close requirement REQ-1' }).click();
+      await expect(sheet).toHaveCount(0);
+    };
+    /** Sync inside the Tickets pop-up, then close it so the brief is readable again. */
+    const sync = async () => {
+      await page.getByRole('button', { name: 'Tickets · Linear', exact: true }).click();
+      await tickets.getByRole('button', { name: 'Sync tickets', exact: true }).click();
+      await expect(tickets.getByText(/Last synced/)).toBeVisible();
+      await tickets.getByRole('button', { name: 'Close tickets' }).click();
+      await expect(tickets).toHaveCount(0);
+    };
     await page.locator('.feature-summary').first().click();
-    await page.locator('.req-row > summary').first().click();
-    await expect(page.getByText('Delivery ticket · F-1 · Published').first()).toBeVisible();
-    await expect(page.getByText(/Tracker: Todo/).first()).toBeVisible();
-    await expect(page.getByText(/Tracker status is not acceptance evidence/).first()).toBeVisible();
+    await openSheet();
+    await expect(sheet.getByText('Delivery ticket · F-1 · Published')).toBeVisible();
+    await expect(sheet.getByText(/Tracker: Todo/)).toBeVisible();
+    await expect(sheet.getByText(/Tracker status is not acceptance evidence/)).toBeVisible();
+    await closeSheet();
     tracker.issues.get('issue-1')!.status = 'In Progress';
-    await page.getByRole('button', { name: 'Sync tickets', exact: true }).click();
-    await expect(page.getByText(/Tracker: In Progress/).first()).toBeVisible();
+    await sync();
+    await openSheet();
+    await expect(sheet.getByText(/Tracker: In Progress/)).toBeVisible();
+    await closeSheet();
     expect(tracker.issues.size).toBe(1);
     expect(tracker.calls.filter((call) => call === 'create')).toHaveLength(1);
     expect(tracker.linear.calls.filter((call) => call === 'create')).toHaveLength(1);
     tracker.issues.get('issue-1')!.status = 'Done';
     tracker.issues.get('issue-1')!.statusType = 'completed';
-    await page.getByRole('button', { name: 'Sync tickets', exact: true }).click();
-    await expect(page.getByText(/Tracker: Done/).first()).toBeVisible();
+    await sync();
+    await openSheet();
+    await expect(sheet.getByText(/Tracker: Done/)).toBeVisible();
+    await closeSheet();
     await expect(page.getByRole('region', { name: 'Delivery attention' })).toContainText(
       'Checking completion',
     );
     await lookAgain(page);
     const attention = page.getByRole('region', { name: 'Delivery attention' });
-    await expect(attention).toContainText('is marked Done, but its requirements are incomplete');
+    await expect(attention.getByText('Delivery deviation')).toHaveAttribute(
+      'title',
+      /is marked Done, but its requirements are incomplete/,
+    );
     await expect(page.getByRole('button', { name: 'Stop', exact: true })).toHaveCount(0);
     await page.locator('.feature-summary').first().click();
     await expect(page.locator('.feature-summary').first()).toContainText('Delivery deviation');
@@ -122,11 +155,15 @@ test('an existing plan can connect later, publish, and resync its linked tickets
       path: info.outputPath('delivery-deviation-overview.png'),
       fullPage: true,
     });
-    await attention.getByRole('button', { name: 'Review requirement' }).click();
-    await expect(page.locator('.req-row').first()).toHaveAttribute('open', '');
+    // The finding's line opens the affected requirement with the full story.
+    await attention.locator('.attention-open').first().click();
+    await expect(sheet.getByRole('region', { name: 'Delivery attention' })).toContainText(
+      'is marked Done, but its requirements are incomplete',
+    );
+    await closeSheet();
     // A human edit remains a conflict, and retry never overwrites it or makes another issue.
     tracker.issues.get('issue-1')!.description += '\nHuman note';
-    await page.getByRole('button', { name: 'Sync tickets', exact: true }).click();
+    await sync();
     await expect(page.getByText(/1 ticket\(s\) need attention/)).toBeVisible();
     expect(tracker.issues.get('issue-1')!.description).toContain('Human note');
     expect(tracker.issues.size).toBe(1);

@@ -8,7 +8,8 @@ export type RuntimeRequest = {
   prompt: string;
   schema: Record<string, unknown>;
   cwd: string;
-  tools: { url: string; token: string };
+  /** Loopback MCP endpoint; toolCount 0 marks a reasoning-only turn that serves no Aiden tools. */
+  tools: { url: string; token: string; toolCount?: number };
   signal: AbortSignal;
   progress: (message: string) => void;
 };

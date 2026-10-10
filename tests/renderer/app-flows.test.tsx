@@ -91,9 +91,16 @@ test('a project whose first rewrite is running shows it, and a stopped one says 
 
 test('the brief keeps only touch points on screen; the rest lives in one menu', async () => {
   await openProject();
-  expect(screen.getByRole('region', { name: 'Project outcome' })).toBeVisible();
+  // Nothing has been decided yet, so the outcome waits in the menu instead of taking a card.
+  expect(screen.queryByRole('region', { name: 'Project outcome' })).toBeNull();
   for (const name of ['Refresh', 'Refresh status', 'Schedule', 'App URL', 'Markdown', 'Check now'])
     expect(screen.queryByRole('button', { name })).toBeNull();
+  await userEvent.click(screen.getByLabelText('More'));
+  expect(screen.getByRole('menuitem', { name: 'Close project' })).toBeEnabled();
+  // The fixture project has no lifecycle record yet, so acceptance waits for one.
+  expect(screen.getByRole('menuitem', { name: 'Accept outcome' })).toBeDisabled();
+  expect(screen.getByRole('menuitem', { name: /Change branch/ })).toBeEnabled();
+  await userEvent.click(screen.getByLabelText('More'));
   await menu('Export Markdown');
   expect(screen.getByLabelText('More').closest('details')).not.toHaveAttribute('open');
   expect(f.api.saveExport).toHaveBeenCalledWith(expect.objectContaining({ format: 'markdown' }));
@@ -149,27 +156,17 @@ test('action items: PM decisions are answered in place, Dev items copy a prompt,
   await openProject();
   const actions = screen.getByRole('region', { name: 'Needs you' });
   expect(actions).toHaveTextContent('Needs you · 3');
-  await userEvent.click(screen.getByText('Users can list books.', { selector: '.row-title' }));
-  await userEvent.click(screen.getByText('Users can create books.', { selector: '.row-title' }));
   expect(actions).not.toHaveTextContent('Already decided?');
-  const items = [
-    ...within(actions).getAllByRole('listitem'),
-    ...screen
-      .getAllByRole('region', { name: 'Action items' })
-      .flatMap((region) => within(region).getAllByRole('listitem')),
-  ];
-  expect(items.map((item) => item.querySelector('.chip')?.textContent)).toEqual([
-    'PM',
-    'PM',
-    'PM',
-    'Dev',
-    'PM',
-  ]);
+  const items = within(actions).getAllByRole('listitem');
+  expect(items.map((item) => item.querySelector('.chip')?.textContent)).toEqual(['PM', 'PM', 'PM']);
   expect(items[0]).toHaveTextContent('Decide: Can two books share a title?');
   expect(items[0]).toHaveTextContent('Reversible assumption: Allow duplicates');
   expect(items[1]).toHaveTextContent('Tell Aiden where your app runs');
-  expect(items[3]).toHaveTextContent('Finish: Users can list books.');
-  expect(items[4]).toHaveTextContent('Test by hand: Users can create books.');
+  // A decision names its requirement, and that name opens the requirement's pop-up.
+  await userEvent.click(within(items[0]!).getByRole('button', { name: 'For REQ-2' }));
+  const sheet = screen.getByRole('dialog', { name: 'Requirement REQ-2' });
+  expect(sheet).toHaveTextContent('Users can create books.');
+  await userEvent.click(within(sheet).getByRole('button', { name: 'Close requirement REQ-2' }));
   const choice = within(actions).getByRole('button', { name: 'Block duplicates' });
   await userEvent.click(choice);
   expect(choice).toHaveAttribute('aria-pressed', 'true');
@@ -197,17 +194,28 @@ test('action items: PM decisions are answered in place, Dev items copy a prompt,
     expect.stringContaining('What should an empty library say?'),
   );
   expect(screen.getByText(/On Teams, Aiden takes this to them/)).toBeVisible();
-  await userEvent.click(within(items[3]!).getByRole('button', { name: 'Copy work item' }));
+  await userEvent.click(screen.getByText('Users can list books.', { selector: '.row-title' }));
+  const dev = within(screen.getByRole('dialog', { name: 'Requirement REQ-1' })).getByRole(
+    'region',
+    { name: 'Action items' },
+  );
+  expect(within(dev).getAllByRole('listitem')).toHaveLength(1);
+  expect(dev.querySelector('.chip')).toHaveTextContent('Dev');
+  await userEvent.click(within(dev).getByRole('button', { name: 'Copy work item' }));
   expect(writeText).toHaveBeenLastCalledWith(
     expect.stringMatching(/Finish: Users can list books\. \(REQ-1\)[\s\S]*What the code shows:/),
   );
-  await userEvent.click(within(items[4]!).getByRole('button', { name: 'Done' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Close requirement REQ-1' }));
+  await userEvent.click(screen.getByText('Users can create books.', { selector: '.row-title' }));
+  const manual = screen.getByRole('dialog', { name: 'Requirement REQ-2' });
+  expect(manual).toHaveTextContent('Test by hand: Users can create books.');
+  await userEvent.click(within(manual).getByRole('button', { name: 'Done' }));
   expect(f.request).toHaveBeenCalledWith('confirmAction', {
     projectId: report.projectId,
     key: 'REQ-2',
     reportId: report.id,
   });
-  await waitFor(() => expect(actions).not.toHaveTextContent('Test by hand'));
+  await waitFor(() => expect(manual).not.toHaveTextContent('Test by hand'));
 });
 
 test('Why? opens the run conversation: the logged reason first, then questions answered from the record', async () => {
@@ -331,12 +339,16 @@ test('what done means stays editable, and editing it makes Aiden look again', as
 
 test('code evidence, support, and a fresh project stay one click away', async () => {
   await openProject();
-  await userEvent.click(screen.getAllByText('In the code')[0]!);
-  await userEvent.click(screen.getAllByRole('button', { name: /frontend · app.txt:1/ })[0]!);
+  await userEvent.click(screen.getByText('Users can list books.', { selector: '.row-title' }));
+  const sheet = screen.getByRole('dialog', { name: 'Requirement REQ-1' });
+  expect(within(sheet).getByText('In the code')).toBeVisible();
+  await userEvent.click(within(sheet).getByRole('button', { name: /frontend · app.txt:1/ }));
   expect(await screen.findByRole('dialog', { name: 'Code evidence' })).toHaveTextContent(
     'GET /books',
   );
   await userEvent.click(screen.getByRole('button', { name: 'Close evidence' }));
+  expect(sheet).toBeVisible();
+  await userEvent.click(within(sheet).getByRole('button', { name: 'Close requirement REQ-1' }));
   await userEvent.click(screen.getByRole('button', { name: 'Join our Slack' }));
   expect(f.api.openExternal).toHaveBeenCalledWith(expect.stringContaining('join.slack.com'));
   await userEvent.click(screen.getByRole('button', { name: 'Create project' }));

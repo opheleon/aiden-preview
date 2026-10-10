@@ -3,7 +3,7 @@ import { type JSX, useEffect, useRef, useState } from 'react';
 import type { Workspace } from '../hooks/useWorkspace';
 
 /** Record an explicit acceptance or closure with a note and a clear explanation of its effect. */
-function OutcomeDialog({
+export function OutcomeDialog({
   workspace,
   mode,
   dismiss,
@@ -105,24 +105,73 @@ function OutcomeDialog({
  * Offer acceptance once a check has produced evidence to accept, or when the project already has
  * an acceptance or closure decision to show. A brand-new project has nothing to accept yet.
  */
-function outcomeReady(workspace: Workspace): boolean {
+export function outcomeReady(workspace: Workspace): boolean {
   const lifecycle = workspace.project.lifecycle;
   return !!workspace.report || lifecycle?.status === 'closed' || !!lifecycle?.history.length;
 }
 
-/** Keep the person's outcome decision separate from automated progress, with reversible project closure. */
-export function ProjectOutcome({ workspace }: { workspace: Workspace }): JSX.Element | null {
+/**
+ * Whether the card has something to show. When quiet, that means a decision to show or revisit:
+ * an acceptance, a closure, or history. Otherwise any project with a check to accept qualifies.
+ */
+function outcomeShown(workspace: Workspace, quiet: boolean): boolean {
+  if (!outcomeReady(workspace)) return false;
+  const lifecycle = workspace.project.lifecycle;
+  return (
+    !quiet ||
+    lifecycle?.status === 'closed' ||
+    !!lifecycle?.acceptance ||
+    !!lifecycle?.history.length
+  );
+}
+
+/** What a past decision was, for the history list. */
+function historyLabel(action: 'accepted' | 'closed' | 'reopened'): string {
+  if (action === 'accepted') return 'Manually accepted';
+  return action === 'closed' ? 'Project closed' : 'Project reopened';
+}
+
+/** Past acceptances, closures, and reopenings with their notes, newest first. */
+function DecisionHistory({
+  history,
+}: {
+  history: NonNullable<Workspace['project']['lifecycle']>['history'];
+}): JSX.Element | null {
+  if (!history.length) return null;
+  return (
+    <details>
+      <summary>Decision history</summary>
+      <ol>
+        {[...history].reverse().map((entry, index) => (
+          <li key={`${entry.at}-${index}`}>
+            <strong>{historyLabel(entry.action)}</strong>
+            {' · '}
+            <time dateTime={entry.at}>{new Date(entry.at).toLocaleString()}</time>
+            <p>{entry.note}</p>
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
+/**
+ * Keep the person's outcome decision separate from automated progress, with reversible project
+ * closure. When quiet, the card appears only once there is a decision to show or revisit; until
+ * then the decision lives in the overflow menu.
+ */
+export function ProjectOutcome({
+  workspace,
+  quiet = false,
+}: {
+  workspace: Workspace;
+  quiet?: boolean;
+}): JSX.Element | null {
   const [mode, setMode] = useState<'accept' | 'close'>();
   const lifecycle = workspace.project.lifecycle;
   const closed = lifecycle?.status === 'closed';
   const accepted = lifecycle?.acceptanceCurrent;
-  if (!outcomeReady(workspace)) return null;
-  /** Reopening restores the existing monitoring configuration without changing the evidence. */
-  async function reopen(): Promise<void> {
-    const project = await workspace.call('reopenProject', { projectId: workspace.project.id });
-    workspace.setProject((current) => (current.id === project.id ? project : current));
-    workspace.setProjects((projects) => projects.map((p) => (p.id === project.id ? project : p)));
-  }
+  if (!outcomeShown(workspace, quiet)) return null;
   return (
     <section className="project-outcome" aria-label="Project outcome">
       <div className="outcome-row">
@@ -135,49 +184,49 @@ export function ProjectOutcome({ workspace }: { workspace: Workspace }): JSX.Ele
             <p>Outcome manually accepted. Check results are preserved below.</p>
           )}
         </div>
-        <div className="button-row">
-          {closed ? (
-            <button onClick={() => void workspace.action(reopen)}>Reopen project</button>
-          ) : (
-            <>
-              <button
-                disabled={workspace.busy || !workspace.baseline || !lifecycle}
-                onClick={() => setMode('accept')}
-              >
-                {accepted ? 'Update acceptance' : 'Accept outcome'}
-              </button>
-              <button disabled={workspace.busy} onClick={() => setMode('close')}>
-                Close project
-              </button>
-            </>
-          )}
-        </div>
+        <OutcomeButtons workspace={workspace} onChoose={setMode} />
       </div>
-      {!!lifecycle?.history.length && (
-        <details>
-          <summary>Decision history</summary>
-          <ol>
-            {[...lifecycle.history].reverse().map((entry, index) => (
-              <li key={`${entry.at}-${index}`}>
-                <strong>
-                  {entry.action === 'accepted'
-                    ? 'Manually accepted'
-                    : entry.action === 'closed'
-                      ? 'Project closed'
-                      : 'Project reopened'}
-                </strong>
-                {' · '}
-                <time dateTime={entry.at}>{new Date(entry.at).toLocaleString()}</time>
-                <p>{entry.note}</p>
-              </li>
-            ))}
-          </ol>
-        </details>
-      )}
+      <DecisionHistory history={lifecycle?.history ?? []} />
       {mode && (
         <OutcomeDialog workspace={workspace} mode={mode} dismiss={() => setMode(undefined)} />
       )}
     </section>
+  );
+}
+
+/** Reopen a closed project, or record a decision on an active one. */
+function OutcomeButtons({
+  workspace,
+  onChoose,
+}: {
+  workspace: Workspace;
+  onChoose: (mode: 'accept' | 'close') => void;
+}): JSX.Element {
+  const lifecycle = workspace.project.lifecycle;
+  /** Reopening restores the existing monitoring configuration without changing the evidence. */
+  async function reopen(): Promise<void> {
+    const project = await workspace.call('reopenProject', { projectId: workspace.project.id });
+    workspace.setProject((current) => (current.id === project.id ? project : current));
+    workspace.setProjects((projects) => projects.map((p) => (p.id === project.id ? project : p)));
+  }
+  if (lifecycle?.status === 'closed')
+    return (
+      <div className="button-row">
+        <button onClick={() => void workspace.action(reopen)}>Reopen project</button>
+      </div>
+    );
+  return (
+    <div className="button-row">
+      <button
+        disabled={workspace.busy || !workspace.baseline || !lifecycle}
+        onClick={() => onChoose('accept')}
+      >
+        {lifecycle?.acceptanceCurrent ? 'Update acceptance' : 'Accept outcome'}
+      </button>
+      <button disabled={workspace.busy} onClick={() => onChoose('close')}>
+        Close project
+      </button>
+    </div>
   );
 }
 

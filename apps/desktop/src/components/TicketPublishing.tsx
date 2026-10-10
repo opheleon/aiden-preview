@@ -63,6 +63,32 @@ export function TicketPublishing({
   );
 }
 
+/**
+ * The ticket problems that belong on the brief itself: a failed sync and tickets needing a
+ * person's attention. Everything else about publishing waits in the Tickets pop-up.
+ */
+export function TicketAlerts({ state }: { state: TicketState | null }): JSX.Element | null {
+  const attention = attentionCount(state);
+  if (!state?.error && !attention) return null;
+  return (
+    <div className="ticket-alerts">
+      {state?.error && <p role="alert">{state.error}</p>}
+      {!!attention && (
+        <p role="alert">
+          {attention} ticket(s) need attention. Open their requirements for details.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Tickets whose last sync ended in a conflict, an uncertain match, or an error. */
+function attentionCount(state: TicketState | null): number {
+  return (
+    state?.records.filter((r) => ['conflict', 'uncertain', 'error'].includes(r.state)).length ?? 0
+  );
+}
+
 /** Keep the summary factual for local, paused, and enabled destinations. */
 function publishingLabel(state: TicketState | null): string {
   if (!state?.settings) return 'Tickets are local until you connect a tracker.';
@@ -72,8 +98,7 @@ function publishingLabel(state: TicketState | null): string {
 
 /** Surface failures and retired tickets even while requirement details are collapsed. */
 function PublishingHealth({ state }: { state: TicketState | null }): JSX.Element {
-  const attention =
-    state?.records.filter((r) => ['conflict', 'uncertain', 'error'].includes(r.state)).length ?? 0;
+  const attention = attentionCount(state);
   return (
     <>
       {state?.linearProject?.url && (

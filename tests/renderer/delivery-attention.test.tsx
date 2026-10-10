@@ -164,7 +164,7 @@ test('per-ticket timestamps avoid making unrelated closures look stale', () => {
   expect(deliveryAttention(value)[0]?.kind).toBe('deviation');
 });
 
-test('overview prioritizes the disconnect, keeps evidence folded, and opens the nested requirement', async () => {
+test('overview prioritizes the disconnect as one line per finding, with the full story in the requirement pop-up', async () => {
   f.reset();
   f.setReport(current);
   f.setTickets(tracker);
@@ -179,35 +179,46 @@ test('overview prioritizes the disconnect, keeps evidence folded, and opens the 
     attention.compareDocumentPosition(screen.getByRole('region', { name: 'Status' })) &
       Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
-  expect(
-    within(attention).getByText('TES-13 is marked Done, but its requirements are incomplete.'),
-  ).toBeVisible();
+  // The finding is one line: the feature and its label, which explains itself on hover.
+  expect(within(attention).getByText('Delivery deviation')).toHaveAttribute(
+    'title',
+    'TES-13 is marked Done, but its requirements are incomplete.',
+  );
+  expect(within(attention).queryByText(/The implementation is absent/)).toBeNull();
   const feature = screen.getByRole('region', { name: 'Read books' });
-  expect(within(feature).getAllByText('Delivery deviation')[0]).toBeVisible();
-  expect(within(attention).getByText(/The implementation is absent/)).not.toBeVisible();
-  await userEvent.click(within(attention).getByText('Evidence and next steps'));
-  expect(within(attention).getByText(/The implementation is absent/)).toBeVisible();
-  expect(within(attention).getByRole('link', { name: 'Open TES-13' })).toHaveAttribute(
+  expect(within(feature).getAllByText('Delivery deviation')).toHaveLength(2);
+  await userEvent.click(within(attention).getByRole('button', { name: 'Read books' }));
+  const sheet = screen.getByRole('dialog', { name: 'Requirement REQ-1' });
+  const finding = within(sheet).getByRole('region', { name: 'Delivery attention' });
+  expect(finding).toHaveTextContent('TES-13 is marked Done, but its requirements are incomplete.');
+  expect(finding).toHaveTextContent('Delivery of Create books depends on this step.');
+  expect(within(finding).getByText(/The implementation is absent/)).toBeVisible();
+  expect(within(finding).getByRole('link', { name: 'Open TES-13' })).toHaveAttribute(
     'href',
     tracker.records[0]!.url,
   );
-  await userEvent.click(within(attention).getByRole('button', { name: 'Review requirement' }));
-  expect(document.getElementById('requirement-REQ-1')).toHaveAttribute('open');
-  expect(document.activeElement).toBe(document.querySelector('#requirement-REQ-1 > summary'));
-  expect(within(feature).getAllByText('Delivery deviation')[1]).toBeVisible();
+  await userEvent.click(within(sheet).getByRole('button', { name: 'Close requirement REQ-1' }));
+  expect(document.activeElement).toBe(
+    within(attention).getByRole('button', { name: 'Read books' }),
+  );
   expect(screen.getByRole('progressbar')).toHaveAttribute('value', '0');
 });
 
 test('unverified completion offers an explicit retry; resolved findings remove the card', async () => {
   const onCheck = vi.fn();
+  const onOpen = vi.fn();
   const items = deliveryAttention({ ...input(), report: undefined, runs: [] });
-  const { rerender } = render(<DeliveryAttention items={items} busy={false} onCheck={onCheck} />);
+  const { rerender } = render(
+    <DeliveryAttention items={items} busy={false} onCheck={onCheck} onOpen={onOpen} />,
+  );
   expect(screen.getByText('Completion unverified')).toBeVisible();
   await userEvent.click(screen.getByRole('button', { name: 'Run check again' }));
   expect(onCheck).toHaveBeenCalledOnce();
-  rerender(<DeliveryAttention items={items} busy onCheck={onCheck} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Read books' }));
+  expect(onOpen).toHaveBeenCalledWith('REQ-1');
+  rerender(<DeliveryAttention items={items} busy onCheck={onCheck} onOpen={onOpen} />);
   expect(screen.getByRole('button', { name: 'Run check again' })).toBeDisabled();
-  rerender(<DeliveryAttention items={[]} busy={false} onCheck={onCheck} />);
+  rerender(<DeliveryAttention items={[]} busy={false} onCheck={onCheck} onOpen={onOpen} />);
   expect(screen.queryByRole('region', { name: 'Delivery attention' })).toBeNull();
 });
 

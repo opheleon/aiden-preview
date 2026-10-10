@@ -14,6 +14,8 @@ export interface ItemHandlers {
   onAnswer: (callId: string, answer: string) => Promise<void>;
   onWatch: (result: CriterionResult) => void;
   onDone: (key: string) => Promise<void>;
+  /** Open the requirement a decision belongs to; absent inside that requirement's own pop-up. */
+  onOpen?: ((requirementId: string) => void) | undefined;
 }
 
 /** One action item: who, what should happen, why, and the one thing to do about it. */
@@ -26,17 +28,15 @@ function Item({ item, handlers }: { item: ActionItem; handlers: ItemHandlers }):
         <strong>{item.action}</strong>
       </p>
       <p className="row-sub">{item.why}</p>
-      {item.call && item.requirementId && (
-        <a
+      {item.call && item.requirementId && handlers.onOpen && (
+        <button
+          type="button"
           className="text-button"
-          href={`#requirement-${item.requirementId}`}
-          onClick={() => {
-            const row = document.getElementById(`requirement-${item.requirementId}`);
-            if (row instanceof HTMLDetailsElement) row.open = true;
-          }}
+          aria-haspopup="dialog"
+          onClick={() => handlers.onOpen?.(item.requirementId!)}
         >
           For {item.requirementId}
-        </a>
+        </button>
       )}
       {item.call && <DecisionAnswer call={item.call} onAnswer={handlers.onAnswer} />}
       {(item.prompt || item.result || item.confirmable) && (
@@ -72,7 +72,11 @@ export function ActionItems({
   title = 'Action items',
   embedded = false,
   ...handlers
-}: ItemHandlers & { items: ActionItem[]; title?: string; embedded?: boolean }): JSX.Element | null {
+}: ItemHandlers & {
+  items: ActionItem[];
+  title?: string;
+  embedded?: boolean;
+}): JSX.Element | null {
   const [all, setAll] = useState(false);
   if (!items.length) return null;
   return (

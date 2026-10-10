@@ -1,8 +1,24 @@
 # Changelog
 
-## Unreleased
+## 1.2.3
+
+- Make the overview readable at a glance: each requirement is one line with one status chip, and opening it shows everything Aiden knows in a pop-up, including its ticket, actions, verification gaps, and evidence. Delivery findings are one line each and open the affected requirement. A feature's outcome, rationale, and test plan sit behind an (i) button, and the chip explains how Aiden knows on hover.
+
+- Move controls off the brief until they are needed: Adjust plan and Tickets open pop-ups, Accept outcome and Close project live in the project menu until there is a decision to show or every requirement is done, and the monitored branch is a hover on the last-checked line once it is configured.
 
 - Publish a fixed-name Mac installer so the marketing download link can always follow the latest stable release.
+
+- Track another team's roadmap from a pasted checklist: each open item becomes its own requirement, items the owners checked off count as done, unchecked items need merged work or an open pull request to show progress and count as remaining work rather than deviations, and their undefined scope never becomes a question for you.
+
+- Credit work with receipts: code checks search commit history by date, path, subject, or changed text, look up pull requests on public GitHub repositories without credentials, and resolve pull requests and issues linked in your intent, including their live state. Checks also see your original text, so they flag premises that no longer hold, such as a release your intent still calls beta.
+
+- Run app checks and Ask why with Codex again: reasoning-only steps no longer fail because they use no tools. App checks no longer pass a claim about every item from one example.
+
+- Keep shallow clones usable for code checks, and name a partial clone with how to fix it instead of reporting a generic Git failure.
+
+- Show work built in the code apart from verified work: the overall progress bar is green for requirements done and verified and blue for requirements built but not yet verified, with the built count beside the total. Requirements that can only be checked in code count as done.
+
+- Name each repository in the project's monitoring line when a project has several, such as "rolldown on origin/main, vite on origin/main", and show one "not configured" before any branch is chosen.
 
 ## 1.2.2
 

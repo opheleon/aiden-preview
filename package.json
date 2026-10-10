@@ -1,7 +1,7 @@
 {
   "name": "opheleon-desktop-app",
   "private": true,
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Opheleon Aiden desktop workspace",
   "main": "dist/apps/desktop/src/main.js",
   "type": "module",

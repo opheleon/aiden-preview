@@ -166,32 +166,49 @@ async function openProject() {
   return screen.findByRole('region', { name: 'Requirements' });
 }
 
-/** A requirement's row, found by its ID. */
+/** A requirement's line on the brief, found by its ID. */
 function row(status: HTMLElement, id: string): HTMLElement {
-  const details = within(status).getByText(id, { selector: 'summary code' }).closest('details');
-  if (!details) throw new Error(`No row for ${id}`);
-  return details;
+  const line = within(status).getByText(id, { selector: '.req-row code' }).closest('li');
+  if (!line) throw new Error(`No row for ${id}`);
+  return line;
 }
 
-test('the brief leads with status, action items by role, and one status per requirement', async () => {
+/** Open a requirement's pop-up from its line and return the dialog. */
+async function openRow(status: HTMLElement, id: string, text: string): Promise<HTMLElement> {
+  await userEvent.click(within(row(status, id)).getByText(text));
+  return screen.getByRole('dialog', { name: `Requirement ${id}` });
+}
+
+/** Close a requirement's pop-up. */
+async function closeSheet(sheet: HTMLElement, id: string): Promise<void> {
+  await userEvent.click(within(sheet).getByRole('button', { name: `Close requirement ${id}` }));
+  expect(screen.queryByRole('dialog', { name: `Requirement ${id}` })).toBeNull();
+}
+
+test('the brief leads with status, one status per requirement, and work inside each pop-up', async () => {
   const status = await openProject();
   expect(screen.getByText('0 of 2 requirements complete')).toBeVisible();
   expect(screen.getByRole('progressbar')).toHaveAttribute('value', '0');
   expect(within(row(status, 'REQ-1')).getByText('In progress')).toBeVisible();
   expect(within(row(status, 'REQ-2')).getByText('Not started')).toBeVisible();
-  await userEvent.click(within(row(status, 'REQ-1')).getByText('Users can list books.'));
-  await userEvent.click(
-    within(row(status, 'REQ-2')).getByText('Users can create books.', {
-      selector: 'summary .row-title',
-    }),
+  // The line carries nothing but the text and the chip; the chip explains itself on hover.
+  expect(within(row(status, 'REQ-1')).getByText('In progress')).toHaveAttribute(
+    'title',
+    expect.stringMatching(/1 action remaining/),
   );
-  expect(
-    within(row(status, 'REQ-1')).getByRole('region', { name: 'Action items' }),
-  ).toHaveTextContent('Finish: Users can list books.');
-  expect(
-    within(row(status, 'REQ-2')).getByRole('region', { name: 'Action items' }),
-  ).toHaveTextContent('Build: Users can create books.');
+  expect(screen.queryByRole('region', { name: 'Action items' })).toBeNull();
+  let sheet = await openRow(status, 'REQ-1', 'Users can list books.');
+  expect(within(sheet).getByRole('region', { name: 'Action items' })).toHaveTextContent(
+    'Finish: Users can list books.',
+  );
+  await closeSheet(sheet, 'REQ-1');
+  sheet = await openRow(status, 'REQ-2', 'Users can create books.');
+  expect(within(sheet).getByRole('region', { name: 'Action items' })).toHaveTextContent(
+    'Build: Users can create books.',
+  );
   expect(screen.queryByRole('region', { name: 'Risks' })).toBeNull();
+  await userEvent.keyboard('{Escape}');
+  expect(screen.queryByRole('dialog')).toBeNull();
 });
 
 test('app failures produce work items while blocking decisions suppress dependent verification actions', async () => {
@@ -199,31 +216,31 @@ test('app failures produce work items while blocking decisions suppress dependen
   saveCheck(report.baselineId, [listed, created, emptyLibrary]);
   f.setCalls([openCall()]);
   const status = await openProject();
-  const first = row(status, 'REQ-1');
-  expect(within(first).getByText('In progress')).toBeVisible();
-  await userEvent.click(within(first).getByText('Users can list books.'));
-  expect(within(first).getByText('Fail')).toBeVisible();
-  expect(within(first).getByText(/As a first-time user/)).toBeVisible();
-  expect(within(first).getByText('Found by Aiden')).toBeVisible();
+  expect(within(row(status, 'REQ-1')).getByText('In progress')).toBeVisible();
   expect(within(row(status, 'REQ-2')).getByText('Blocked')).toBeVisible();
   expect(screen.getByText('0 of 2 requirements complete')).toBeVisible();
   expect(screen.getByRole('region', { name: 'Needs you' })).toHaveTextContent(
     'Decide: Can two books share a title?',
   );
-  await userEvent.click(
-    within(row(status, 'REQ-2')).getByText('Users can create books.', {
-      selector: 'summary .row-title',
-    }),
-  );
+  const second = await openRow(status, 'REQ-2', 'Users can create books.');
+  expect(within(second).queryByRole('region', { name: 'Action items' })).toBeNull();
+  expect(within(second).getByText(/dependent work are paused/)).toBeVisible();
+  await closeSheet(second, 'REQ-2');
+  const first = await openRow(status, 'REQ-1', 'Users can list books.');
+  expect(within(first).getByText('Fail')).toBeVisible();
+  expect(within(first).getByText(/As a first-time user/)).toBeVisible();
+  expect(within(first).getByText('Found by Aiden')).toBeVisible();
   const actions = within(first).getByRole('region', { name: 'Action items' });
   expect(actions).toHaveTextContent('Fix: An empty library says there are no books yet.');
   expect(actions).toHaveTextContent('Now: A blank page');
-  expect(within(row(status, 'REQ-2')).queryByRole('region', { name: 'Action items' })).toBeNull();
-  expect(within(row(status, 'REQ-2')).getByText(/dependent work are paused/)).toBeVisible();
   await userEvent.click(within(actions).getByRole('button', { name: 'Watch recording REQ-1-E1' }));
   expect(await screen.findByRole('dialog', { name: 'Browser check' })).toHaveTextContent(
     'REQ-1 edge case E1 · Browser check',
   );
+  // Escape closes the topmost pop-up only.
+  await userEvent.keyboard('{Escape}');
+  expect(screen.queryByRole('dialog', { name: 'Browser check' })).toBeNull();
+  expect(screen.getByRole('dialog', { name: 'Requirement REQ-1' })).toBeVisible();
 });
 
 test('a check of earlier requirements is never attached to the current ones', async () => {
@@ -330,7 +347,21 @@ test('statuses follow what Aiden saw, then open decisions, then the code', () =>
   expect(requirementState({ ...base, code: 'missing', method: 'person' }).label).toBe(
     'Needs manual test',
   );
-  expect(requirementState({ ...base, method: 'code' }).how).toMatch(/checked the code/);
+  expect(requirementState({ ...base, method: 'code' })).toMatchObject({
+    label: 'Done',
+    tone: 'verified',
+    basis: 'code',
+    how: expect.stringMatching(/checked the code/),
+  });
+  // A code-only requirement with edge cases is built, not done, until those cases are checked.
+  expect(requirementState({ ...base, method: 'code', expectedEdges: 2 })).toMatchObject({
+    label: 'Built',
+    tone: 'implemented',
+  });
+  expect(requirementState({ ...base, method: 'app' })).toMatchObject({
+    label: 'Built',
+    tone: 'implemented',
+  });
   expect(requirementState({ ...base, main: created }).how).toBe(
     'Built in the code. Synthetic backend-only explanation',
   );
@@ -370,16 +401,13 @@ test('API evidence opens in Watch and an inconclusive check can be confirmed man
   ]);
   const status = await openProject();
   const first = row(status, 'REQ-1');
-  expect(first).toHaveTextContent('Checked via the API.');
+  expect(within(first).getByText('Done')).toHaveAttribute('title', 'Checked via the API.');
   await userEvent.click(within(first).getByRole('button', { name: 'Watch recording REQ-1' }));
   const dialog = await screen.findByRole('dialog', { name: 'API check' });
   expect(await within(dialog).findByRole('img', { name: /API check screenshot/ })).toBeVisible();
   expect(dialog).toHaveTextContent('API check passed');
   await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
-  const second = row(status, 'REQ-2');
-  await userEvent.click(
-    within(second).getByText('Users can create books.', { selector: 'summary .row-title' }),
-  );
+  const second = await openRow(status, 'REQ-2', 'Users can create books.');
   const actions = within(second).getByRole('region', { name: 'Action items' });
   expect(actions).toHaveTextContent('Test by hand:');
   await userEvent.click(within(actions).getByRole('button', { name: 'Done' }));

@@ -17,6 +17,7 @@ import {
 } from '../renderer/delivery-progress';
 import { type ItemState, plural } from '../renderer/requirement-status';
 import { DeliveryStatus } from './DeliveryStatus';
+import { requirementCounts, RequirementProgress } from './RequirementProgress';
 
 /** Project-level direction and evidence confidence, without turning requirement counts into effort. */
 export function DeliveryProgress({
@@ -35,36 +36,28 @@ export function DeliveryProgress({
   const { estimate, previous, error } = useDeliveryEvidence(workspace);
   const features = featureProgress(product, states);
   const current = features.find((f) => !f.complete && !f.blocked && !f.waitingOn.length);
-  const done = [...states.values()].filter((s) => s.label === 'Done').length;
-  const total = product.requirements.length;
+  const counts = requirementCounts(states, product.requirements.length);
   const blocked = workspace.calls.some(isBlocking);
   return (
     <div className="delivery-progress">
       {job && <DeliveryStatus job={job} />}
-      <div className="progress-heading">
-        <h2 className="card-label">Overall progress</h2>
-        <p className="brief-status">
-          <strong>
-            {done} of {total} requirements complete
-          </strong>
-        </p>
-      </div>
-      <progress
-        aria-label="Requirements complete, not percentage of effort"
-        max={total}
-        value={done}
-      />
+      <RequirementProgress counts={counts} detail={verificationSummary(states)} />
       {report && !remoteDeliveryVerified(report) && (
         <p className="brief-note" role="status">
           <strong>Branch unverified.</strong> Monitored remote-branch evidence is unavailable. Local
           work is not counted as delivered. Check repository access, then run a new assessment.
         </p>
       )}
-      <p className="row-sub">{verificationSummary(states)}</p>
-      <NextStep blocked={blocked} job={!!job} current={current} allDone={done === total} />
+      <NextStep
+        blocked={blocked}
+        job={!!job}
+        current={current}
+        allDone={counts.done === counts.total}
+      />
       <details className="progress-details">
         <summary>Progress details and estimates</summary>
         <div className="progress-detail-content">
+          <p>{verificationSummary(states)}</p>
           {features.length > 0 && (
             <p>
               {features.filter((f) => f.complete).length} of {features.length} delivery steps
@@ -167,15 +160,12 @@ function verificationSummary(states: Map<string, ItemState>): string {
   const values = [...states.values()];
   const counts = [
     [
-      values.filter((s) => s.label === 'Done' && s.tone === 'verified').length,
+      values.filter((s) => s.label === 'Done' && s.tone === 'verified' && s.basis !== 'code')
+        .length,
       'verified with recorded checks',
     ],
-    [
-      values.filter((s) => s.label === 'Done' && s.tone === 'implemented').length,
-      'checked in code',
-    ],
+    [values.filter((s) => s.label === 'Done' && s.basis === 'code').length, 'checked in code'],
     [values.filter((s) => s.tone === 'manual').length, 'confirmed by you'],
-    [values.filter((s) => s.label === 'Built').length, 'built, awaiting verification'],
   ] as const;
   return (
     counts

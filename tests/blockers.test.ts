@@ -195,8 +195,14 @@ void test('automatic planning assesses defined scope, saves blocked tickets, and
     assert.equal(reportRun.status, 'completed', reportRun.error);
     const input = runtime.inputs[runtime.calls.indexOf('assess')] as {
       baseline: Product;
+      intent: string;
+      linkedWork: unknown[];
       openDecisions: { question: string; requirementId: string | null; blocking: boolean }[];
     };
+    // The assessment sees the person's own text for premises and links, resolved in code.
+    assert.equal(typeof input.intent, 'string');
+    assert.ok(input.intent.length > 0);
+    assert.deepEqual(input.linkedWork, []);
     // Only the undefined requirement is withheld; prerequisite waits are still assessed.
     assert.deepEqual(
       input.baseline.requirements.map((r) => r.id),

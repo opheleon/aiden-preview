@@ -1,6 +1,7 @@
-import { type JSX, useState } from 'react';
+import { type JSX, type ReactNode, useState } from 'react';
 
 import type { CriterionResult } from '../../../../packages/contracts/src/index';
+import type { TicketState } from '../../../../packages/contracts/src/tickets';
 import { ActionItems } from '../components/ActionItems';
 import { BrowserEvidence } from '../components/BrowserEvidence';
 import { CodingDelivery } from '../components/CodingDelivery';
@@ -9,6 +10,7 @@ import { DeliveryPlan } from '../components/DeliveryPlan';
 import { DeliveryProgress } from '../components/DeliveryProgress';
 import { DoneMeans } from '../components/DoneMeans';
 import { type ProjectTab, ProjectTabs } from '../components/ProjectTabs';
+import { requirementCounts } from '../components/RequirementProgress';
 import { useCodingDelivery } from '../hooks/useCodingDelivery';
 import { useTrackerTickets } from '../hooks/useTrackerTickets';
 import type { Workspace } from '../hooks/useWorkspace';
@@ -18,30 +20,91 @@ import { BriefHeader } from './BriefHeader';
 import { ProjectHistory } from './ProjectHistory';
 const api = window.aiden;
 
+/** One tab's content, kept in the page but hidden while another tab is selected. */
+function Panel({
+  id,
+  tab,
+  children,
+}: {
+  id: ProjectTab;
+  tab: ProjectTab;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <section
+      className="project-panel"
+      role="tabpanel"
+      id={`project-panel-${id}`}
+      aria-labelledby={`project-tab-${id}`}
+      hidden={tab !== id}
+    >
+      {children}
+    </section>
+  );
+}
+
+/** Work that stopped early, with the button that recovers from it. */
+function recovery(
+  workspace: Workspace,
+  state: ReturnType<typeof briefData>['state'],
+): { text: string; label: string; run: () => void } | null {
+  const note = state.note;
+  if (!note) return null;
+  return {
+    text: note.text,
+    label: note.recovery === 'look' ? 'Run check again' : 'Try again',
+    run: () =>
+      void (note.recovery === 'look'
+        ? workspace.lookNow()
+        : workspace.editIntent({ context: workspace.project.context })),
+  };
+}
+
+/** The selected tab, falling back to the overview when the saved tab is no longer offered. */
+function currentTab(saved: ProjectTab | undefined, coding: boolean): ProjectTab {
+  const tab = saved ?? 'overview';
+  return tab === 'coding' && !coding ? 'overview' : tab;
+}
+
+/** Delivery findings and whether every requirement is done, from the current brief data. */
+function overview(
+  workspace: Workspace,
+  data: ReturnType<typeof briefData>,
+  tracker: TicketState | null,
+): { attention: ReturnType<typeof deliveryAttention>; allDone: boolean } {
+  const { product, report, stateMap, check } = data;
+  const counts = requirementCounts(stateMap, product?.requirements.length ?? 0);
+  return {
+    attention: deliveryAttention({
+      product,
+      report,
+      states: stateMap,
+      check,
+      tracker,
+      runs: workspace.runs,
+    }),
+    allDone: !!product && counts.total > 0 && counts.done === counts.total,
+  };
+}
+
 /**
  * The home screen: a brief that reads like a PM's Monday update. Only touch points ask anything of
- * the person; everything else is what Aiden did, found, and decided, with evidence.
+ * the person; everything else is what Aiden did, found, and decided, with evidence one click away
+ * in a requirement's pop-up.
  */
 export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
   const { project, baseline } = workspace;
-  const busy = workPaused(workspace);
+  const busy = workspace.busy || project.lifecycle?.status === 'closed';
   const [watching, setWatching] = useState<CriterionResult | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
   const delivery = useCodingDelivery(workspace);
   const tracker = useTrackerTickets(workspace);
   const [selectedTabs, setSelectedTabs] = useState<Record<string, ProjectTab>>({});
   const coding = delivery.enabled || delivery.jobs.length > 0;
-  const savedTab = selectedTabs[project.id] ?? 'overview';
-  const tab = savedTab === 'coding' && !coding ? 'overview' : savedTab;
-  const { report, product, check, stateMap, actions, unverified, state, status, update } =
-    briefData(workspace);
-  const attention = deliveryAttention({
-    product,
-    report,
-    states: stateMap,
-    check,
-    tracker: tracker.state,
-    runs: workspace.runs,
-  });
+  const tab = currentTab(selectedTabs[project.id], coding);
+  const data = briefData(workspace);
+  const { report, product, check, stateMap, actions, unverified, state, status, update } = data;
+  const { attention, allDone } = overview(workspace, data, tracker.state);
   return (
     <div className="brief">
       <BriefHeader
@@ -49,6 +112,7 @@ export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
         delivery={delivery}
         {...status}
         showStatus={tab === 'overview'}
+        allDone={allDone}
         navigation={
           <ProjectTabs
             selected={tab}
@@ -61,6 +125,7 @@ export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
             items={attention}
             busy={busy}
             onCheck={() => void workspace.lookNow()}
+            onOpen={setOpen}
           />
         }
         progress={
@@ -74,30 +139,16 @@ export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
             />
           ) : undefined
         }
-        note={
-          state.note && {
-            text: state.note.text,
-            label: state.note.recovery === 'look' ? 'Run check again' : 'Try again',
-            run: () =>
-              void (state.note?.recovery === 'look'
-                ? workspace.lookNow()
-                : workspace.editIntent({ context: project.context })),
-          }
-        }
+        note={recovery(workspace, state)}
       />
-      <section
-        className="project-panel"
-        role="tabpanel"
-        id="project-panel-overview"
-        aria-labelledby="project-tab-overview"
-        hidden={tab !== 'overview'}
-      >
+      <Panel id="overview" tab={tab}>
         <ActionItems
           title="Needs you"
           items={actions.filter((a) => !a.requirementId || a.call)}
           onAnswer={workspace.answerCall}
           onWatch={setWatching}
           onDone={workspace.confirm}
+          onOpen={setOpen}
         />
         {product && (
           <DeliveryPlan
@@ -110,16 +161,12 @@ export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
             actions={actions.filter((a) => !a.call)}
             risks={unverified}
             onWatch={setWatching}
+            open={open}
+            onOpen={setOpen}
           />
         )}
-      </section>
-      <section
-        className="project-panel"
-        role="tabpanel"
-        id="project-panel-scope"
-        aria-labelledby="project-tab-scope"
-        hidden={tab !== 'scope'}
-      >
+      </Panel>
+      <Panel id="scope" tab={tab}>
         {baseline ? (
           <DoneMeans
             baseline={baseline}
@@ -131,27 +178,15 @@ export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
         ) : (
           <p className="brief-card">Aiden has not written the scope yet.</p>
         )}
-      </section>
+      </Panel>
       {coding && (
-        <section
-          className="project-panel"
-          role="tabpanel"
-          id="project-panel-coding"
-          aria-labelledby="project-tab-coding"
-          hidden={tab !== 'coding'}
-        >
+        <Panel id="coding" tab={tab}>
           {baseline && (
             <CodingDelivery key={project.id} workspace={workspace} delivery={delivery} />
           )}
-        </section>
+        </Panel>
       )}
-      <section
-        className="project-panel"
-        role="tabpanel"
-        id="project-panel-activity"
-        aria-labelledby="project-tab-activity"
-        hidden={tab !== 'activity'}
-      >
+      <Panel id="activity" tab={tab}>
         <ProjectHistory
           workspace={workspace}
           delivery={delivery}
@@ -159,7 +194,7 @@ export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
           update={update}
           onWatch={setWatching}
         />
-      </section>
+      </Panel>
       {watching && check && (
         <BrowserEvidence
           api={api}
@@ -171,9 +206,4 @@ export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
       )}
     </div>
   );
-}
-
-/** Closed projects preserve their scope and evidence until explicitly reopened. */
-function workPaused(workspace: Workspace): boolean {
-  return workspace.busy || workspace.project.lifecycle?.status === 'closed';
 }

@@ -1,5 +1,5 @@
-import { ChevronRight, Play } from 'lucide-react';
-import type { JSX, MouseEvent, ReactNode } from 'react';
+import { Play } from 'lucide-react';
+import type { JSX, MouseEvent } from 'react';
 
 import type { CriterionResult, Report, TriageItem } from '../../../../packages/contracts/src/index';
 import type { DeliveryAttention } from '../renderer/delivery-attention';
@@ -10,12 +10,16 @@ type Requirement = Report['baseline']['requirements'][number];
 /** Open one cited code excerpt from the accepted report. */
 export type OpenEvidence = (assessmentIndex: number, evidenceIndex: number) => void;
 
-/** A status chip in the shared badge style. */
-export function Chip({ state }: { state: ItemState }): JSX.Element {
-  return <span className={`chip chip--${state.tone}`}>{state.label}</span>;
+/** A status chip in the shared badge style; the tooltip says how Aiden knows. */
+export function Chip({ state, title }: { state: ItemState; title?: string }): JSX.Element {
+  return (
+    <span className={`chip chip--${state.tone}`} title={title}>
+      {state.label}
+    </span>
+  );
 }
 
-/** Play button for a browser check that has a recording; it never toggles the row. */
+/** Play button for a browser check that has a recording; it never opens the row. */
 export function Watch({
   result,
   label,
@@ -32,11 +36,52 @@ export function Watch({
       aria-label={`Watch recording ${label}`}
       onClick={(event: MouseEvent) => {
         event.preventDefault();
+        event.stopPropagation();
         onWatch(result);
       }}
     >
       <Play size={11} aria-hidden="true" /> Watch
     </button>
+  );
+}
+
+/**
+ * One requirement on the brief: its text and one chip. The chip's tooltip says how Aiden knows,
+ * and the row opens the requirement's full story in a pop-up.
+ */
+export function RequirementRow({
+  id,
+  text,
+  state,
+  main,
+  onWatch,
+  onOpen,
+  actionCount = 0,
+  attention,
+}: {
+  id: string;
+  text: string;
+  state: ItemState;
+  main?: CriterionResult | undefined;
+  onWatch: (result: CriterionResult) => void;
+  onOpen: (id: string) => void;
+  actionCount?: number;
+  attention?: DeliveryAttention | undefined;
+}): JSX.Element {
+  const how = `${state.how}${actionCount > 0 ? ` · ${plural(actionCount, 'action')} remaining` : ''}`;
+  return (
+    <li className="req-row" id={`requirement-${id}`}>
+      <button type="button" className="req-open" aria-haspopup="dialog" onClick={() => onOpen(id)}>
+        <span className="row-title">
+          <code>{id}</code> {text}
+        </span>
+      </button>
+      <span className="row-side">
+        <Watch result={main} label={id} onWatch={onWatch} />
+        {attention && <AttentionBadge item={attention} />}
+        <Chip state={state} title={how} />
+      </span>
+    </li>
   );
 }
 
@@ -84,94 +129,63 @@ function EdgeCases({
   );
 }
 
-/**
- * One requirement on the brief: its text, one chip, and how Aiden knows. Opening it shows the edge
- * cases, what the browser check saw, and the code evidence.
- */
-export function RequirementRow({
+/** The evidence behind a requirement: edge cases, what the browser check saw, and the code. */
+export function RequirementDetail({
   requirement,
   report,
-  state,
   main,
   edges,
   triage,
   onWatch,
   onOpenEvidence,
-  children,
-  actionCount = 0,
-  attention,
 }: {
   requirement: Requirement;
   report: Report;
-  state: ItemState;
   main: CriterionResult | undefined;
   edges: CriterionResult[];
   triage: TriageItem[];
   onWatch: (result: CriterionResult) => void;
   onOpenEvidence: OpenEvidence;
-  children?: ReactNode;
-  actionCount?: number;
-  attention?: DeliveryAttention | undefined;
 }): JSX.Element {
   const assessmentIndex = report.assessments.findIndex((a) => a.requirementId === requirement.id);
   const assessment = report.assessments[assessmentIndex];
   return (
-    <details className="req-row" id={`requirement-${requirement.id}`}>
-      <summary>
-        <span className="row-main">
-          <span className="row-title">
-            <ChevronRight className="req-chevron" size={13} aria-hidden="true" />
-            <code>{requirement.id}</code> {requirement.text}
-          </span>
-          <span className="row-sub">
-            {state.how}
-            {actionCount > 0 && ` · ${plural(actionCount, 'action')} remaining`}
-          </span>
-        </span>
-        <span className="row-side">
-          <Watch result={main} label={requirement.id} onWatch={onWatch} />
-          {attention && <AttentionBadge item={attention} />}
-          <Chip state={state} />
-        </span>
-      </summary>
-      <div className="req-detail">
-        {children}
-        <EdgeCases requirement={requirement} results={edges} triage={triage} onWatch={onWatch} />
-        {main && (main.expected || main.observed) && (
-          <div className="req-block">
-            <h3>In your app</h3>
-            <p>{main.explanation}</p>
-            {main.expected && <p className="row-sub">Expected: {main.expected}</p>}
-            {main.observed && <p className="row-sub">Saw: {main.observed}</p>}
-          </div>
-        )}
-        {assessment && (
-          <div className="req-block">
-            <h3>In the code</h3>
-            <p>{assessment.explanation}</p>
-            {assessment.evidence.length > 0 && (
-              <div className="evidence-links">
-                {assessment.evidence.map((item, evidenceIndex) => (
-                  <button
-                    key={`${item.repositoryId}:${item.path}:${item.startLine}`}
-                    className="text-button"
-                    onClick={() => onOpenEvidence(assessmentIndex, evidenceIndex)}
-                  >
-                    {item.repositoryId} · {item.path}:{item.startLine}
-                  </button>
-                ))}
-              </div>
-            )}
-            {assessment.remainingWork.length > 0 && (
-              <ul className="still-to-do">
-                {assessment.remainingWork.map((work, index) => (
-                  <li key={index}>{work}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-      </div>
-    </details>
+    <>
+      <EdgeCases requirement={requirement} results={edges} triage={triage} onWatch={onWatch} />
+      {main && (main.expected || main.observed) && (
+        <div className="req-block">
+          <h3>In your app</h3>
+          <p>{main.explanation}</p>
+          {main.expected && <p className="row-sub">Expected: {main.expected}</p>}
+          {main.observed && <p className="row-sub">Saw: {main.observed}</p>}
+        </div>
+      )}
+      {assessment && (
+        <div className="req-block">
+          <h3>In the code</h3>
+          <p>{assessment.explanation}</p>
+          {assessment.evidence.length > 0 && (
+            <div className="evidence-links">
+              {assessment.evidence.map((item, evidenceIndex) => (
+                <button
+                  key={`${item.repositoryId}:${item.path}:${item.startLine}`}
+                  className="text-button"
+                  onClick={() => onOpenEvidence(assessmentIndex, evidenceIndex)}
+                >
+                  {item.repositoryId} · {item.path}:{item.startLine}
+                </button>
+              ))}
+            </div>
+          )}
+          {assessment.remainingWork.length > 0 && (
+            <ul className="still-to-do">
+              {assessment.remainingWork.map((work, index) => (
+                <li key={index}>{work}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </>
   );
 }
