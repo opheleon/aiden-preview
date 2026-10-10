@@ -10,6 +10,8 @@ Scope holds what you’re building and how you’ll know it works. Refine it as 
 
 Overview shows progress, what’s left, and what needs your attention. Each requirement is one line with one status; hover the status to see how Aiden knows, and open the line for its checks, evidence, linked ticket, and next actions. A delivery step's outcome and rationale sit behind its (i) button. Activity shows what changed and why. Runs has the details of each check.
 
+![A requirement opened from the overview, showing its status, ticket, and code evidence with synthetic fixture data](screenshots/requirement-fixture.png)
+
 While Preview is open, Aiden watches the selected remote branch every minute and checks again when pushed code changes. It also checks each morning if no check has run that day. Use Run check now in the project header to start a fresh assessment from current code. Interrupted checks stay in history; this action does not resume their old snapshots.
 
 With automatic tickets enabled, Aiden checks tracker status every minute while the project is idle. A status change prompts a new code assessment, as does the first successful read of an already completed or canceled ticket. Saving scope and finishing an assessment also reconcile tickets. Sync tickets does this on demand.
