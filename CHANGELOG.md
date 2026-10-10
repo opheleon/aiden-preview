@@ -1,16 +1,18 @@
 # Changelog
 
-## Unreleased
+## 1.2.3
 
 - Publish a fixed-name Mac installer so the marketing download link can always follow the latest stable release.
 
-- Track another team's roadmap from a pasted checklist: each open item becomes its own requirement, items the owners checked off count as done, unchecked items need merged work or an open pull request to show progress, and their undefined scope never becomes a question for you.
+- Track another team's roadmap from a pasted checklist: each open item becomes its own requirement, items the owners checked off count as done, unchecked items need merged work or an open pull request to show progress and count as remaining work rather than deviations, and their undefined scope never becomes a question for you.
 
 - Credit work with receipts: code checks search commit history by date, path, subject, or changed text, look up pull requests on public GitHub repositories without credentials, and resolve pull requests and issues linked in your intent, including their live state. Checks also see your original text, so they flag premises that no longer hold, such as a release your intent still calls beta.
 
 - Run app checks and Ask why with Codex again: reasoning-only steps no longer fail because they use no tools. App checks no longer pass a claim about every item from one example.
 
 - Keep shallow clones usable for code checks, and name a partial clone with how to fix it instead of reporting a generic Git failure.
+
+- Show work built in the code apart from verified work: the overall progress bar is green for requirements done and verified and blue for requirements built but not yet verified, with the built count beside the total. Requirements that can only be checked in code count as done.
 
 - Name each repository in the project's monitoring line when a project has several, such as "rolldown on origin/main, vite on origin/main", and show one "not configured" before any branch is chosen.
 
