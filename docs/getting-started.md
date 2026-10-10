@@ -22,7 +22,7 @@ Aiden follows pushed code on that branch. Local edits stay on your computer. An 
 
 ## Let Aiden write the tickets
 
-If you use Linear, open Connect tracker or Publishing settings on the project. Choose your connection and team, enable automatic tickets, and select Create project and publish tickets.
+If you use Linear, open Tickets on the project's delivery plan, then Connect tracker or Publishing settings. Choose your connection and team, enable automatic tickets, and select Create project and publish tickets.
 
 Aiden creates a Linear project for this project and writes tickets from the delivery plan. Each requirement links to its delivery ticket(s); several requirements can belong to one usable step. Connecting later works too: Sync tickets publishes the existing plan and keeps the same issues up to date.
 
@@ -34,7 +34,7 @@ Refine Scope as you learn. Aiden checks again and updates the project. Activity 
 
 ## Accept the outcome
 
-Review what Aiden checked and any available recordings. Delivery attention shows where the work differs from what you asked for, along with what to do next. Product decides whether the outcome is right; engineering signs off on how it was built.
+Review what Aiden checked and any available recordings: open a requirement to see its checks, evidence, and next actions. Delivery attention shows where the work differs from what you asked for; open the finding for the full story and what to do next. Accept outcome is in the project menu, and on the project itself once every requirement is done. Product decides whether the outcome is right; engineering signs off on how it was built.
 
 Code on the selected branch, app or API checks, and ticket status each answer a different question. A closed ticket does not verify the result. A merge or deployment needs its own evidence, and unavailable checks remain unverified. Aiden does not close tickets just because code appears.
 

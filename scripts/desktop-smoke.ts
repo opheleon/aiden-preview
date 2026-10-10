@@ -155,12 +155,14 @@ try {
   await expect(page.getByRole('button', { name: 'Refresh status' })).toHaveCount(0);
   await page.screenshot({ path: 'test-results/desktop-smoke/brief-fixture.png', fullPage: true });
   await page.getByRole('tab', { name: 'Overview', exact: true }).click();
-  await page.locator('.req-row > summary').first().click();
-  await page.getByRole('button', { name: /frontend · app.txt:1/ }).click();
+  await page.locator('.req-row .req-open').first().click();
+  const sheet = page.getByRole('dialog', { name: /^Requirement REQ-/ });
+  await sheet.getByRole('button', { name: /frontend · app.txt:1/ }).click();
   await page.getByRole('dialog', { name: 'Code evidence' }).waitFor();
   if (!(await page.locator('pre').innerText()).includes('GET /books'))
     throw new Error('Evidence did not open.');
   await page.getByRole('button', { name: 'Close evidence' }).click();
+  await sheet.getByRole('button', { name: /^Close requirement/ }).click();
   const exportFile = path.join(f.root, 'export.md');
   await app.evaluate(({ dialog }, target) => {
     dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath: target });

@@ -1,30 +1,22 @@
-import { AlertTriangle, ArrowRight } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import type { JSX } from 'react';
 
 import type { DeliveryAttention as Attention } from '../renderer/delivery-attention';
 
-/** Open nested evidence with keyboard focus instead of linking to an invisible collapsed row. */
-function revealRequirement(id: string): void {
-  const row = document.getElementById(`requirement-${id}`);
-  if (!row) return;
-  let parent: HTMLElement | null = row;
-  while (parent) {
-    if (parent instanceof HTMLDetailsElement) parent.open = true;
-    parent = parent.parentElement;
-  }
-  row.querySelector('summary')?.focus();
-  row.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
-}
-
-/** A persistent summary above progress; evidence stays expandable and tracker links remain explicit. */
+/**
+ * Delivery findings above progress, one line each: the feature and its finding. The line opens
+ * the affected requirement's pop-up, where the summary, impact, evidence, and next step live.
+ */
 export function DeliveryAttention({
   items,
   busy,
   onCheck,
+  onOpen,
 }: {
   items: Attention[];
   busy: boolean;
   onCheck: () => void;
+  onOpen: (requirementId: string) => void;
 }): JSX.Element | null {
   if (!items.length) return null;
   const deviations = items.filter((item) => item.kind === 'deviation').length;
@@ -35,59 +27,41 @@ export function DeliveryAttention({
     >
       <header className="attention-heading">
         <AlertTriangle size={20} aria-hidden="true" />
-        <div>
-          <h2>
-            {deviations
-              ? `Delivery at risk · ${deviations} ${deviations === 1 ? 'deviation' : 'deviations'}`
-              : 'Delivery needs verification'}
-          </h2>
-          <p>Review the findings and verification gaps below.</p>
-        </div>
+        <h2>
+          {deviations
+            ? `Delivery at risk · ${deviations} ${deviations === 1 ? 'deviation' : 'deviations'}`
+            : 'Delivery needs verification'}
+        </h2>
+        {items.some((item) => item.kind === 'unverified') && (
+          <button className="text-button" disabled={busy} onClick={onCheck}>
+            Run check again
+          </button>
+        )}
       </header>
-      {items.map((item) => (
-        <article className="attention-item" key={item.featureId}>
-          <div className="attention-item-heading">
-            <h3>{item.title}</h3>
-            <AttentionBadge item={item} />
-          </div>
-          <p>
-            <strong>{item.summary}</strong>
-          </p>
-          <p>{item.impact}</p>
-          <details className="attention-evidence">
-            <summary>Evidence and next steps</summary>
-            <ul>
-              {item.evidence.map((text) => (
-                <li key={text}>{text}</li>
-              ))}
-            </ul>
-            <p>{item.next}</p>
-          </details>
-          <div className="attention-actions">
+      <ul className="attention-rows">
+        {items.map((item) => (
+          <li className="attention-row" key={item.featureId}>
             <button
-              className="text-button"
-              onClick={() => revealRequirement(item.requirementIds[0]!)}
+              type="button"
+              className="attention-open"
+              aria-haspopup="dialog"
+              onClick={() => onOpen(item.requirementIds[0]!)}
             >
-              Review requirement <ArrowRight size={14} aria-hidden="true" />
+              {item.title}
             </button>
-            {item.remote?.url && (
-              <a href={item.remote.url} target="_blank" rel="noreferrer">
-                Open {item.remote.issueId ?? 'ticket'}
-              </a>
-            )}
-            {item.kind === 'unverified' && (
-              <button className="text-button" disabled={busy} onClick={onCheck}>
-                Run check again
-              </button>
-            )}
-          </div>
-        </article>
-      ))}
+            <AttentionBadge item={item} />
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
 
-/** Keep the same discrepancy label visible on collapsed features and requirements. */
+/** The same finding label on the attention row, the feature, and the requirement; hover for the summary. */
 export function AttentionBadge({ item }: { item: Attention }): JSX.Element {
-  return <span className={`attention-badge attention-badge--${item.kind}`}>{item.label}</span>;
+  return (
+    <span className={`attention-badge attention-badge--${item.kind}`} title={item.summary}>
+      {item.label}
+    </span>
+  );
 }

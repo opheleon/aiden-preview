@@ -49,7 +49,16 @@ test('planned projects show one ordered work hierarchy and actions remain inside
   expect(browse).toHaveTextContent('Delivery deviation');
   const create = screen.getByRole('region', { name: 'Create books' });
   expect(create).toHaveTextContent('Waiting on prerequisites');
-  expect(within(browse).getByText('Find a book in the library.')).not.toBeVisible();
+  // The outcome and rationale wait behind the (i) button instead of taking a paragraph each.
+  expect(within(browse).queryByText('Find a book in the library.')).toBeNull();
+  await userEvent.click(within(browse).getByRole('button', { name: 'About F-1' }));
+  expect(within(browse).getByText('Find a book in the library.')).toBeVisible();
+  expect(within(browse).getByText('Deliver reading before editing.')).toBeVisible();
+  expect(within(browse).getByRole('button', { name: 'About F-1' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  expect(browse.querySelector('details')).not.toHaveAttribute('open');
   await userEvent.click(within(browse).getByRole('heading', { name: 'F-1 Browse books' }));
   await userEvent.click(within(create).getByRole('heading', { name: 'F-2 Create books' }));
   expect(within(create).getByRole('link', { name: 'Browse books' })).toHaveAttribute(
@@ -61,15 +70,19 @@ test('planned projects show one ordered work hierarchy and actions remain inside
   await userEvent.click(screen.getByText('Progress details and estimates'));
   expect(screen.getByText(/No target agreed yet/)).toBeVisible();
   expect(screen.queryByRole('region', { name: 'Needs you' })).toBeNull();
-  expect(
-    within(browse).getByRole('button', { name: 'Copy work item' }).closest('details'),
-  ).not.toHaveAttribute('open');
+  expect(screen.queryByRole('button', { name: 'Copy work item' })).toBeNull();
   await userEvent.click(
     within(browse).getByText('Users can list books.', { selector: '.row-title' }),
   );
-  expect(within(browse).getByRole('button', { name: 'Copy work item' })).toBeVisible();
+  const sheet = screen.getByRole('dialog', { name: 'Requirement REQ-1' });
+  expect(sheet).toHaveTextContent('REQ-1 · Browse books');
+  expect(within(sheet).getByRole('button', { name: 'Copy work item' })).toBeVisible();
+  await userEvent.click(within(sheet).getByRole('button', { name: 'Close requirement REQ-1' }));
   await userEvent.click(screen.getByRole('button', { name: 'Adjust plan' }));
-  expect(screen.getByRole('button', { name: 'Move Create books earlier' })).toBeDisabled();
+  const editor = screen.getByRole('dialog', { name: 'Adjust plan' });
+  expect(within(editor).getByRole('button', { name: 'Move Create books earlier' })).toBeDisabled();
+  await userEvent.click(within(editor).getByRole('button', { name: 'Close adjust plan' }));
+  expect(screen.queryByRole('dialog')).toBeNull();
 });
 
 test('plan edits respect prerequisites and save the full plan without a mandatory approval flow', async () => {
@@ -213,7 +226,10 @@ test('a blocking decision pauses its feature, dependents wait on it, and tickets
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
   const browse = await screen.findByRole('region', { name: 'Browse books' });
   const create = screen.getByRole('region', { name: 'Create books' });
-  expect(browse).toHaveTextContent('Waiting on 1 decision. This requirement and dependent work');
+  expect(within(browse).getByText('Blocked')).toHaveAttribute(
+    'title',
+    expect.stringMatching(/Waiting on 1 decision. This requirement and dependent work/),
+  );
   expect(create).toHaveTextContent('Waiting on prerequisites');
   expect(create).not.toHaveTextContent('Blocked by a decision');
   expect(screen.queryByRole('button', { name: 'Copy work item' })).not.toBeInTheDocument();
@@ -222,9 +238,11 @@ test('a blocking decision pauses its feature, dependents wait on it, and tickets
   ).toBeVisible();
   await userEvent.click(within(create).getByRole('heading', { name: 'F-2 Create books' }));
   const row = within(create).getByText(/Users can create books/, { selector: '.row-title' });
-  expect(row.closest('details')).toHaveTextContent('Waiting');
+  expect(row.closest('li')).toHaveTextContent('Waiting');
   await userEvent.click(row);
-  await userEvent.click(within(create).getByRole('button', { name: 'Copy ticket' }));
+  const sheet = screen.getByRole('dialog', { name: 'Requirement REQ-2' });
+  expect(sheet).toHaveTextContent('A prerequisite feature is waiting on 1 decision.');
+  await userEvent.click(within(sheet).getByRole('button', { name: 'Copy ticket' }));
   const ticket = copy.mock.calls[0]?.[0] as string;
   expect(ticket).toContain('## Waiting on a prerequisite decision');
   expect(ticket).toContain('F-1 Browse books needs a decision first: Who can browse this library?');

@@ -41,14 +41,13 @@ export function DeliveryProgress({
   return (
     <div className="delivery-progress">
       {job && <DeliveryStatus job={job} />}
-      <RequirementProgress counts={counts} />
+      <RequirementProgress counts={counts} detail={verificationSummary(states)} />
       {report && !remoteDeliveryVerified(report) && (
         <p className="brief-note" role="status">
           <strong>Branch unverified.</strong> Monitored remote-branch evidence is unavailable. Local
           work is not counted as delivered. Check repository access, then run a new assessment.
         </p>
       )}
-      <p className="row-sub">{verificationSummary(states)}</p>
       <NextStep
         blocked={blocked}
         job={!!job}
@@ -58,6 +57,7 @@ export function DeliveryProgress({
       <details className="progress-details">
         <summary>Progress details and estimates</summary>
         <div className="progress-detail-content">
+          <p>{verificationSummary(states)}</p>
           {features.length > 0 && (
             <p>
               {features.filter((f) => f.complete).length} of {features.length} delivery steps

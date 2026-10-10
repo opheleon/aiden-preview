@@ -28,9 +28,16 @@ export function requirementCounts(
  * The overall progress line and a two-tone bar: green for requirements done and verified, blue for
  * requirements built in the code that no check has confirmed yet. Example: "3 of 15 requirements
  * complete · 5 built, not yet verified". The bar counts requirements, not effort. Screen readers
- * get the native progress element and the visible text; the colored bar is decorative.
+ * get the native progress element and the visible text; the colored bar is decorative. The
+ * verification breakdown is a tooltip on the count and is repeated under Progress details.
  */
-export function RequirementProgress({ counts }: { counts: RequirementCounts }): JSX.Element {
+export function RequirementProgress({
+  counts,
+  detail,
+}: {
+  counts: RequirementCounts;
+  detail?: string;
+}): JSX.Element {
   const { total, done, built } = counts;
   /** Width of a bar segment as a share of all requirements. */
   const share = (n: number) => `${total ? (100 * n) / total : 0}%`;
@@ -39,7 +46,7 @@ export function RequirementProgress({ counts }: { counts: RequirementCounts }): 
       <div className="progress-heading">
         <h2 className="card-label">Overall progress</h2>
         <p className="brief-status">
-          <strong>
+          <strong title={detail}>
             {done} of {total} requirements complete
           </strong>
           {built > 0 && <span className="progress-built"> · {built} built, not yet verified</span>}

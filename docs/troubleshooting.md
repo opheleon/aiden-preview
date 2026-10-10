@@ -28,4 +28,4 @@ Confirm the team, project destination, permissions, and publishing choice in Pro
 
 Check Settings → Project → Branch monitoring. Select an existing remote branch and make sure this computer can read it. Push the intended work before expecting remote code evidence. Missing GitHub credentials do not make browser checks proof of remote code delivery. Accessible app checks may still provide their own evidence.
 
-If a closed ticket still shows a deviation, expand Evidence and next steps. Restore access, resolve the missing requirement, or run the outstanding acceptance check and reassess. A tracker status alone cannot clear a confirmed implementation mismatch.
+If a closed ticket still shows a deviation, open the finding to see the evidence and next steps. Restore access, resolve the missing requirement, or run the outstanding acceptance check and reassess. A tracker status alone cannot clear a confirmed implementation mismatch.
