@@ -134,13 +134,7 @@ export function BriefHeader({
           {when && <p className="brief-when">{when}</p>}
           <p className="brief-when">
             {closed ? 'Monitoring paused for' : 'Monitoring'}{' '}
-            {workspace.project.repositories
-              .map((repo) =>
-                repo.monitoredBranch
-                  ? `${repo.monitoredBranch.remote}/${repo.monitoredBranch.branch}`
-                  : 'not configured',
-              )
-              .join(', ')}{' '}
+            {monitoringLabel(workspace.project.repositories)}{' '}
             <button
               className="text-button"
               onClick={() => {
@@ -184,4 +178,23 @@ export function BriefHeader({
       <LiveLine workspace={workspace} />
     </>
   );
+}
+
+/**
+ * Which branch each repository follows. With several repositories each branch is named by its
+ * folder ("rolldown on origin/main, vite on origin/main"); before any branch is chosen, one
+ * "not configured" stands for the whole project instead of one per repository.
+ */
+export function monitoringLabel(repositories: Workspace['project']['repositories']): string {
+  if (!repositories.some((repo) => repo.monitoredBranch)) return 'not configured';
+  return repositories
+    .map((repo) => {
+      const name = repo.path.split('/').at(-1);
+      const branch = repo.monitoredBranch
+        ? `${repo.monitoredBranch.remote}/${repo.monitoredBranch.branch}`
+        : null;
+      if (repositories.length === 1) return branch ?? 'not configured';
+      return branch ? `${name} on ${branch}` : `${name} not configured`;
+    })
+    .join(', ');
 }

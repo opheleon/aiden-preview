@@ -12,6 +12,8 @@
 
 - Keep shallow clones usable for code checks, and name a partial clone with how to fix it instead of reporting a generic Git failure.
 
+- Name each repository in the project's monitoring line when a project has several, such as "rolldown on origin/main, vite on origin/main", and show one "not configured" before any branch is chosen.
+
 ## 1.2.2
 
 - Put app update checks, downloads, progress, and explicit restart in the sidebar footer. Keep download and beta-channel preferences in Settings.
