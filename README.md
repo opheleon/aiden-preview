@@ -8,7 +8,7 @@ You set the intent, make the calls, and accept the outcome.
 
 **Preview · Apple Silicon macOS · Apache 2.0**
 
-[Download](https://github.com/opheleon/aiden-preview/releases) · [Getting started](docs/getting-started.md) · [Join our Slack](https://join.slack.com/t/aidenbyopheleon/shared_invite/zt-4apsg5d7p-FDO9ae0imxj~KgauP8lpsw)
+[Website](https://opheleon.ai) · [Download](https://github.com/opheleon/aiden-preview/releases) · [Getting started](docs/getting-started.md) · [Join our Slack](https://join.slack.com/t/aidenbyopheleon/shared_invite/zt-4apsg5d7p-FDO9ae0imxj~KgauP8lpsw)
 
 ![Aiden project overview using synthetic fixture data](docs/screenshots/report-fixture.png)
 
