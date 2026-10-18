@@ -10,6 +10,11 @@ export type DemoNote = { id: number; text: string };
 function digest(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
+const API_KEY_SALT = 'local-auth-demo-api-key-salt-v1';
+/** Derive API-key hashes with computational effort suitable for password-like secrets. */
+function apiKeyHash(value: string): Buffer {
+  return scryptSync(value, API_KEY_SALT, 32);
+}
 /** Store a salted password derivation rather than the password itself. */
 function passwordHash(password: string): string {
   const salt = randomBytes(16).toString('hex');
@@ -66,8 +71,9 @@ export class DemoDatabase {
   }
   /** Authenticate the demo API account with a header key and no browser session. */
   apiUser(key: string): number | null {
-    if (!timingSafeEqual(Buffer.from(digest(key)), Buffer.from(digest(this.account.apiKey))))
-      return null;
+    const actual = apiKeyHash(key);
+    const expected = apiKeyHash(this.account.apiKey);
+    if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return null;
     const row = this.db.prepare('SELECT id FROM users WHERE email=?').get(this.account.email);
     return row ? Number(row.id) : null;
   }
