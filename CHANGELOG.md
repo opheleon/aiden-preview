@@ -2,6 +2,12 @@
 
 ## 1.2.4
 
+- Require packaged desktop journeys on hosted Windows, Linux, and macOS runners, with installed Windows and extracted Linux AppImage coverage and screenshots/traces saved for every run.
+
+- Wait for worker cleanup when closing the desktop app so interrupted checks keep their cancellation state across restart.
+
+- Resolve bundled workflow files correctly on Windows so the installed app can write requirements and run checks.
+
 - Include the verification browser and video encoder in macOS and Windows packages, so private sign-in and app checks work without a separate browser installation. Test packaged login with an unavailable external browser cache.
 
 - Preserve cancellation status when a device check finishes during a concurrent status read.

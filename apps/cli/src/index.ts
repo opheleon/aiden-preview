@@ -42,7 +42,7 @@ const command = positionals[0];
 const client = new WorkerClient();
 const terminal = createInterface({ input: process.stdin, output: process.stderr });
 process.on('SIGINT', () => {
-  client.close();
+  void client.close();
   terminal.close();
 });
 /** Require an interactive terminal before accepting review or authentication input. */
@@ -343,5 +343,5 @@ try {
   process.exitCode = 1;
 } finally {
   terminal.close();
-  client.close();
+  await client.close();
 }

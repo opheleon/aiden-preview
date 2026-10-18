@@ -35,6 +35,7 @@ let worker: WorkerClient;
 let window: BrowserWindow;
 let updater: DesktopUpdater;
 let quitting = false;
+let quitReady = false;
 const activeRuns = new Set<string>();
 const activeCodingJobs = new Set<string>();
 /** Connect lifecycle observers before loading renderer content; failures never relaunch paid work. */
@@ -138,9 +139,17 @@ app
     app.quit();
   });
 app.on('window-all-closed', () => app.quit());
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  if (quitReady) return;
+  if (worker) event.preventDefault();
+  if (quitting) return;
   quitting = true;
   watcher?.stop();
   updater?.dispose();
-  worker?.close();
+  if (worker) {
+    void worker.close().then(() => {
+      quitReady = true;
+      app.quit();
+    });
+  }
 });

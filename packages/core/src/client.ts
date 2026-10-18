@@ -71,6 +71,8 @@ export class WorkerClient extends EventEmitter {
   private closed = false;
   private timeout: number;
   private shutdownTimer: ReturnType<typeof setTimeout> | undefined;
+  private shutdown: Promise<void> | undefined;
+  private exited = false;
 
   /** Start the worker with the caller's environment; provider execution remains in the worker. */
   constructor(env: NodeJS.ProcessEnv = process.env, options: WorkerClientOptions = {}) {
@@ -89,8 +91,12 @@ export class WorkerClient extends EventEmitter {
     this.child.stderr.resume();
     this.input = createInterface({ input: this.child.stdout });
     this.input.on('line', (line) => this.receive(line));
-    this.child.on('error', () => this.fail('Aiden worker could not start.'));
+    this.child.on('error', () => {
+      this.exited = true;
+      this.fail('Aiden worker could not start.');
+    });
     this.child.on('exit', () => {
+      this.exited = true;
       clearTimeout(this.shutdownTimer);
       this.fail('Aiden worker stopped. Reopen the app to resume saved work.');
     });
@@ -165,12 +171,28 @@ export class WorkerClient extends EventEmitter {
     });
   }
 
-  /** Stop accepting requests immediately, then allow five seconds for worker cleanup. */
-  close(): void {
-    if (this.closed) return;
+  /** Reject new requests and await worker cleanup before the host exits; bound a stuck shutdown. */
+  close(): Promise<void> {
+    if (this.shutdown) return this.shutdown;
     this.fail('Worker is closed.');
-    this.child.stdin.end();
-    this.shutdownTimer = setTimeout(() => this.child.kill('SIGTERM'), 5000);
-    this.shutdownTimer.unref();
+    this.shutdown = new Promise((resolve) => {
+      if (this.exited) return resolve();
+      /** Release shutdown listeners once the worker exits or the cleanup deadline expires. */
+      const finish = () => {
+        clearTimeout(this.shutdownTimer);
+        this.child.off('exit', finish);
+        this.child.off('error', finish);
+        resolve();
+      };
+      this.child.once('exit', finish);
+      this.child.once('error', finish);
+      this.shutdownTimer = setTimeout(() => {
+        this.child.kill('SIGKILL');
+        finish();
+      }, 5000);
+      this.shutdownTimer.unref();
+      this.child.stdin.end();
+    });
+    return this.shutdown;
   }
 }

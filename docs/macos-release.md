@@ -28,7 +28,7 @@ Running the workflow manually from the Actions tab is a dry run: unsigned builds
 
 ### Hosted packaged-app tests
 
-Every PR runs the shared `packaged-desktop.yml` workflow on macOS 15 ARM64, Windows Server 2025 x64, and Ubuntu 24.04 x64. Each builds an unsigned distributable with the verification browser, then runs setup, real local database login, API-key access, saved credential reuse, project deletion, restart, update transport, and evidence journeys. Provider output is synthetic and consumes no subscription quota. The Mac package is a ZIP; Windows runs the silently installed NSIS app; Linux runs an extracted AppImage under Xvfb with its Chromium sandbox helper enabled. Linux packaging is a CI compatibility target, not a published release asset.
+Every PR runs the shared `packaged-desktop.yml` workflow on macOS 15 ARM64, Windows Server 2025 x64, and Ubuntu 24.04 x64. Each builds an unsigned distributable with the verification browser, then runs setup, real local database login, API-key access, session credential reuse, project closure, restart, update transport, and evidence journeys. Provider output is synthetic and consumes no subscription quota. The Mac package is a ZIP; Windows runs the silently installed NSIS app; Linux runs an extracted AppImage under Xvfb with its Chromium sandbox helper enabled. Linux packaging is a CI compatibility target, not a published release asset.
 
 Download `packaged-evidence-<os>` from the Quality run for screenshots, Playwright traces, and the HTML report, including successful runs. `pnpm test:package` selects the installed or extracted app for the host OS; `AIDEN_PACKAGED_APP` can override its path. These checks do not cover SmartScreen, macOS permission dialogs, or upgrades on a consumer desktop.
 

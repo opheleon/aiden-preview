@@ -73,6 +73,9 @@ async function completed(service: DeviceVerification, id: string) {
     const run = await service.read(id);
     if (run?.status !== 'running') {
       assert.ok(run);
+      // The terminal record is written before report I/O and the device lock are released.
+      // Wait for teardown before a subsequent test reuses the same phone.
+      await service.wait(id);
       return run;
     }
     await setTimeout(20);

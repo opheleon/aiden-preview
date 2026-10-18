@@ -25,6 +25,7 @@ execFileSync(
     'test',
     '--config',
     'playwright.desktop.config.ts',
+    '--max-failures=3',
   ],
   { env, stdio: 'inherit' },
 );
