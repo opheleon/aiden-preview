@@ -55,9 +55,11 @@ class FixtureLauncher {
         RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true
       })) {
       if (!AssignProcessToJobObject(job, child.Handle)) { child.Kill(); return 126; }
-      var input = ForwardInput(child);
-      var output = child.StandardOutput.BaseStream.CopyToAsync(Console.OpenStandardOutput());
-      var error = child.StandardError.BaseStream.CopyToAsync(Console.OpenStandardError());
+      // Console pipe reads may block synchronously before returning a Task on .NET Framework.
+      // Start all three pumps independently so an open stdin cannot prevent replies flowing.
+      var input = Task.Run(() => ForwardInput(child));
+      var output = Task.Run(() => child.StandardOutput.BaseStream.CopyToAsync(Console.OpenStandardOutput()));
+      var error = Task.Run(() => child.StandardError.BaseStream.CopyToAsync(Console.OpenStandardError()));
       child.WaitForExit();
       Task.WaitAll(output, error);
       int code = child.ExitCode;
