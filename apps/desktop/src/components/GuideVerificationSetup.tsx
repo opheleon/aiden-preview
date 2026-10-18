@@ -1,4 +1,4 @@
-import { type JSX, useEffect, useState } from 'react';
+import { type JSX, useEffect, useRef, useState } from 'react';
 
 import type { VerifyMethod } from '../../../../packages/contracts/src/guide';
 import type { Guide } from '../hooks/useGuide';
@@ -179,8 +179,19 @@ function useVerificationSetup(props: SetupProps) {
 export function GuideVerificationSetup(props: SetupProps): JSX.Element {
   const setup = useVerificationSetup(props);
   const { workspace, guide } = props;
+  const form = useRef<HTMLDivElement>(null);
+  const requestedReady =
+    !!props.initialMethod && setup.loaded && setup.selected[props.initialMethod];
+  useEffect(() => {
+    if (!requestedReady) return;
+    const target = form.current?.querySelector<HTMLInputElement>(
+      '[data-guide-entry-target] input[type="url"]',
+    );
+    target?.focus();
+    target?.scrollIntoView?.({ block: 'nearest' });
+  }, [requestedReady, props.initialMethod]);
   return (
-    <div className="guide-card guide-verification">
+    <div ref={form} className="guide-card guide-verification">
       <fieldset
         className="guide-method-list"
         disabled={!setup.loaded || setup.pending || guide.thinking}
@@ -189,7 +200,11 @@ export function GuideVerificationSetup(props: SetupProps): JSX.Element {
         {methods
           .filter((method) => method.id !== 'phone' || phoneVerificationVisible())
           .map((method) => (
-            <div className="guide-method-option" key={method.id}>
+            <div
+              className="guide-method-option"
+              key={method.id}
+              data-guide-entry-target={props.initialMethod === method.id ? '' : undefined}
+            >
               <label className="guide-method-choice" aria-label={method.label}>
                 <input
                   type="checkbox"

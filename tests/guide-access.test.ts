@@ -3,10 +3,12 @@ import path from 'node:path';
 import test from 'node:test';
 
 import { ProjectDeviceTestSchema } from '../packages/contracts/src/device-verification.js';
+import type { VerificationSettings } from '../packages/contracts/src/verification.js';
 import { Engine } from '../packages/core/src/engine.js';
 import { guideFacts } from '../packages/core/src/guide-context.js';
 import { configureGuideVerification, testAppUrl } from '../packages/core/src/guide-verification.js';
-import { atomic, Store } from '../packages/core/src/storage.js';
+import { atomic, hash, Store } from '../packages/core/src/storage.js';
+import { verificationAccessKeys } from '../packages/core/src/verification-access.js';
 import {
   readAppUrl,
   saveVerificationSettings,
@@ -158,4 +160,54 @@ void test('setup proves every selected target before saving and ties readiness t
     'removed targets lose old evidence',
   );
   await assert.rejects(testAppUrl('file:///private/fixture'), /http/i);
+});
+
+void test('access fingerprints preserve existing presence flags and invalidate changed authentication', () => {
+  for (const available of [undefined, false, true]) {
+    const settings: VerificationSettings = {
+      url: 'http://localhost:3000/app',
+      api: { url: 'http://localhost:3000/api/', allowMutations: false, keyHeader: 'X-API-Key' },
+      ...(available === undefined
+        ? {}
+        : { apiKeyConfigured: available, webCredentialsConfigured: available }),
+      authRevision: 'revision-one',
+    };
+    const keys = verificationAccessKeys(settings);
+    assert.equal(
+      keys.api,
+      hash(
+        JSON.stringify({
+          ...settings.api,
+          credentialsAvailable: available,
+          url: settings.api!.url,
+          auth: 'revision-one',
+        }),
+      ),
+      'existing API access evidence remains valid',
+    );
+    assert.equal(
+      keys.web,
+      hash(
+        JSON.stringify({
+          url: settings.url,
+          login: undefined,
+          credentialsAvailable: available,
+          auth: 'revision-one',
+        }),
+      ),
+      'existing browser access evidence remains valid',
+    );
+    assert.notDeepEqual(
+      keys,
+      verificationAccessKeys({ ...settings, authRevision: 'revision-two' }),
+    );
+    assert.notEqual(
+      keys.api,
+      verificationAccessKeys({ ...settings, apiKeyConfigured: !available }).api,
+    );
+    assert.notEqual(
+      keys.web,
+      verificationAccessKeys({ ...settings, webCredentialsConfigured: !available }).web,
+    );
+  }
 });

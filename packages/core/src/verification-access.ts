@@ -9,7 +9,7 @@ export function verificationAccessKeys(settings: VerificationSettings): Record<s
       JSON.stringify({
         url: new URL(settings.url).href,
         login: settings.webLogin,
-        credentialsAvailable: settings.webCredentialsConfigured,
+        credentialsAvailable: availabilityFlag(settings.webCredentialsConfigured),
         auth: settings.authRevision,
       }),
     );
@@ -17,11 +17,22 @@ export function verificationAccessKeys(settings: VerificationSettings): Record<s
     keys.api = hash(
       JSON.stringify({
         ...settings.api,
-        credentialsAvailable: settings.apiKeyConfigured,
+        credentialsAvailable: availabilityFlag(settings.apiKeyConfigured),
         url: new URL(settings.api.url).href,
         auth: settings.authRevision,
       }),
     );
   if (settings.phone) keys.phone = hash(JSON.stringify(settings.phone));
   return keys;
+}
+
+/**
+ * Fingerprints contain only a public presence flag, never a credential. Return literal values
+ * so secret-named settings cannot flow into the generic content hash. Preserve absent versus
+ * false flags to keep previously saved access fingerprints valid.
+ */
+function availabilityFlag(value: boolean | undefined): boolean | undefined {
+  if (value === true) return true;
+  if (value === false) return false;
+  return undefined;
 }

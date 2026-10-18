@@ -2,6 +2,10 @@
 
 ## 1.2.4
 
+- Preserve cancellation status when a device check finishes during a concurrent status read.
+
+- Keep requested web/API setup fields visible after settings load, including in smaller chat windows. Install the login-test browser in desktop CI and explicitly normalize public credential-presence flags used in access fingerprints.
+
 - Show explicit setup status and a close button in project chat. Keep confirmed requirements confirmed when a code connection only refreshes the overview; genuine scope changes still require review.
 
 - Confirm local-code and manual-check setup directly. Show access checks only for app/API/device targets, and update the actions automatically when selections change.

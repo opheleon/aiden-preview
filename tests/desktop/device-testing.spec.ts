@@ -23,7 +23,12 @@ test('project connections check access before saving and keep API keys private a
       .getByRole('button', { name: 'Manage' })
       .click();
     const chat = page.getByRole('dialog', { name: 'Chat with Aiden' });
+    await page.setViewportSize({ width: 600, height: 700 });
     await chat.getByRole('button', { name: 'API access' }).click();
+    await expect(chat.getByLabel('API base URL')).toBeFocused();
+    await expect(chat.getByLabel('API base URL')).toBeInViewport();
+    await page.screenshot({ path: info.outputPath('api-entry-narrow.png') });
+    await page.setViewportSize({ width: 1320, height: 868 });
     await expect(chat.getByLabel('API base URL')).toBeInViewport();
     expect(await f.calls()).toEqual(callsBefore);
     await expect(chat.getByRole('checkbox', { name: /iPhone/ })).toHaveCount(0);

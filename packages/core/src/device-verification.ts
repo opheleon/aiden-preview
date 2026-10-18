@@ -233,13 +233,20 @@ export class DeviceVerification {
   /** Return a saved run, keeping interrupted device sessions distinct from completed verification. */
   async read(id: string): Promise<DeviceRun | null> {
     z.string().uuid().parse(id);
+    // A run can finish during the file reads below. Its earlier snapshot is not an orphan.
+    const ownedAtRead = this.active.has(id);
     const file = await boundedPath(this.root, `device-runs/${id}/run.json`);
     const saved = await optionalJson(file);
     if (!saved) return null;
     const run = DeviceRunSchema.parse(saved);
     if (run.id !== id) throw new Error('Saved device run identity does not match its folder.');
     run.reportPath = await boundedPath(this.root, `device-runs/${id}/report.html`);
-    if (run.status === 'running' && !this.active.has(id) && !otherWorkerAlive(run.ownerPid))
+    if (
+      run.status === 'running' &&
+      !ownedAtRead &&
+      !this.active.has(id) &&
+      !otherWorkerAlive(run.ownerPid)
+    )
       return {
         ...run,
         status: 'failed',

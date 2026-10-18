@@ -142,7 +142,13 @@ void test('cancellation aborts the actor, cleans up the phone, and leaves a save
   });
   const { runId } = await service.start(config);
   await ready;
+  const reads = Array.from({ length: 30 }, () => service.read(runId));
   assert.equal(service.cancel(runId).cancelled, true);
+  for (const snapshot of await Promise.all(reads)) {
+    assert.ok(snapshot);
+    assert.ok(['running', 'cancelled'].includes(snapshot.status), snapshot.message);
+  }
+  await service.wait(runId);
   const run = await completed(service, runId);
   assert.equal(run.status, 'cancelled');
   assert.equal(fixture.calls.at(-1)?.method, 'DELETE');

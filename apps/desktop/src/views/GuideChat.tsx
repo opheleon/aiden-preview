@@ -171,8 +171,11 @@ export function GuideChat({
     const element = thread.current;
     if (!visible || !element || !following.current) return;
     if (entry && requestedAction.current) {
+      const target =
+        requestedAction.current.querySelector('[data-guide-entry-target] input[type="url"]') ??
+        requestedAction.current;
       element.scrollTop =
-        requestedAction.current.getBoundingClientRect().top -
+        target.getBoundingClientRect().top -
         element.getBoundingClientRect().top +
         element.scrollTop;
       return;
