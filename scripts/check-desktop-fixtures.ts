@@ -14,8 +14,11 @@ const { stdout } = await promisify(execFile)(provider.binary, ['--version'], {
   timeout: 10_000,
 });
 assert.match(stdout, /synthetic-desktop-provider/);
+console.log('Synthetic provider version probe passed.');
 process.env.AIDEN_CODEX_BINARY = provider.binary;
-const client = new RpcClient(cleanEnvironment(), process.cwd());
+const client = new RpcClient({ ...cleanEnvironment(), AIDEN_FIXTURE_TRACE: '1' }, process.cwd());
+// These diagnostics contain only byte counts from our synthetic peer, never model prompts.
+client.process.stderr.on('data', (bytes: Buffer) => process.stderr.write(bytes));
 try {
   await client.request('initialize', {}, 10_000);
   const account = await client.request('account/read', {}, 10_000);

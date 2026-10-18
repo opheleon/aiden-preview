@@ -33,9 +33,20 @@ class FixtureLauncher {
     }
     return value.Append('\\', slashes * 2).Append('"').ToString();
   }
+  static async Task Pump(Stream source, Stream destination, string name) {
+    var buffer = new byte[8192];
+    int count;
+    while ((count = await source.ReadAsync(buffer, 0, buffer.Length)) > 0) {
+      await destination.WriteAsync(buffer, 0, count);
+      // Process.StandardInput.BaseStream buffers short writes until flushed.
+      await destination.FlushAsync();
+      if (Environment.GetEnvironmentVariable("AIDEN_FIXTURE_TRACE") == "1")
+        Console.Error.WriteLine("Fixture " + name + ": forwarded " + count + " bytes");
+    }
+  }
   static async Task ForwardInput(Process child) {
     try {
-      await Console.OpenStandardInput().CopyToAsync(child.StandardInput.BaseStream);
+      await Pump(Console.OpenStandardInput(), child.StandardInput.BaseStream, "stdin");
       child.StandardInput.Close();
     } catch (IOException) { }
   }
@@ -58,8 +69,8 @@ class FixtureLauncher {
       // Console pipe reads may block synchronously before returning a Task on .NET Framework.
       // Start all three pumps independently so an open stdin cannot prevent replies flowing.
       var input = Task.Run(() => ForwardInput(child));
-      var output = Task.Run(() => child.StandardOutput.BaseStream.CopyToAsync(Console.OpenStandardOutput()));
-      var error = Task.Run(() => child.StandardError.BaseStream.CopyToAsync(Console.OpenStandardError()));
+      var output = Task.Run(() => Pump(child.StandardOutput.BaseStream, Console.OpenStandardOutput(), "stdout"));
+      var error = Task.Run(() => Pump(child.StandardError.BaseStream, Console.OpenStandardError(), "stderr"));
       child.WaitForExit();
       Task.WaitAll(output, error);
       int code = child.ExitCode;
