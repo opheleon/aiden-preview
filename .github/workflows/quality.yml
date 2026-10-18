@@ -63,6 +63,8 @@ jobs:
             test-results/
             playwright-report/
           retention-days: 14
+  packaged:
+    uses: ./.github/workflows/packaged-desktop.yml
   security:
     uses: ./.github/workflows/security.yml
     permissions:
@@ -70,12 +72,13 @@ jobs:
       security-events: write
   quality:
     if: always()
-    needs: [checks, desktop, security]
+    needs: [checks, desktop, packaged, security]
     runs-on: ubuntu-latest
     steps:
       - name: Require every quality job
         env:
           CHECKS: ${{ needs.checks.result }}
           DESKTOP: ${{ needs.desktop.result }}
+          PACKAGED: ${{ needs.packaged.result }}
           SECURITY: ${{ needs.security.result }}
-        run: test "$CHECKS" = success && test "$DESKTOP" = success && test "$SECURITY" = success
+        run: test "$CHECKS" = success && test "$DESKTOP" = success && test "$PACKAGED" = success && test "$SECURITY" = success

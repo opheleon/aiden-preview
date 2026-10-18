@@ -13,7 +13,8 @@ import type { WorkflowContext } from './workflow-context.js';
 
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 /** Repository or packaged-app root that contains the versioned workflow prompts. */
-export const workflowRoot = sourceRoot.endsWith('/dist') ? path.dirname(sourceRoot) : sourceRoot;
+export const workflowRoot =
+  path.basename(sourceRoot) === 'dist' ? path.dirname(sourceRoot) : sourceRoot;
 
 /** Stage dependencies keep runtime calls, checkpoint paths, and progress scoped to one run. */
 interface ModelStageOptions {

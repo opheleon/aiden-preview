@@ -36,7 +36,7 @@ function transport(timeout = 50) {
       child.stdout.write(JSON.stringify(value) + '\n');
     },
     close() {
-      client.close();
+      void client.close();
       child.emit('exit', 0);
     },
   };
@@ -87,6 +87,33 @@ void test('a timed-out request is not retried and a late reply is ignored', asyn
   }
 });
 
+void test('shutdown waits for worker exit so cancellation can be saved before the host quits', async () => {
+  const t = transport();
+  let finished = false;
+  const closing = t.client.close();
+  assert.equal(t.client.close(), closing);
+  void closing.then(() => {
+    finished = true;
+  });
+  await Promise.resolve();
+  assert.equal(finished, false);
+  assert.equal(t.child.stdin.writableEnded, true);
+  await assert.rejects(t.client.request('projects'), /closed/);
+  t.child.emit('exit', 0);
+  await closing;
+  assert.equal(finished, true);
+  assert.equal(t.child.kills, 0);
+});
+
+void test('shutdown kills an unresponsive worker after the cleanup deadline', async (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const t = transport();
+  const closing = t.client.close();
+  context.mock.timers.tick(5000);
+  await closing;
+  assert.equal(t.child.kills, 1);
+});
+
 void test('invalid JSON, invalid events, oversized replies, and malformed envelopes fail closed', async () => {
   for (const response of [
     'not-json',
@@ -113,7 +140,7 @@ void test('exit, spawn failure, stdin failure, and explicit shutdown settle pend
     let stopped = 0;
     t.client.on('workerStopped', () => stopped++);
     const pending = t.client.request('projects');
-    if (failure === 'close') t.client.close();
+    if (failure === 'close') void t.client.close();
     else if (failure === 'stdin') t.child.stdin.emit('error', new Error('fixture'));
     else t.child.emit(failure, new Error('fixture'));
     await assert.rejects(pending);

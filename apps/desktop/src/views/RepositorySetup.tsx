@@ -49,7 +49,7 @@ export function RepositorySetup(props: RepositorySetupProps): React.JSX.Element 
           <div className="repo-heading">
             <FolderKanban size={19} />
             <div>
-              <strong>{project.rootPath.split('/').at(-1) || project.rootPath}</strong>
+              <strong>{project.rootPath.split(/[\\/]/).at(-1) || project.rootPath}</strong>
               <small title={project.rootPath}>{project.rootPath}</small>
             </div>
           </div>
@@ -104,7 +104,7 @@ export function RepositorySetup(props: RepositorySetupProps): React.JSX.Element 
           <div className="repo-heading">
             <FolderGit2 size={17} />
             <div>
-              <strong>{r.path.split('/').at(-1)}</strong>
+              <strong>{r.path.split(/[\\/]/).at(-1)}</strong>
               <small title={r.path}>
                 {project.rootPath
                   ? r.path === project.rootPath

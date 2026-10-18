@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 
 import { type ElectronApplication, expect } from '@playwright/test';
 
-// Synthetic ZIP bytes exercise transport and SHA-512 checks, never native installation.
+// Synthetic bytes exercise transport and SHA-512 checks, never native installation.
 export async function downloadFixture(app: ElectronApplication, root: string) {
   await expect
     .poll(() =>
@@ -19,6 +19,9 @@ export async function downloadFixture(app: ElectronApplication, root: string) {
   const current = await app.evaluate(({ app }) => app.getVersion());
   const parts = current.split('.');
   const version = `${parts[0]}.${parts[1]}.${Number(parts[2]!.split('-')[0]) + 1}`;
+  const extension =
+    process.platform === 'darwin' ? 'zip' : process.platform === 'win32' ? 'exe' : 'AppImage';
+  const artifactName = `synthetic-${process.arch}.${extension}`;
   const bytes = Buffer.alloc(22);
   bytes.writeUInt32LE(0x06054b50);
   const digest = createHash('sha512').update(bytes).digest('base64');
@@ -26,9 +29,9 @@ export async function downloadFixture(app: ElectronApplication, root: string) {
   const requests: string[] = [];
   const server = createServer((request, response) => {
     requests.push(request.url ?? '');
-    if (request.url?.split('?')[0] === '/synthetic-arm64.zip') {
+    if (request.url?.split('?')[0] === `/${artifactName}`) {
       response.writeHead(200, {
-        'Content-Type': 'application/zip',
+        'Content-Type': 'application/octet-stream',
         'Content-Length': bytes.length,
       });
       response.end(corrupt ? Buffer.alloc(bytes.length, 1) : bytes);
@@ -37,7 +40,7 @@ export async function downloadFixture(app: ElectronApplication, root: string) {
       response.end(
         JSON.stringify({
           version,
-          files: [{ url: 'synthetic-arm64.zip', sha512: digest, size: bytes.length }],
+          files: [{ url: artifactName, sha512: digest, size: bytes.length }],
           releaseDate: '2026-01-01T00:00:00.000Z',
         }),
       );
@@ -67,6 +70,7 @@ export async function downloadFixture(app: ElectronApplication, root: string) {
               throw new Error('Unexpected packaged update feed.');
           }
         }
+        autoUpdater.disableDifferentialDownload = true;
         autoUpdater.setFeedURL({ provider: 'generic', url });
         const state = { unhandled: 0, downloadedFile: '', checksumFailures: 0 };
         Object.assign(globalThis, { aidenDownloadTest: state });
@@ -88,6 +92,7 @@ export async function downloadFixture(app: ElectronApplication, root: string) {
   }
   return {
     requests,
+    artifactName,
     setCorrupt: (value: boolean) => {
       corrupt = value;
     },

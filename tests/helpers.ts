@@ -11,7 +11,14 @@ export async function g(cwd: string, ...args: string[]) {
     await exec(
       'git',
       ['-c', 'user.name=Aiden Test', '-c', 'user.email=fixture@example.invalid', ...args],
-      { cwd, env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' } },
+      {
+        cwd,
+        env: {
+          ...process.env,
+          GIT_CONFIG_NOSYSTEM: '1',
+          GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
+        },
+      },
     )
   ).stdout.trim();
 }

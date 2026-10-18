@@ -86,6 +86,17 @@ test('setup chat proves real database-backed web login and API-key access before
     expect(stored).not.toContain(demoAccount.password);
     expect(stored).not.toContain(demoAccount.apiKey);
     expect(JSON.parse(stored).credentialStorage).toBe('session');
+    // Recheck in a fresh browser using only public settings. Neither the renderer request nor
+    // the provider receives a password or API key on this subsequent sign-in.
+    const reused = await page.evaluate(async (projectId) => {
+      const settings = await window.aiden!.request('verificationSettings', { projectId });
+      return window.aiden!.request('configureGuideVerification', {
+        projectId,
+        update: { url: settings.url, webLogin: settings.webLogin, api: settings.api },
+        save: false,
+      });
+    }, projectIds[0]!);
+    expect(reused.message).toContain('Access checked');
     const beforeRestart = await page.evaluate(
       async (projectId) => window.aiden!.request('guide', { projectId }),
       projectIds[0]!,

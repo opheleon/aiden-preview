@@ -153,6 +153,6 @@ void test('desktop and CLI worker protocol expose the same discovery and validat
     assert.equal(result.repositories.length, 2);
     await assert.rejects(client.request('discoverRepositories', { rootPath: '' }));
   } finally {
-    client.close();
+    await client.close();
   }
 });

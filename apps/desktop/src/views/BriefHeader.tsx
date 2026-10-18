@@ -279,7 +279,7 @@ export function monitoringLabel(repositories: Workspace['project']['repositories
   if (!repositories.some((repo) => repo.monitoredBranch)) return 'not configured';
   return repositories
     .map((repo) => {
-      const name = repo.path.split('/').at(-1);
+      const name = repo.path.split(/[\\/]/).at(-1);
       const branch = repo.monitoredBranch
         ? `${repo.monitoredBranch.remote}/${repo.monitoredBranch.branch}`
         : null;

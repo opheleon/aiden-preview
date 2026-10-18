@@ -44,6 +44,10 @@ export async function desktopFixture() {
         : { args: ['dist/apps/desktop/src/main.js'] }),
       env: {
         ...env,
+        // Packaged journeys must work without a developer's cached browser installation.
+        ...(packagedApp
+          ? { PLAYWRIGHT_BROWSERS_PATH: path.join(f.root, 'unavailable-browser-cache') }
+          : {}),
         AIDEN_HEADLESS: '1',
         AIDEN_HOME: path.join(f.root, 'desktop-data'),
         AIDEN_CODEX_BINARY: binary,

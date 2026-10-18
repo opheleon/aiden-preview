@@ -62,27 +62,30 @@ test('setting the intent is one screen, and Aiden starts with only the intent', 
   expect(screen.queryByRole('button', { name: /Approve/ })).toBeNull();
 });
 
-test('a folder without Git is a note, not a blocker', async () => {
-  const original = f.request.getMockImplementation()!;
-  f.request.mockImplementation((method: string, p?: unknown) =>
-    method === 'discoverRepositories'
-      ? Promise.resolve({ rootPath: '/no-git', warnings: [], repositories: [] })
-      : original(method, p),
-  );
-  try {
-    render(<App />);
-    await userEvent.click(await screen.findByRole('button', { name: 'Create project' }));
-    await userEvent.type(screen.getByLabelText('What are you building?'), 'List books');
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Add the project folder (optional)' }),
+test.each(['/no-git', String.raw`C:\projects\no-git`])(
+  'a folder without Git is a note, not a blocker: %s',
+  async (rootPath) => {
+    const original = f.request.getMockImplementation()!;
+    f.request.mockImplementation((method: string, p?: unknown) =>
+      method === 'discoverRepositories'
+        ? Promise.resolve({ rootPath, warnings: [], repositories: [] })
+        : original(method, p),
     );
-    expect(await screen.findByText(/No Git repository was found in no-git/)).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Choose a different folder' })).toBeVisible();
-    expect(screen.getByRole('button', { name: /Hand it to Aiden/ })).toBeEnabled();
-  } finally {
-    f.request.mockImplementation(original);
-  }
-});
+    try {
+      render(<App />);
+      await userEvent.click(await screen.findByRole('button', { name: 'Create project' }));
+      await userEvent.type(screen.getByLabelText('What are you building?'), 'List books');
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Add the project folder (optional)' }),
+      );
+      expect(await screen.findByText(/No Git repository was found in no-git/)).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Choose a different folder' })).toBeVisible();
+      expect(screen.getByRole('button', { name: /Hand it to Aiden/ })).toBeEnabled();
+    } finally {
+      f.request.mockImplementation(original);
+    }
+  },
+);
 
 test('a project whose first rewrite is running shows it, and a stopped one says so', async () => {
   f.reset(false);

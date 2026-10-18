@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { fixture } from '../helpers.js';
+import { executableFixture } from './executable-fixture.js';
 
 export async function providerLauncher(f: Awaited<ReturnType<typeof fixture>>) {
   const fixtureFile = path.join(f.root, 'fixture.json');
@@ -11,8 +12,6 @@ export async function providerLauncher(f: Awaited<ReturnType<typeof fixture>>) {
   await writeFile(fixtureFile, JSON.stringify(f));
   await writeFile(control, JSON.stringify({ clarification: true }));
   await writeFile(calls, '');
-  const binary = path.join(f.root, 'provider-fixture');
-  const quote = (value: string) => "'" + value.replaceAll("'", "'\"'\"'") + "'";
   const args = [
     process.execPath,
     '--import',
@@ -22,14 +21,12 @@ export async function providerLauncher(f: Awaited<ReturnType<typeof fixture>>) {
     control,
     calls,
   ];
-  await writeFile(binary, '#!/bin/sh\nexec ' + args.map(quote).join(' ') + ' "$@"\n', {
-    mode: 0o755,
-  });
-  const claude = path.join(f.root, 'claude-fixture');
-  await writeFile(
-    claude,
-    '#!/bin/sh\nprintf \'%s\\n\' \'{"loggedIn":false,"authMethod":"none","apiProvider":"firstParty"}\'\n',
-    { mode: 0o755 },
-  );
+  const binary = await executableFixture(path.join(f.root, 'provider-fixture'), args);
+  const claude = await executableFixture(path.join(f.root, 'claude-fixture'), [
+    process.execPath,
+    '-e',
+    'console.log(JSON.stringify({loggedIn:false,authMethod:"none",apiProvider:"firstParty"}))',
+    '--',
+  ]);
   return { binary, claude, control, calls };
 }

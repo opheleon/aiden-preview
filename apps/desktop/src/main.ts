@@ -35,6 +35,7 @@ let worker: WorkerClient;
 let window: BrowserWindow;
 let updater: DesktopUpdater;
 let quitting = false;
+let quitReady = false;
 const activeRuns = new Set<string>();
 const activeCodingJobs = new Set<string>();
 /** Connect lifecycle observers before loading renderer content; failures never relaunch paid work. */
@@ -51,7 +52,8 @@ function observeDesktop(): void {
     if (!window.isDestroyed()) window.webContents.send('aiden:event', event);
   });
   worker.on('workerStopped', () => {
-    if (!quitting) void diagnostics.record({ component: 'worker', code: 'worker_stopped' });
+    if (quitting) return;
+    void diagnostics.record({ component: 'worker', code: 'worker_stopped' });
     watcher.stop();
     if (!window.isDestroyed())
       window.webContents.send('aiden:event', {
@@ -80,6 +82,10 @@ app
     worker = new WorkerClient({
       ...process.env,
       AIDEN_HOME: dataRoot,
+      AIDEN_PACKAGED: app.isPackaged ? '1' : '0',
+      ...(app.isPackaged
+        ? { PLAYWRIGHT_BROWSERS_PATH: path.join(process.resourcesPath, 'playwright') }
+        : {}),
     });
     window = new BrowserWindow({
       width: 1320,
@@ -134,9 +140,17 @@ app
     app.quit();
   });
 app.on('window-all-closed', () => app.quit());
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  if (quitReady) return;
+  if (worker) event.preventDefault();
+  if (quitting) return;
   quitting = true;
   watcher?.stop();
   updater?.dispose();
-  worker?.close();
+  if (worker) {
+    void worker.close().then(() => {
+      quitReady = true;
+      app.quit();
+    });
+  }
 });
