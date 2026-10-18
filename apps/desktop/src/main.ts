@@ -52,7 +52,8 @@ function observeDesktop(): void {
     if (!window.isDestroyed()) window.webContents.send('aiden:event', event);
   });
   worker.on('workerStopped', () => {
-    if (!quitting) void diagnostics.record({ component: 'worker', code: 'worker_stopped' });
+    if (quitting) return;
+    void diagnostics.record({ component: 'worker', code: 'worker_stopped' });
     watcher.stop();
     if (!window.isDestroyed())
       window.webContents.send('aiden:event', {
