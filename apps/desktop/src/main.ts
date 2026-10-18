@@ -14,6 +14,9 @@ import { ProjectWatcher } from './watcher.js';
 import { registerWorkerIpc } from './worker-ipc.js';
 // Electron otherwise names the macOS app menu after package.json's npm name.
 app.setName('Aiden');
+// Automated verification renders normally without presenting or activating a native window.
+const headless = process.env.AIDEN_HEADLESS === '1';
+if (headless && process.platform === 'darwin') app.setActivationPolicy('prohibited');
 const dataRoot = process.env.AIDEN_HOME || path.join(app.getPath('home'), '.aiden');
 const diagnostics = new LocalDiagnostics(dataRoot);
 mkdirSync(path.join(dataRoot, 'desktop'), { recursive: true, mode: 0o700 });
@@ -21,7 +24,7 @@ app.setPath('userData', path.join(dataRoot, 'desktop'));
 const ownsInstance = app.requestSingleInstanceLock();
 if (!ownsInstance) app.quit();
 app.on('second-instance', () => {
-  if (window && !window.isDestroyed()) {
+  if (!headless && window && !window.isDestroyed()) {
     window.restore();
     window.focus();
   }
@@ -84,12 +87,17 @@ app
       minWidth: 950,
       minHeight: 680,
       title: 'Aiden',
+      show: !headless,
+      focusable: !headless,
+      skipTaskbar: headless,
+      paintWhenInitiallyHidden: true,
       backgroundColor: '#F6F4EE',
       webPreferences: {
         preload: path.join(here, 'preload.cjs'),
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
+        backgroundThrottling: !headless,
       },
     });
     /** Accept requests only from this window’s main frame, excluding embedded or foreign content. */
@@ -118,10 +126,11 @@ app
   })
   .catch(async () => {
     await diagnostics.record({ component: 'startup', code: 'startup_failed' });
-    dialog.showErrorBox(
-      'Aiden could not start',
-      'Startup was interrupted. Quit and reopen Aiden. Saved projects and checkpoints have been preserved; analysis will not restart automatically.',
-    );
+    if (!headless)
+      dialog.showErrorBox(
+        'Aiden could not start',
+        'Startup was interrupted. Quit and reopen Aiden. Saved projects and checkpoints have been preserved; analysis will not restart automatically.',
+      );
     app.quit();
   });
 app.on('window-all-closed', () => app.quit());

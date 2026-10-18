@@ -182,32 +182,60 @@ test('overview prioritizes the disconnect, keeps evidence folded, and opens the 
   expect(
     within(attention).getByText('TES-13 is marked Done, but its requirements are incomplete.'),
   ).toBeVisible();
-  const feature = screen.getByRole('region', { name: 'Read books' });
-  expect(within(feature).getAllByText('Delivery deviation')[0]).toBeVisible();
-  expect(within(attention).getByText(/The implementation is absent/)).not.toBeVisible();
-  await userEvent.click(within(attention).getByText('Evidence and next steps'));
-  expect(within(attention).getByText(/The implementation is absent/)).toBeVisible();
+  const plan = screen.getByRole('region', { name: 'Read books' });
+  expect(plan).toBeVisible();
+  expect(plan.querySelector('details')).not.toHaveAttribute('open');
   expect(within(attention).getByRole('link', { name: 'Open TES-13' })).toHaveAttribute(
     'href',
     tracker.records[0]!.url,
   );
-  await userEvent.click(within(attention).getByRole('button', { name: 'Review requirement' }));
-  expect(document.getElementById('requirement-REQ-1')).toHaveAttribute('open');
-  expect(document.activeElement).toBe(document.querySelector('#requirement-REQ-1 > summary'));
-  expect(within(feature).getAllByText('Delivery deviation')[1]).toBeVisible();
-  expect(screen.getByRole('progressbar')).toHaveAttribute('value', '0');
+  const review = within(attention).getByRole('button', { name: 'Review with Aiden' });
+  await userEvent.click(review);
+  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  expect(within(chat).getByRole('region', { name: 'Selected requirement' })).toHaveTextContent(
+    'REQ-1',
+  );
+  expect(f.request).not.toHaveBeenCalledWith('askGuide', expect.anything());
+  await userEvent.click(within(chat).getByRole('button', { name: 'Back' }));
+  expect(review).toHaveFocus();
+  await userEvent.click(within(attention).getByRole('button', { name: 'View evidence' }));
+  expect(screen.getByRole('tab', { name: 'Activity' })).toHaveAttribute('aria-selected', 'true');
 });
 
 test('unverified completion offers an explicit retry; resolved findings remove the card', async () => {
   const onCheck = vi.fn();
   const items = deliveryAttention({ ...input(), report: undefined, runs: [] });
-  const { rerender } = render(<DeliveryAttention items={items} busy={false} onCheck={onCheck} />);
+  const { rerender } = render(
+    <DeliveryAttention
+      items={items}
+      busy={false}
+      onCheck={onCheck}
+      onReview={vi.fn()}
+      onEvidence={vi.fn()}
+    />,
+  );
   expect(screen.getByText('Completion unverified')).toBeVisible();
   await userEvent.click(screen.getByRole('button', { name: 'Run check again' }));
   expect(onCheck).toHaveBeenCalledOnce();
-  rerender(<DeliveryAttention items={items} busy onCheck={onCheck} />);
+  rerender(
+    <DeliveryAttention
+      items={items}
+      busy
+      onCheck={onCheck}
+      onReview={vi.fn()}
+      onEvidence={vi.fn()}
+    />,
+  );
   expect(screen.getByRole('button', { name: 'Run check again' })).toBeDisabled();
-  rerender(<DeliveryAttention items={[]} busy={false} onCheck={onCheck} />);
+  rerender(
+    <DeliveryAttention
+      items={[]}
+      busy={false}
+      onCheck={onCheck}
+      onReview={vi.fn()}
+      onEvidence={vi.fn()}
+    />,
+  );
   expect(screen.queryByRole('region', { name: 'Delivery attention' })).toBeNull();
 });
 

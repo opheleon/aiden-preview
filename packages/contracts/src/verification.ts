@@ -1,19 +1,54 @@
 import { z } from 'zod/v3';
 
+import { ProjectDeviceTestSchema } from './device-verification.js';
+import { ApiKeyHeaderSchema, WebCredentialsSchema, WebLoginSchema } from './verification-auth.js';
+
 /** An explicitly selected API; writes require a disposable test environment. */
 export const ApiVerificationSchema = z
   .object({
     url: z.string().url().max(2000),
     allowMutations: z.boolean().default(false),
+    keyHeader: ApiKeyHeaderSchema.optional(),
   })
   .strict();
 
-/** Worker-only settings file; test credentials stay in the worker and never enter run output. */
+/** Worker-bound setup changes, including private input fields. Null disables a surface. */
+export const VerificationUpdateSchema = z
+  .object({
+    url: z.string().url().max(2000).nullable().optional(),
+    webLogin: WebLoginSchema.nullable().optional(),
+    webCredentials: WebCredentialsSchema.optional(),
+    apiKey: z.string().min(1).max(4000).optional(),
+    rememberCredentials: z.boolean().optional(),
+    api: ApiVerificationSchema.nullable().optional(),
+    phone: ProjectDeviceTestSchema.nullable().optional(),
+    trigger: z.enum(['manual', 'after_assessment']).optional(),
+    /** The person checks the work by hand; Aiden lists the tests instead of running agents. */
+    manual: z.boolean().optional(),
+  })
+  .strict();
+/** Setup update sent directly to the worker; private values are never echoed in public settings. */
+export type VerificationUpdate = z.input<typeof VerificationUpdateSchema>;
+
+/** Worker configuration, including hydrated secrets and legacy migration inputs. Disk settings omit secrets. */
 export const VerificationConfigSchema = z
   .object({
     /** The project's app URL, saved from Settings or the CLI; its origin counts as configured. */
     url: z.string().url().max(2000).optional(),
+    webLogin: WebLoginSchema.optional(),
+    credentialOrigin: z.string().url().optional(),
+    apiKey: z
+      .object({ origin: z.string().url(), value: z.string().min(1).max(4000) })
+      .strict()
+      .optional(),
+    authRevision: z.string().uuid().optional(),
+    credentialStorage: z.enum(['keyring', 'session']).optional(),
+    rememberCredentials: z.boolean().optional(),
+    credentialsForgotten: z.boolean().optional(),
     api: ApiVerificationSchema.optional(),
+    phone: ProjectDeviceTestSchema.optional(),
+    trigger: z.enum(['manual', 'after_assessment']).optional(),
+    manual: z.boolean().optional(),
     allowedOrigins: z.array(z.string().url()).max(20).default([]),
     credentials: z
       .object({ username: z.string().min(1).max(500), password: z.string().min(1).max(500) })
@@ -32,7 +67,16 @@ export type VerificationConfig = z.infer<typeof VerificationConfigSchema>;
 /** Verification settings safe to show in the renderer; test credentials are never included. */
 export type VerificationSettings = {
   url: string | null;
+  webLogin?: z.infer<typeof WebLoginSchema>;
+  webCredentialsConfigured?: boolean;
+  apiKeyConfigured?: boolean;
+  authRevision?: string;
+  credentialStorage?: 'keyring' | 'session';
+  rememberCredentials?: boolean;
   api?: z.infer<typeof ApiVerificationSchema>;
+  phone?: z.infer<typeof ProjectDeviceTestSchema>;
+  trigger?: 'manual' | 'after_assessment';
+  manual?: boolean;
 };
 
 /** Model-selected reasons a criterion cannot be checked; Aiden adds its own reasons in verdicts. */

@@ -8,7 +8,7 @@ Scope holds what you’re building and how you’ll know it works. Refine it as 
 
 ## Where does it stand?
 
-Overview shows progress, what’s left, and what needs your attention. Expand a requirement for its checks, linked tickets, and next actions. Activity shows what changed and why. Runs has the details of each check.
+Overview shows progress, remaining effort, agreed timing, the delivery plan, and what needs your attention. Expand a delivery step for checks, linked tickets, and next actions. Scope holds the agreed requirements and plan; Change opens a requirement in chat. Activity shows what changed and why, with the details of each check under All runs.
 
 While Preview is open, Aiden watches the selected remote branch every minute and checks again when pushed code changes. It also checks each morning if no check has run that day. Use Run check now in the project header to start a fresh assessment from current code. Interrupted checks stay in history; this action does not resume their old snapshots.
 
@@ -16,7 +16,7 @@ With automatic tickets enabled, Aiden checks tracker status every minute while t
 
 ## When will it land?
 
-Expand Progress details and estimates to see how much work remains and the reasoning behind the estimate. When comparable delivery history is available, Aiden uses it to estimate how long the remaining work could take. When evidence or history is insufficient, the forecast stays unavailable.
+Remaining effort and estimated time stay visible on Overview. Expand How this is estimated for the evidence behind the estimate. App-only projects show verification progress and explain that a code repository is needed to estimate development effort. When comparable delivery history is available, Aiden uses it to estimate how long the remaining work could take. When evidence or history is insufficient, the forecast stays unavailable.
 
 ## What’s in the way?
 

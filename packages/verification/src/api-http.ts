@@ -65,6 +65,10 @@ export interface ApiReceipt {
   url: string;
   requestBody: string | null;
   bearer: string | null;
+  /** The header actually sent for authentication, without its private value. */
+  authenticationHeader: 'X-API-Key' | 'Authorization' | null;
+  /** This isolated HTTP client never sends browser cookies. */
+  cookiesSent: false;
   status: number;
   body: unknown;
   secrets: Record<string, string>;
@@ -75,6 +79,8 @@ export class ApiHttp {
   private secrets = new Map<string, string>();
   readonly receipts: ApiReceipt[] = [];
   readonly target: URL;
+  /** API-key mode excludes account creation and token-based login tools. */
+  readonly apiKeyOnly: boolean;
   /**
    * Validate the API address and bind its explicit write permission and cancellation signal.
    * `expiredToken` is an optional, worker-configured fixture: a token the project owner confirms
@@ -86,9 +92,12 @@ export class ApiHttp {
     private readonly signal: AbortSignal,
     credentials?: { username: string; password: string },
     expiredToken?: string,
+    private readonly apiKey?: { value: string; header: 'X-API-Key' | 'Authorization' },
   ) {
     this.target = parseApiUrl(url);
-    if (credentials) {
+    this.apiKeyOnly = !!apiKey;
+    if (apiKey) this.secrets.set('apiKey', apiKey.value);
+    if (credentials && !apiKey) {
       this.secrets.set('username', credentials.username);
       this.secrets.set('password', credentials.password);
     }
@@ -146,6 +155,8 @@ export class ApiHttp {
   /** Substitute secret handles in JSON string values, rejecting ambiguous non-JSON bodies. */
   private requestBody(raw: string | null): string | undefined {
     if (raw === null) return undefined;
+    if (this.apiKeyOnly && /@secret:/.test(raw))
+      throw new Error('API keys may only be sent in the configured header.');
     const value: unknown = JSON.parse(raw, (_key, item: unknown) =>
       typeof item === 'string' ? this.resolve(item) : item,
     );
@@ -200,7 +211,12 @@ export class ApiHttp {
     if (request.bearer) {
       if (request.bearer !== 'invalid-test-token' && !request.bearer.startsWith('@secret:'))
         throw new Error('Use a returned credential handle, null, or invalid-test-token.');
-      headers.Authorization = `Bearer ${this.resolve(request.bearer)}`;
+      if (this.apiKey) {
+        if (!['@secret:apiKey', 'invalid-test-token'].includes(request.bearer))
+          throw new Error('Use the configured API key handle, an invalid test key, or no key.');
+        headers[this.apiKey.header] =
+          (this.apiKey.header === 'Authorization' ? 'Bearer ' : '') + this.resolve(request.bearer);
+      } else headers.Authorization = `Bearer ${this.resolve(request.bearer)}`;
     }
     return headers;
   }
@@ -256,6 +272,8 @@ export class ApiHttp {
       url: this.redact(url.href),
       requestBody: request.body === null ? null : this.redact(request.body),
       bearer: request.bearer,
+      authenticationHeader: request.bearer ? (this.apiKey?.header ?? 'Authorization') : null,
+      cookiesSent: false,
       status: response.status,
       body: safeBody,
       secrets,

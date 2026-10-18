@@ -44,5 +44,6 @@
       "project": ["src/**/*.ts"]
     }
   },
+  "ignoreBinaries": ["appium"],
   "ignoreExportsUsedInFile": true
 }

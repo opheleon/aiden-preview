@@ -30,7 +30,8 @@ test('the runs list shows work in progress live, and a run opens its full histor
   ]);
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
-  await userEvent.click(await screen.findByRole('button', { name: /^Runs/ }));
+  await userEvent.click(screen.getByRole('tab', { name: 'Activity' }));
+  await userEvent.click(screen.getByText('All runs', { selector: 'summary' }));
   const list = await screen.findByRole('region', { name: 'All runs' });
   const live = within(list).getByRole('button', { name: /Checking the code/ });
   expect(live).toHaveTextContent('Now: Read frontend/app.txt from line 1');
@@ -65,7 +66,7 @@ test('the runs list shows work in progress live, and a run opens its full histor
     }),
   );
   expect(await screen.findByText('Two new commits landed.')).toBeVisible();
-  await userEvent.click(screen.getByRole('button', { name: 'Stop' }));
+  await userEvent.click(screen.getAllByRole('button', { name: 'Stop' }).at(-1)!);
   expect(f.request).toHaveBeenCalledWith('cancel', { runId: 'live-run' });
   await userEvent.click(screen.getByRole('button', { name: 'All runs' }));
   expect(await screen.findByRole('region', { name: 'All runs' })).toBeVisible();
@@ -75,18 +76,23 @@ test('the brief links to the run in progress', async () => {
   f.startRun({ id: 'live-run', kind: 'report' }, [entry('Read frontend/app.txt from line 1')]);
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
-  await userEvent.click(await screen.findByRole('button', { name: 'Watch it work' }));
-  expect(await screen.findByRole('heading', { name: 'Checking the code' })).toBeVisible();
-  await userEvent.click(screen.getByRole('button', { name: 'All runs' }));
-  await userEvent.click(screen.getByRole('button', { name: /Book|Synthetic books/ }));
+  const show = await screen.findByRole('button', { name: 'Show progress' });
+  await userEvent.click(show);
+  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  expect(within(chat).getByRole('region', { name: 'Checks in this chat' })).toHaveTextContent(
+    'Read frontend/app.txt from line 1',
+  );
+  await userEvent.click(within(chat).getByRole('button', { name: 'Back' }));
   expect(await screen.findByRole('region', { name: 'Status' })).toBeVisible();
+  expect(show).toHaveFocus();
 });
 
 test('blocked runs explain the missing information and accept an answer in place', async () => {
   f.setCalls([openCall({ requirementId: null, runId: report.id, blocking: true })]);
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
-  await userEvent.click(await screen.findByRole('button', { name: /^Runs/ }));
+  await userEvent.click(screen.getByRole('tab', { name: 'Activity' }));
+  await userEvent.click(screen.getByText('All runs', { selector: 'summary' }));
   const list = await screen.findByRole('region', { name: 'All runs' });
   const run = within(list).getByRole('button', { name: /Checked the code/ });
   expect(run).toHaveTextContent('Blocked');
@@ -112,7 +118,8 @@ test('the stage tracker follows progress events between full refreshes', async (
   ]);
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
-  await userEvent.click(await screen.findByRole('button', { name: /^Runs/ }));
+  await userEvent.click(screen.getByRole('tab', { name: 'Activity' }));
+  await userEvent.click(screen.getByText('All runs', { selector: 'summary' }));
   const list = await screen.findByRole('region', { name: 'All runs' });
   await userEvent.click(within(list).getByRole('button', { name: /Checking the code/ }));
   const stages = await screen.findByRole('list', { name: 'Stages' });

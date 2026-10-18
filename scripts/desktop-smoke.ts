@@ -56,6 +56,7 @@ const app = await electron.launch({
     : { args: ['dist/apps/desktop/src/main.js'] }),
   env: {
     ...env,
+    AIDEN_HEADLESS: '1',
     AIDEN_CODEX_BINARY: provider.binary,
     AIDEN_HOME: home,
     AIDEN_CLAUDE_BINARY: claudeFixture,
@@ -68,6 +69,13 @@ try {
   tracing = true;
   const page = await app.firstWindow();
   await page.locator('[data-guide-ready="true"]').waitFor();
+  expect(
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().every(
+        (window) => !window.isVisible() && !window.isFocused() && !window.isFocusable(),
+      ),
+    ),
+  ).toBe(true);
   if (await page.getByRole('dialog').isVisible())
     await page.getByRole('button', { name: 'Later', exact: true }).click();
   if (packagedApp) {
@@ -84,23 +92,26 @@ try {
     .getByLabel('What are you building?')
     .fill('Users can list books. Users can create books.');
   const handOff = page.getByRole('button', { name: /Hand it to Aiden/ });
-  await expect(handOff).toBeDisabled();
+  // The intent alone is enough to start; the project folder is optional.
+  await expect(handOff).toBeEnabled();
   await app.evaluate(({ dialog }, repo) => {
     dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [repo] });
   }, f.root);
   const rootName = path.basename(await realpath(f.root));
-  await page.getByRole('button', { name: 'Choose the project folder', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Add the project folder (optional)', exact: true })
+    .click();
   await expect(page.getByRole('button', { name: `${rootName} · 2 repositories` })).toBeVisible();
   await expect(handOff).toBeEnabled();
-  // Empty roots have an honest recovery state and cannot be handed over.
+  // Empty roots say code can be connected later; they never block the start.
   const emptyFolder = path.join(f.root, 'empty-project');
   await mkdir(emptyFolder);
   await app.evaluate(({ dialog }, folder) => {
     dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [folder] });
   }, emptyFolder);
   await page.getByRole('button', { name: `${rootName} · 2 repositories` }).click();
-  await expect(page.getByText(/No Git repositories with commits were found/)).toBeVisible();
-  await expect(handOff).toBeDisabled();
+  await expect(page.getByText(/No Git repository was found in empty-project/)).toBeVisible();
+  await expect(handOff).toBeEnabled();
   await app.evaluate(({ dialog }, folder) => {
     dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [folder] });
   }, f.root);
@@ -141,7 +152,7 @@ try {
   await expect(page.getByTestId('claude-connection')).toContainText('Sign in to Claude Code');
   await page.getByRole('button', { name: 'Codex', exact: true }).click();
   await page.getByRole('button', { name: 'A book project' }).click();
-  await page.getByRole('region', { name: 'Requirements' }).waitFor();
+  await page.getByRole('region', { name: 'Project connections' }).waitFor();
   await page.getByRole('tab', { name: 'Activity', exact: true }).click();
   const log = page.getByRole('region', { name: 'Activity' });
   await expect(log).toBeVisible();
@@ -154,7 +165,7 @@ try {
   await expect(log.getByRole('textbox', { name: 'Ask about this run' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Refresh status' })).toHaveCount(0);
   await page.screenshot({ path: 'test-results/desktop-smoke/brief-fixture.png', fullPage: true });
-  await page.getByRole('tab', { name: 'Overview', exact: true }).click();
+  await page.getByRole('tab', { name: 'Scope', exact: true }).click();
   await page.locator('.req-row > summary').first().click();
   await page.getByRole('button', { name: /frontend · app.txt:1/ }).click();
   await page.getByRole('dialog', { name: 'Code evidence' }).waitFor();
@@ -196,7 +207,7 @@ try {
   if (savedRuntime.model !== 'fixture-selected-model' || savedRuntime.auth !== 'apiKey')
     throw new Error('Saved runtime changed during refresh.');
   await page.getByRole('button', { name: 'Project', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'App URL settings' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Project verification' })).toBeVisible();
   await page.getByRole('button', { name: 'Desktop app', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'App updates' })).toBeVisible();
   if (updates) {
@@ -229,7 +240,7 @@ try {
   await page.getByRole('button', { name: 'Integrations', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Connect Linear' })).toBeVisible();
   await page.getByRole('button', { name: 'A book project' }).click();
-  await page.getByRole('region', { name: 'Requirements' }).waitFor();
+  await page.getByRole('region', { name: 'Project connections' }).waitFor();
   if (errors.length) throw new Error(errors.join('\n'));
   console.log(
     JSON.stringify({

@@ -1,4 +1,4 @@
-import { ArrowRight, FileText, FolderKanban } from 'lucide-react';
+import { ArrowRight, CircleAlert, FileText, FolderKanban, Info } from 'lucide-react';
 import type { JSX } from 'react';
 
 import brandMark from '../assets/brand-mark.svg';
@@ -7,14 +7,15 @@ import type { Workspace } from '../hooks/useWorkspace';
 const api = window.aiden;
 
 /**
- * The whole setup: say what you are building and where the code is. Aiden writes what done means
- * and starts looking on its own; there is no review step before it gets to work.
+ * The whole start: say what you are building. The project folder is optional; after the start the
+ * Guide plays back the requirements and asks how the work should be checked.
  */
 export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element {
   const { project, setProject, busy, scanning, scanProjectFolder, start, action } = workspace;
   const folder = project.rootPath?.split('/').at(-1) || project.rootPath;
   const repos = project.repositories.length;
-  const missing = scanning ? '' : startHint(!!project.context.trim(), folder, repos);
+  const blocker = scanning ? undefined : startHint(!!project.context.trim(), folder, repos);
+  const missing = blocker?.blocking ? blocker.why : '';
   return (
     <section className="goal-starter set-intent" aria-label="New project">
       <div className="goal-starter-brand">
@@ -66,7 +67,7 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
               ? 'Finding repositories…'
               : folder
                 ? `${folder} · ${repos} ${repos === 1 ? 'repository' : 'repositories'}`
-                : 'Choose the project folder'}
+                : 'Add the project folder (optional)'}
           </button>
           <select
             className="chat-model-select"
@@ -87,7 +88,7 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
           </select>
           <button
             className="primary goal-starter-create"
-            disabled={busy || scanning || !project.context.trim() || !repos}
+            disabled={busy || scanning || !project.context.trim()}
             aria-describedby={missing ? 'start-hint' : undefined}
             onClick={() => void start()}
           >
@@ -95,11 +96,12 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
           </button>
         </div>
       </div>
-      {missing && (
-        <p className="inline-note" id="start-hint">
-          {missing}
-        </p>
-      )}
+      <StartBlocker
+        scanning={scanning}
+        blocker={blocker}
+        folder={folder}
+        onChooseFolder={() => void scanProjectFolder(true)}
+      />
       <details>
         <summary>Model and effort</summary>
         <RuntimeSettings
@@ -134,16 +136,83 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
   );
 }
 
+/** Something the person should know before starting: a blocker, or a note that does not block. */
+interface StartBlockerInfo {
+  why: string;
+  fix: string;
+  chooseFolder: boolean;
+  blocking: boolean;
+}
+
 /**
- * Say what is still needed before Aiden can start, or nothing when the project is ready.
- * Example: a folder without Git repositories asks for one that contains a repository.
+ * Say what is still needed before Aiden can start. Only the intent is required; a folder without a
+ * Git repository is a note, because code can be connected later in the Guide.
+ * Example: an empty box blocks; a folder with no repository explains and offers another folder.
  */
-function startHint(hasIntent: boolean, folder: string | undefined, repos: number): string {
+function startHint(
+  hasIntent: boolean,
+  folder: string | undefined,
+  repos: number,
+): StartBlockerInfo | undefined {
+  if (!hasIntent)
+    return {
+      why: 'To start, describe what you are building.',
+      fix: 'Type or paste your goal in the box above, or use Import a file. The project folder is optional.',
+      chooseFolder: false,
+      blocking: true,
+    };
   if (folder && !repos)
-    return `No Git repositories were found in ${folder}. Choose a folder that contains one.`;
-  if (!hasIntent && !folder)
-    return 'To start, describe what you are building and choose the project folder.';
-  if (!hasIntent) return 'To start, describe what you are building.';
-  if (!folder) return 'To start, choose the project folder.';
-  return '';
+    return {
+      why: `No Git repository was found in ${folder}. You can start now and connect your code later in the Guide.`,
+      fix: 'Code checks need a Git repository. Web, API, and manual checks do not.',
+      chooseFolder: true,
+      blocking: false,
+    };
+  return {
+    why: 'After you start, Aiden plays back the requirements and asks how to check the work.',
+    fix: folder
+      ? 'Aiden will also check the code in this folder.'
+      : 'No folder needed. You can connect your code, a web app, or an API in the setup chat.',
+    chooseFolder: false,
+    blocking: false,
+  };
+}
+
+/**
+ * Explain prominently why the start button is disabled and how to fix it.
+ * Example: an empty intent shows the reason and the fix; a folder without Git offers another folder.
+ */
+function StartBlocker({
+  scanning,
+  blocker,
+  folder,
+  onChooseFolder,
+}: {
+  scanning: boolean;
+  blocker: StartBlockerInfo | undefined;
+  folder: string | undefined;
+  onChooseFolder: () => void;
+}): JSX.Element | null {
+  if (scanning)
+    return (
+      <p className="start-blocker" role="status">
+        <FolderKanban size={16} />
+        <span>Finding repositories in the project folder. You can start when this finishes.</span>
+      </p>
+    );
+  if (!blocker) return null;
+  return (
+    <div className={blocker.blocking ? 'start-blocker' : 'start-blocker start-note'}>
+      {blocker.blocking ? <CircleAlert size={16} /> : <Info size={16} />}
+      <div>
+        <p id={blocker.blocking ? 'start-hint' : undefined}>{blocker.why}</p>
+        <p className="start-blocker-fix">{blocker.fix}</p>
+      </div>
+      {blocker.chooseFolder && (
+        <button className="start-blocker-action" onClick={onChooseFolder}>
+          {folder ? 'Choose a different folder' : 'Browse for a folder'}
+        </button>
+      )}
+    </div>
+  );
 }

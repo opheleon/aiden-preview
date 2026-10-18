@@ -133,7 +133,7 @@ export class ConnectionManager {
     connection: McpConnection,
     oauth?: StoredOAuthProvider,
   ): Promise<Transport> {
-    const secret = await this.vault.read(connection.id);
+    const secret = connection.auth === 'bearer' ? await this.vault.read(connection.id) : {};
     const headers = new Headers();
     if (connection.auth === 'bearer') {
       if (!secret.bearer)
@@ -230,6 +230,7 @@ export class ConnectionManager {
   /** Test a connection, returning a browser URL when OAuth requires user interaction. */
   async connect(id: string): Promise<{ connection: McpConnection; authUrl: string | undefined }> {
     const connection = await this.get(id);
+    this.vault.retryRead(id);
     connection.status = 'connecting';
     connection.message = undefined;
     connection.updatedAt = new Date().toISOString();
@@ -474,9 +475,10 @@ export class ConnectionManager {
   /** Remove saved metadata and credentials after best-effort session shutdown. */
   async remove(id: string): Promise<{ removed: boolean }> {
     await this.disconnect(id).catch(() => {});
-    const rows = (await this.list()).filter((row) => row.id !== id);
-    await atomic(this.file, rows);
-    await this.vault.remove(id);
+    const connection = await this.get(id);
+    await this.vault.remove(id, connection.auth !== 'none' && !connection.sessionOnly);
+    const remaining = (await this.list()).filter((row) => row.id !== id);
+    await atomic(this.file, remaining);
     return { removed: true };
   }
   /** Release transports on exit without revoking saved connection intent or reusable credentials. */

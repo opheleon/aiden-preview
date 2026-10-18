@@ -1,5 +1,12 @@
 import type { BetaSettings, CodingJob } from './delivery-jobs.js';
 import type {
+  DeviceRun,
+  DeviceTarget,
+  DeviceTest,
+  ProjectDeviceTest,
+} from './device-verification.js';
+import type { GuideView, SetupStepId } from './guide.js';
+import type {
   ActivityEntry,
   Baseline,
   Call,
@@ -20,7 +27,9 @@ import type {
   VerificationResult,
   VerificationSettings,
 } from './index.js';
+import type { PhoneApp, PhoneReadiness, PhoneSetup } from './phone-setup.js';
 import type { LinearTeam, TicketSettings, TicketState } from './tickets.js';
+import type { VerificationUpdate } from './verification.js';
 /** Coarse sign-in state safe to show without exposing provider account identifiers. */
 export type SubscriptionState =
   'authenticated' | 'sign_in_required' | 'unavailable' | 'check_failed';
@@ -49,11 +58,22 @@ type ProjectRef = { projectId: string };
 type RunRef = ProjectRef & { runId: string };
 /** Allowlisted desktop and CLI operations with stable request/result contracts across the worker boundary. */
 export type WorkerAPI = {
+  phoneSetup: { params: Record<string, never>; result: PhoneReadiness };
+  savePhoneSetup: { params: PhoneSetup; result: PhoneSetup };
+  phoneApps: { params: { udid: string }; result: PhoneApp[] };
+  deviceProbe: { params: DeviceTarget; result: Record<string, string> };
+  deviceTest: { params: DeviceTest; result: { runId: string } };
+  deviceRuns: { params: Record<string, never>; result: DeviceRun[] };
+  deviceRun: { params: { runId: string }; result: DeviceRun | null };
+  deviceCancel: { params: { runId: string }; result: { cancelled: boolean } };
   discoverRepositories: { params: { rootPath: string }; result: RepositoryDiscovery };
   /** Record human acceptance of the currently displayed scope and evidence. */
   acceptOutcome: { params: ProjectRef & { note: string; evidenceKey: string }; result: Project };
   /** Pause project monitoring while retaining evidence and external tracker state. */
-  closeProject: { params: ProjectRef & { note: string }; result: Project };
+  closeProject: {
+    params: ProjectRef & { note: string; forgetCredentials?: boolean };
+    result: Project;
+  };
   /** Resume monitoring for a closed project. */
   reopenProject: { params: ProjectRef; result: Project };
   projects: { params: Record<string, never>; result: Project[] };
@@ -68,7 +88,10 @@ export type WorkerAPI = {
     };
   };
   /** With `autoAccept`, Aiden commits what done means itself and then looks, instead of stopping for review. */
-  prepare: { params: { project: Project; autoAccept?: boolean }; result: { runId: string } };
+  prepare: {
+    params: { project: Project; autoAccept?: boolean; verification?: VerificationUpdate };
+    result: { runId: string };
+  };
   approve: { params: RunRef & { product: Product }; result: Baseline };
   /** `browserCheck` also checks the saved app URL in a browser once the assessment is accepted. */
   report: { params: ProjectRef & { browserCheck?: boolean }; result: { runId: string } };
@@ -76,11 +99,15 @@ export type WorkerAPI = {
   cancel: { params: { runId: string }; result: { cancelled: boolean } };
   waitForRun: { params: { runId: string }; result: null };
   /**
-   * Assess the code against what done means, then find and check the running app. Without a
-   * reason (a person asked), a look that stopped early is picked up instead of started over.
+   * Assess repository code against what done means, optionally check the installed phone build,
+   * then estimate remaining work. Device criteria and provider selection come from the accepted report.
    */
   look: {
-    params: ProjectRef & { reason?: 'commit' | 'morning' | 'ticket' };
+    params: ProjectRef & {
+      reason?: 'commit' | 'morning' | 'ticket';
+      device?: ProjectDeviceTest;
+      verifySurfaces?: boolean;
+    };
     result: { runId: string };
   };
   /** Everything Aiden did on the project, newest first. */
@@ -100,6 +127,34 @@ export type WorkerAPI = {
   explain: { params: RunRef & { at: string; summary: string }; result: ChatMessage[] };
   /** Ask about a run; answered from its saved record with the project's runtime and billing. */
   askWhy: { params: RunRef & { question: string }; result: ChatMessage[] };
+  /** The project's Guide conversation and the setup checklist derived from saved project state. */
+  guide: { params: ProjectRef; result: GuideView };
+  /**
+   * Talk to the project's Guide with its runtime and billing. `kickoff` asks it to play back the
+   * requirements; `retry` answers the last unanswered message again; otherwise `text` is required.
+   */
+  askGuide: {
+    params: ProjectRef & {
+      text?: string;
+      kickoff?: boolean;
+      retry?: boolean;
+      clarification?: { callId: string; answer: string };
+    };
+    result: GuideView;
+  };
+  /** Record an app fact in the Guide thread, such as a saved URL, so the Guide knows about it. */
+  guideEvent: { params: ProjectRef & { text: string }; result: GuideView };
+  /** Mark the current requirements as confirmed by the person. */
+  confirmRequirements: { params: ProjectRef; result: GuideView };
+  /** Skip an optional or deferrable setup step. */
+  skipSetupStep: { params: ProjectRef & { step: SetupStepId }; result: GuideView };
+  /** Check that an app URL answers, without opening a browser or running any check. */
+  testAppUrl: { params: { url: string }; result: { reachable: boolean; message: string } };
+  /** Check every selected target and optionally save only after all access checks succeed. */
+  configureGuideVerification: {
+    params: ProjectRef & { update: VerificationUpdate; save: boolean; code?: Project };
+    result: { message: string };
+  };
   /** Every call recorded for the project, oldest first. */
   calls: { params: ProjectRef; result: Call[] };
   /** Answer a call; `runId` is the work it started, or null when Aiden uses it on the next look. */
@@ -223,7 +278,7 @@ export type WorkerAPI = {
   verify: { params: ProjectRef & { url?: string }; result: { runId: string } };
   verificationSettings: { params: ProjectRef; result: VerificationSettings };
   updateVerificationSettings: {
-    params: ProjectRef & { url?: string | null; api?: VerificationSettings['api'] | null };
+    params: ProjectRef & VerificationUpdate;
     result: VerificationSettings;
   };
   verification: {

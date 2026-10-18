@@ -14,6 +14,7 @@ test('an existing plan can connect later, publish, and resync its linked tickets
   try {
     const { page, app } = desktop;
     await createProject(app, page, fixture.root);
+    await page.getByRole('tab', { name: 'Scope', exact: true }).click();
     await page.getByRole('button', { name: 'Connect tracker', exact: true }).click();
     await page.getByRole('button', { name: 'Manage tracker connections' }).click();
     await expect(page.getByRole('button', { name: 'Connect Linear', exact: true })).toBeVisible();
@@ -47,6 +48,7 @@ test('an existing plan can connect later, publish, and resync its linked tickets
     });
     await page.reload();
     await page.getByRole('button', { name: 'A book project', exact: true }).first().click();
+    await page.getByRole('tab', { name: 'Scope', exact: true }).click();
     await page.getByRole('button', { name: 'Connect tracker', exact: true }).click();
     await page
       .getByRole('combobox', { name: 'MCP connection' })
@@ -103,6 +105,7 @@ test('an existing plan can connect later, publish, and resync its linked tickets
     tracker.issues.get('issue-1')!.statusType = 'completed';
     await page.getByRole('button', { name: 'Sync tickets', exact: true }).click();
     await expect(page.getByText(/Tracker: Done/).first()).toBeVisible();
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click();
     await expect(page.getByRole('region', { name: 'Delivery attention' })).toContainText(
       'Checking completion',
     );
@@ -110,8 +113,10 @@ test('an existing plan can connect later, publish, and resync its linked tickets
     const attention = page.getByRole('region', { name: 'Delivery attention' });
     await expect(attention).toContainText('is marked Done, but its requirements are incomplete');
     await expect(page.getByRole('button', { name: 'Stop', exact: true })).toHaveCount(0);
+    await page.getByRole('tab', { name: 'Scope', exact: true }).click();
     await page.locator('.feature-summary').first().click();
     await expect(page.locator('.feature-summary').first()).toContainText('Delivery deviation');
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click();
     await page.setViewportSize({ width: 950, height: 760 });
     await attention.scrollIntoViewIfNeeded();
     await expect(attention).toBeInViewport();
@@ -122,8 +127,12 @@ test('an existing plan can connect later, publish, and resync its linked tickets
       path: info.outputPath('delivery-deviation-overview.png'),
       fullPage: true,
     });
-    await attention.getByRole('button', { name: 'Review requirement' }).click();
-    await expect(page.locator('.req-row').first()).toHaveAttribute('open', '');
+    await attention.getByRole('button', { name: 'Review with Aiden' }).click();
+    const chat = page.getByRole('dialog', { name: 'Chat with Aiden' });
+    await expect(chat.getByRole('region', { name: 'Selected requirement' })).toContainText('REQ-1');
+    await chat.getByRole('button', { name: 'Back' }).click();
+    await expect(attention.getByRole('button', { name: 'Review with Aiden' })).toBeFocused();
+    await page.getByRole('tab', { name: 'Scope', exact: true }).click();
     // A human edit remains a conflict, and retry never overwrites it or makes another issue.
     tracker.issues.get('issue-1')!.description += '\nHuman note';
     await page.getByRole('button', { name: 'Sync tickets', exact: true }).click();

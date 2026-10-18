@@ -32,12 +32,14 @@ void test('an unclassified question blocks affected work and a reversible choice
       question: 'Show busy to coworkers?',
       assumption: 'Show busy',
       options: ['Show busy', 'Hide'],
+      selectionMode: 'single',
       requirementId: 'REQ-2',
       edgeCaseId: 'E1',
     });
     await requestClarification(context, run, signal, {
       question: 'Edge case without a requirement?',
       assumption: 'Ignore the edge case',
+      selectionMode: 'multiple',
       edgeCaseId: 'E3',
     });
     await requestClarification(context, run, signal, {
@@ -46,6 +48,8 @@ void test('an unclassified question blocks affected work and a reversible choice
     });
     const calls = await readCalls(store, 'project');
     assert.equal(calls.length, 4, 'asking again does not add a call');
+    assert.equal(calls[2]?.selectionMode, 'single');
+    assert.equal(calls[3]?.selectionMode, 'multiple');
     assert.deepEqual(
       calls.map((c) => [c.requirementId, c.edgeCaseId, c.options.length]),
       [

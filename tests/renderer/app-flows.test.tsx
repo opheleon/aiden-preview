@@ -12,7 +12,7 @@ beforeEach(() => f.reset());
 async function openProject() {
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
-  await screen.findByRole('region', { name: 'Requirements' });
+  await screen.findByRole('region', { name: 'Project connections' });
 }
 
 /** Open the overflow menu and pick one item. */
@@ -26,26 +26,26 @@ function line(summary: string, extra: Partial<ActivityEntry> = {}): ActivityEntr
   return { at: report.generatedAt, runId: report.id, kind: 'look', summary, ...extra };
 }
 
-test('setting the intent is one screen, and Aiden starts without a review step', async () => {
+test('setting the intent is one screen, and Aiden starts with only the intent', async () => {
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Create project' }));
   expect(screen.getByRole('heading', { name: /What are you building/ })).toBeVisible();
   const start = screen.getByRole('button', { name: /Hand it to Aiden/ });
   expect(start).toBeDisabled();
-  expect(start).toHaveAccessibleDescription(
-    'To start, describe what you are building and choose the project folder.',
-  );
+  expect(start).toHaveAccessibleDescription('To start, describe what you are building.');
   await userEvent.type(screen.getByLabelText('What are you building?'), 'List books');
-  expect(start).toHaveAccessibleDescription('To start, choose the project folder.');
+  // The folder and verification are optional; the Guide asks about them after the start.
+  expect(start).toBeEnabled();
+  expect(start).not.toHaveAccessibleDescription();
+  expect(screen.getByText(/asks how to check the work/)).toBeVisible();
+  expect(screen.queryByText('Verification setup: surfaces and connections')).toBeNull();
   await userEvent.click(screen.getByRole('button', { name: 'Import a file' }));
   expect(screen.getByLabelText('What are you building?')).toHaveValue(
     'List books\n\nImported fixture intent',
   );
-  expect(start).toBeDisabled();
-  await userEvent.click(screen.getByRole('button', { name: 'Choose the project folder' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Add the project folder (optional)' }));
   expect(await screen.findByRole('button', { name: 'synthetic · 1 repository' })).toBeVisible();
   expect(screen.getByText('Synthetic discovery warning')).toBeVisible();
-  expect(start).not.toHaveAccessibleDescription();
   await userEvent.selectOptions(screen.getByLabelText('Model provider'), 'claude');
   await userEvent.click(start);
   await waitFor(() =>
@@ -62,6 +62,28 @@ test('setting the intent is one screen, and Aiden starts without a review step',
   expect(screen.queryByRole('button', { name: /Approve/ })).toBeNull();
 });
 
+test('a folder without Git is a note, not a blocker', async () => {
+  const original = f.request.getMockImplementation()!;
+  f.request.mockImplementation((method: string, p?: unknown) =>
+    method === 'discoverRepositories'
+      ? Promise.resolve({ rootPath: '/no-git', warnings: [], repositories: [] })
+      : original(method, p),
+  );
+  try {
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Create project' }));
+    await userEvent.type(screen.getByLabelText('What are you building?'), 'List books');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add the project folder (optional)' }),
+    );
+    expect(await screen.findByText(/No Git repository was found in no-git/)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Choose a different folder' })).toBeVisible();
+    expect(screen.getByRole('button', { name: /Hand it to Aiden/ })).toBeEnabled();
+  } finally {
+    f.request.mockImplementation(original);
+  }
+});
+
 test('a project whose first rewrite is running shows it, and a stopped one says so', async () => {
   f.reset(false);
   render(<App />);
@@ -69,7 +91,7 @@ test('a project whose first rewrite is running shows it, and a stopped one says 
   expect(await screen.findByText('Aiden is writing the requirements.')).toBeVisible();
   // Nothing has been checked yet, so there is no outcome to accept.
   expect(screen.queryByRole('region', { name: 'Project outcome' })).toBeNull();
-  await userEvent.click(screen.getByRole('button', { name: 'Stop' }));
+  await userEvent.click(screen.getAllByRole('button', { name: 'Stop' }).at(-1)!);
   expect(f.request).toHaveBeenCalledWith('cancel', { runId: 'prepare-run' });
   act(() =>
     f.emit({
@@ -102,17 +124,22 @@ test('the brief keeps only touch points on screen; the rest lives in one menu', 
   expect(f.api.saveExport).toHaveBeenCalledWith(expect.objectContaining({ format: 'json' }));
   expect(screen.queryByRole('menuitem', { name: 'Run check now' })).toBeNull();
   await userEvent.click(screen.getByRole('button', { name: 'Run check now' }));
-  expect(f.request).toHaveBeenCalledWith('look', { projectId: report.projectId });
-  expect(await screen.findByText('Starting a check…')).toBeVisible();
+  expect(f.request).toHaveBeenCalledWith('look', {
+    projectId: report.projectId,
+    verifySurfaces: true,
+  });
+  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  expect(within(chat).getByRole('region', { name: 'Checks in this chat' })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Run check now' })).toBeDisabled();
   act(() =>
     f.emit({ type: 'progress', projectId: report.projectId, runId: 'look-run', message: 'Sync…' }),
   );
-  expect(screen.getByText('Sync…')).toBeVisible();
-  await userEvent.click(screen.getByRole('button', { name: 'Stop' }));
+  expect(within(chat).getByText('Sync…')).toBeVisible();
+  await userEvent.click(within(chat).getByRole('button', { name: 'Stop' }));
   expect(f.request).toHaveBeenCalledWith('cancel', { runId: 'look-run' });
+  await userEvent.click(within(chat).getByRole('button', { name: 'Back' }));
   await menu('Project settings');
-  expect(await screen.findByRole('region', { name: 'App URL settings' })).toBeVisible();
+  expect(await screen.findByRole('region', { name: 'Project verification' })).toBeVisible();
 });
 
 test('action items: PM decisions are answered in place, Dev items copy a prompt, manual tests are marked done', async () => {
@@ -149,11 +176,12 @@ test('action items: PM decisions are answered in place, Dev items copy a prompt,
   await openProject();
   const actions = screen.getByRole('region', { name: 'Needs you' });
   expect(actions).toHaveTextContent('Needs you · 3');
+  await userEvent.click(screen.getByRole('tab', { name: 'Scope' }));
   await userEvent.click(screen.getByText('Users can list books.', { selector: '.row-title' }));
   await userEvent.click(screen.getByText('Users can create books.', { selector: '.row-title' }));
   expect(actions).not.toHaveTextContent('Already decided?');
   const items = [
-    ...within(actions).getAllByRole('listitem'),
+    ...within(actions).getAllByRole('listitem', { hidden: true }),
     ...screen
       .getAllByRole('region', { name: 'Action items' })
       .flatMap((region) => within(region).getAllByRole('listitem')),
@@ -170,6 +198,7 @@ test('action items: PM decisions are answered in place, Dev items copy a prompt,
   expect(items[1]).toHaveTextContent('Tell Aiden where your app runs');
   expect(items[3]).toHaveTextContent('Finish: Users can list books.');
   expect(items[4]).toHaveTextContent('Test by hand: Users can create books.');
+  await userEvent.click(screen.getByRole('tab', { name: 'Overview' }));
   const choice = within(actions).getByRole('button', { name: 'Block duplicates' });
   await userEvent.click(choice);
   expect(choice).toHaveAttribute('aria-pressed', 'true');
@@ -197,6 +226,7 @@ test('action items: PM decisions are answered in place, Dev items copy a prompt,
     expect.stringContaining('What should an empty library say?'),
   );
   expect(screen.getByText(/On Teams, Aiden takes this to them/)).toBeVisible();
+  await userEvent.click(screen.getByRole('tab', { name: 'Scope' }));
   await userEvent.click(within(items[3]!).getByRole('button', { name: 'Copy work item' }));
   expect(writeText).toHaveBeenLastCalledWith(
     expect.stringMatching(/Finish: Users can list books\. \(REQ-1\)[\s\S]*What the code shows:/),
@@ -275,62 +305,46 @@ test('Why? opens the run conversation: the logged reason first, then questions a
   ).toHaveLength(1);
 });
 
-test('what done means stays editable, and editing it makes Aiden look again', async () => {
-  f.setBaseline({
-    id: report.baselineId,
-    projectId: report.projectId,
-    contextHash: 'a'.repeat(64),
-    product: {
-      ...report.baseline,
-      requirements: [
-        {
-          ...report.baseline.requirements[0]!,
-          edgeCases: [{ id: 'E1', text: 'An empty library says so.', origin: 'found' }],
-        },
-        report.baseline.requirements[1]!,
-      ],
-    },
-    reviewedAt: report.generatedAt,
-    retiredIds: ['REQ-7'],
-  });
+test('requirement changes open contextual chat and Back restores Scope and the draft', async () => {
   await openProject();
   await userEvent.click(screen.getByRole('tab', { name: 'Scope' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Edit scope' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Edit scope' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Remove REQ-1 E1' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Remove REQ-2' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Add requirement' }));
-  const save = screen.getByRole('button', { name: 'Save and run check' });
-  expect(save).toBeDisabled();
-  await userEvent.type(screen.getByLabelText('REQ-8'), 'Export books');
-  await userEvent.type(screen.getByLabelText('REQ-1'), ' fast');
-  await userEvent.click(save);
-  expect(f.request).toHaveBeenCalledWith('editIntent', {
-    projectId: report.projectId,
-    product: expect.objectContaining({
-      requirements: [
-        { id: 'REQ-1', text: 'Users can list books. fast', edgeCases: [] },
-        { id: 'REQ-8', text: 'Export books' },
-      ],
-    }),
-  });
-  expect(await screen.findByText('Running a check…')).toBeVisible();
-  act(() => f.emit({ type: 'completed', projectId: report.projectId, runId: 'intent-run' }));
+  const change = screen.getByRole('button', { name: 'Change REQ-1' });
+  await userEvent.click(change);
+  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  expect(within(chat).getByRole('region', { name: 'Selected requirement' })).toHaveTextContent(
+    'Users can list books.',
+  );
+  expect(f.request).not.toHaveBeenCalledWith('askGuide', expect.anything());
+  await userEvent.type(
+    within(chat).getByRole('textbox', { name: 'Message the Guide' }),
+    'Sort books by title',
+  );
+  await userEvent.click(within(chat).getByRole('button', { name: 'Back' }));
+  expect(screen.getByRole('tab', { name: 'Scope' })).toHaveAttribute('aria-selected', 'true');
+  expect(change).toHaveFocus();
+  await userEvent.click(change);
+  expect(within(chat).getByRole('textbox')).toHaveValue('Sort books by title');
+  await userEvent.click(within(chat).getByRole('button', { name: 'Send' }));
+  await waitFor(() =>
+    expect(f.request).toHaveBeenCalledWith(
+      'askGuide',
+      expect.objectContaining({
+        projectId: report.projectId,
+        text: 'I want to change requirement REQ-1. My requested change: Sort books by title',
+      }),
+    ),
+  );
+  expect(f.request).not.toHaveBeenCalledWith('editIntent', expect.anything());
+  await userEvent.click(within(chat).getByRole('button', { name: 'Back' }));
   await userEvent.click(screen.getByRole('button', { name: 'Edit goal' }));
-  const intent = screen.getByLabelText('What you are building');
-  expect(screen.getByRole('button', { name: 'Rewrite requirements' })).toBeDisabled();
-  await userEvent.type(intent, ' and delete them');
-  await userEvent.click(screen.getByRole('button', { name: 'Rewrite requirements' }));
-  expect(f.request).toHaveBeenCalledWith('editIntent', {
-    projectId: report.projectId,
-    context: 'Users can list and create books and delete them',
-  });
-  expect(await screen.findByText('Rewriting the requirements…')).toBeVisible();
+  expect(within(chat).getByRole('region', { name: 'Change project scope' })).toHaveTextContent(
+    'Project goal',
+  );
 });
 
 test('code evidence, support, and a fresh project stay one click away', async () => {
   await openProject();
+  await userEvent.click(screen.getByRole('tab', { name: 'Scope' }));
   await userEvent.click(screen.getAllByText('In the code')[0]!);
   await userEvent.click(screen.getAllByRole('button', { name: /frontend · app.txt:1/ })[0]!);
   expect(await screen.findByRole('dialog', { name: 'Code evidence' })).toHaveTextContent(
@@ -346,24 +360,12 @@ test('code evidence, support, and a fresh project stay one click away', async ()
 test('project settings hold the folder, the app URL, and context connections', async () => {
   await openProject();
   await menu('Project settings');
-  const panel = await screen.findByRole('region', { name: 'App URL settings' });
-  expect(await within(panel).findByRole('status')).toHaveTextContent('No app URL saved.');
-  expect(within(panel).queryByRole('button', { name: 'Check now' })).toBeNull();
-  const input = within(panel).getByLabelText('App URL');
-  await userEvent.type(input, 'file:///etc/passwd');
-  await userEvent.click(within(panel).getByRole('button', { name: 'Save URL' }));
-  expect(await within(panel).findByRole('alert')).toHaveTextContent(
-    /^Only http and https URLs can be verified\.$/,
-  );
-  await userEvent.clear(input);
-  await userEvent.type(input, 'https://beta.example.test');
-  await userEvent.click(within(panel).getByRole('button', { name: 'Save URL' }));
-  expect(within(panel).getByRole('status')).toHaveTextContent('Saved: https://beta.example.test');
-  await userEvent.click(within(panel).getByRole('button', { name: 'Clear' }));
-  expect(f.request).toHaveBeenLastCalledWith('updateVerificationSettings', {
-    projectId: report.projectId,
-    url: null,
-  });
+  const panel = await screen.findByRole('region', { name: 'Project verification' });
+  await userEvent.click(within(panel).getByRole('button', { name: 'Edit verification in chat' }));
+  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  expect(await within(chat).findByRole('button', { name: 'Check access & save' })).toBeVisible();
+  await userEvent.click(within(chat).getByRole('button', { name: 'Back' }));
+  expect(panel).toBeVisible();
   await userEvent.type(screen.getByLabelText('Branch notes for frontend'), ' reviewed');
   await userEvent.click(screen.getByRole('button', { name: 'Rescan folder' }));
   expect(screen.getByLabelText('Branch notes for frontend')).toHaveValue('main reviewed');
@@ -481,7 +483,10 @@ test('a first look that failed says why and offers Look again instead of three m
   expect(screen.getByText(/could not choose which code to look at/)).toBeVisible();
   expect(screen.queryByText('No look finished yet.')).toBeNull();
   await userEvent.click(screen.getByRole('button', { name: 'Run check again' }));
-  expect(f.request).toHaveBeenCalledWith('look', { projectId: report.projectId });
+  expect(f.request).toHaveBeenCalledWith('look', {
+    projectId: report.projectId,
+    verifySurfaces: true,
+  });
   act(() =>
     f.emit({
       type: 'failed',
@@ -490,7 +495,9 @@ test('a first look that failed says why and offers Look again instead of three m
       message: 'The code assessment finished, but the browser check could not start.',
     }),
   );
-  expect(await screen.findByRole('alert')).toHaveTextContent('browser check could not start');
+  expect(
+    await within(screen.getByRole('dialog', { name: 'Chat with Aiden' })).findByRole('alert'),
+  ).toHaveTextContent('browser check could not start');
 });
 
 test('a later look that stopped keeps the last brief and says so', async () => {
@@ -501,7 +508,10 @@ test('a later look that stopped keeps the last brief and says so', async () => {
   ).toHaveTextContent('Paused while Aiden was closed. On Teams, it keeps going.');
   expect(screen.getByText('0 of 2 requirements complete')).toBeVisible();
   await userEvent.click(screen.getByRole('button', { name: 'Run check again' }));
-  expect(f.request).toHaveBeenCalledWith('look', { projectId: report.projectId });
+  expect(f.request).toHaveBeenCalledWith('look', {
+    projectId: report.projectId,
+    verifySurfaces: true,
+  });
 });
 
 test('a scope rewrite updates the project heading and sidebar without reopening it', async () => {

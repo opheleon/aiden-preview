@@ -1,9 +1,28 @@
 import path from 'node:path';
 
+const windowsPrerequisites = [
+  'SystemRoot',
+  'SystemDrive',
+  'windir',
+  'ComSpec',
+  'PATHEXT',
+  'USERPROFILE',
+  'HOMEDRIVE',
+  'HOMEPATH',
+  'APPDATA',
+  'LOCALAPPDATA',
+  'ProgramData',
+  'ProgramFiles',
+  'TEMP',
+  'TMP',
+];
+
 /**
  * Pass only process prerequisites and network trust settings, excluding unrelated credentials.
  * Finder does not inherit shell setup. Append standard macOS CLI locations without evaluating
  * shell profiles, preserving explicitly configured PATH precedence for providers and Node wrappers.
+ * Windows child processes also need system and profile locations to start, resolve executables,
+ * and find provider sign-in state.
  */
 export function cleanEnvironment(
   source: NodeJS.ProcessEnv = process.env,
@@ -21,6 +40,7 @@ export function cleanEnvironment(
       'HTTPS_PROXY',
       'HTTP_PROXY',
       'NO_PROXY',
+      ...(platform === 'win32' ? windowsPrerequisites : []),
     ].flatMap((k) => (source[k] ? [[k, source[k]]] : [])),
   );
   if (platform === 'darwin') {

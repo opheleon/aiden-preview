@@ -20,14 +20,20 @@ test('one handoff produces a brief with evidence, exports, restart, cancellation
     const project = 'A book project';
     await page.screenshot({ path: info.outputPath('delivery-plan.png'), fullPage: true });
     const initialCalls = await fixture.calls();
-    // One handoff plans, checks, and sizes the work automatically.
-    expect(initialCalls.slice(0, 3)).toEqual(['understand', 'assess', 'summary']);
+    // One handoff plans, checks, and sizes the work automatically. The Guide plays back only when
+    // its tab is on screen, so its turns are left out of the handoff order.
+    expect(initialCalls.filter((stage) => stage !== 'guide').slice(0, 3)).toEqual([
+      'understand',
+      'assess',
+      'summary',
+    ]);
     await expect
       .poll(async () => (await fixture.calls()).includes('estimate-remaining'))
       .toBe(true);
     // Local verification belongs to the coding agent; Aiden never asks for localhost.
     await expect(page.getByText('Tell Aiden where your app runs')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Start Claude Code' })).toHaveCount(0);
+    await page.getByRole('tab', { name: 'Scope', exact: true }).click();
     await page.locator('.feature-summary').first().click();
     await page.locator('.req-row > summary').first().click();
     await expect(
@@ -38,7 +44,7 @@ test('one handoff produces a brief with evidence, exports, restart, cancellation
     await expect(page.getByRole('region', { name: 'Activity' })).toContainText(
       'Wrote 2 requirements',
     );
-    await page.getByRole('tab', { name: 'Overview', exact: true }).click();
+    await page.getByRole('tab', { name: 'Scope', exact: true }).click();
     await page.locator('.req-row > summary').first().click();
     await page
       .getByRole('button', { name: /app.txt:1/ })
@@ -72,7 +78,7 @@ test('one handoff produces a brief with evidence, exports, restart, cancellation
     desktop = await fixture.launch(info);
     ({ page, app } = desktop);
     await page.getByRole('button', { name: project, exact: true }).click();
-    await page.getByRole('region', { name: 'Requirements' }).waitFor();
+    await page.getByRole('region', { name: 'Project connections' }).waitFor();
     expect(await fixture.calls()).toEqual(initialCalls);
     await writeFile(fixture.control, JSON.stringify({ pause: true }));
     await lookAgain(page);
@@ -86,7 +92,7 @@ test('one handoff produces a brief with evidence, exports, restart, cancellation
     desktop = await fixture.launch(info);
     ({ page } = desktop);
     await page.getByRole('button', { name: project, exact: true }).click();
-    await page.getByRole('region', { name: 'Requirements' }).waitFor();
+    await page.getByRole('region', { name: 'Project connections' }).waitFor();
     await expect(page.getByText(stoppedNote)).toBeVisible();
     expect(await fixture.calls()).toEqual(cancelledCalls);
     await writeFile(fixture.control, '{}');
@@ -129,7 +135,7 @@ test('quitting during a look preserves the last brief and waits for an explicit 
     await desktop.close();
     desktop = await fixture.launch(info);
     await desktop.page.getByRole('button', { name: 'A book project', exact: true }).click();
-    await desktop.page.getByRole('region', { name: 'Requirements' }).waitFor();
+    await desktop.page.getByRole('region', { name: 'Project connections' }).waitFor();
     expect(await fixture.calls()).toEqual(submitted);
     const recovered = await desktop.page.evaluate(
       async (projectId) => window.aiden!.request('state', { projectId }),
@@ -195,13 +201,14 @@ test('blocking scope pauses assessment and sizing until answered, with a draft t
   try {
     const { page, app } = desktop;
     await createProject(app, page, fixture.root, true);
-    await expect(page.getByText('Blocked by a decision')).toBeVisible();
+    await expect(page.getByText('Blocked by a decision')).toBeAttached();
     await expect(
       page.getByText('Delivery paused: resolve blocking decisions in Needs you.'),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Start Claude Code' })).toHaveCount(0);
     expect(await fixture.calls()).not.toContain('assess');
     expect(await fixture.calls()).not.toContain('estimate-original');
+    await page.getByRole('tab', { name: 'Scope', exact: true }).click();
     await page.locator('.feature-summary').first().click();
     await page.locator('.req-row > summary').first().click();
     await expect(
@@ -212,8 +219,11 @@ test('blocking scope pauses assessment and sizing until answered, with a draft t
     ).toBeVisible();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: info.outputPath('blocked-ticket.png'), fullPage: true });
-    await page.getByRole('button', { name: /^Runs/ }).click();
-    const blockedRun = page.getByRole('button', { name: /Checked the code/ });
+    await page.getByRole('tab', { name: 'Activity', exact: true }).click();
+    await page.getByText('All runs', { exact: true }).click();
+    const blockedRun = page
+      .getByRole('region', { name: 'All runs', exact: true })
+      .getByRole('button', { name: /Checked the code/ });
     await expect(blockedRun).toContainText('Blocked');
     await blockedRun.click();
     await expect(page.getByRole('region', { name: 'Waiting for information' })).toBeVisible();
@@ -224,8 +234,8 @@ test('blocking scope pauses assessment and sizing until answered, with a draft t
       .fill('Only signed-in members may access the library.');
     await page.getByRole('button', { name: 'Answer', exact: true }).click();
     await page.getByRole('button', { name: 'A book project', exact: true }).click();
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click();
     await expect(page.getByText(/estimated complexity points/)).toBeAttached();
-    await page.getByText('Progress details and estimates', { exact: true }).click();
     await expect(page.getByText(/estimated complexity points/)).toBeVisible();
     expect(await fixture.calls()).toContain('assess');
     await expect(page.getByText('Blocked by a decision')).toHaveCount(0);

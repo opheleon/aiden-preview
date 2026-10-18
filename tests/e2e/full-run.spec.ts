@@ -28,6 +28,7 @@ for (const provider of ['codex', 'claude'] as const) {
       args: ['dist/apps/desktop/src/main.js'],
       env: {
         ...env,
+        AIDEN_HEADLESS: '1',
         AIDEN_HOME: path.join(f.root, 'desktop-data'),
       },
     });

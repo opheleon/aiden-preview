@@ -107,6 +107,55 @@
   font-size: 13px;
 }
 
+.start-blocker {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--brand);
+  border-radius: 10px;
+  background: var(--tint);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.start-note {
+  border-color: var(--border);
+  background: var(--card);
+}
+
+.start-blocker svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--brand-dark);
+}
+
+.start-blocker p {
+  margin: 0;
+}
+
+.start-blocker-fix {
+  color: var(--body);
+}
+
+.start-blocker-action {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 6px 12px;
+  border: 1px solid var(--brand-dark);
+  border-radius: 8px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.start-blocker-action:hover {
+  background: var(--brand-dark);
+}
+
 .goal-starter-create {
   margin-left: auto;
 }

@@ -121,6 +121,14 @@ export function registerFileIpc(
     if (url.protocol !== 'https:') throw new Error('Only HTTPS links can be opened.');
     await shell.openExternal(url.href);
   });
+  ipcMain.handle('aiden:openDeviceReport', async (event, input: unknown) => {
+    authorized(event);
+    const runId = z.string().uuid().parse(input);
+    const run = await worker.request('deviceRun', { runId });
+    if (!run) throw new Error('No saved device test.');
+    const failure = await shell.openPath(run.reportPath);
+    if (failure) throw new Error(`Could not open the report: ${failure}`);
+  });
   ipcMain.handle('aiden:openVerificationReport', async (event, input: unknown) => {
     authorized(event);
     const p = z.object({ projectId: id, runId: id }).strict().parse(input);

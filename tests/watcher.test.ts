@@ -15,6 +15,7 @@ async function fixture(initial: Partial<Heads> = {}) {
   let busy = false;
   let fail = false;
   let closed = false;
+  let code = true;
   const operations: string[] = [];
   let needsAssessment = false;
   let heads: Heads = { ready: true, active: false, changed: false, ...initial };
@@ -31,7 +32,11 @@ async function fixture(initial: Partial<Heads> = {}) {
         operations.push(method);
         if (method === 'projects')
           return Promise.resolve([
-            { id: 'project', lifecycle: { status: closed ? 'closed' : 'active' } },
+            {
+              id: 'project',
+              repositories: code ? [{ id: 'app', path: '/synthetic/app', notes: '' }] : [],
+              lifecycle: { status: closed ? 'closed' : 'active' },
+            },
           ]);
         if (method === 'reconcileDelivery') return Promise.resolve([]);
         if (method === 'syncTickets')
@@ -50,6 +55,7 @@ async function fixture(initial: Partial<Heads> = {}) {
     root,
     operations,
     closed: (value: boolean) => (closed = value),
+    withoutCode: () => (code = false),
     watcher,
     looks,
     errors,
@@ -102,7 +108,10 @@ void test('one morning look a day is saved across restarts, and projects without
       isBusy: () => false,
       worker: {
         request: ((method: string, params: unknown) => {
-          if (method === 'projects') return Promise.resolve([{ id: 'project' }]);
+          if (method === 'projects')
+            return Promise.resolve([
+              { id: 'project', repositories: [{ id: 'app', path: '/synthetic/app', notes: '' }] },
+            ]);
           if (method === 'reconcileDelivery' || method === 'syncTickets')
             return Promise.resolve([]);
           if (method === 'heads')
@@ -189,6 +198,19 @@ void test('closed projects skip every monitoring and tracker operation until reo
     f.closed(false);
     await f.watcher.tick();
     assert.deepEqual(f.looks, [{ projectId: 'project', reason: 'commit' }]);
+  } finally {
+    await rm(f.root, { recursive: true, force: true });
+  }
+});
+
+void test('projects without connected code are never watched; their checks start from the Guide', async () => {
+  const f = await fixture({ changed: true });
+  try {
+    f.withoutCode();
+    f.operations.length = 0;
+    await f.watcher.tick();
+    assert.deepEqual(f.looks, []);
+    assert.deepEqual(f.operations, ['projects']);
   } finally {
     await rm(f.root, { recursive: true, force: true });
   }

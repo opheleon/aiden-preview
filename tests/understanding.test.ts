@@ -61,6 +61,12 @@ void test('understanding splits into the baseline product and the calls to recor
   assert.equal('edgeCases' in product.requirements[1]!, false, 'empty lists are omitted');
   assert.equal(calls.length, 1);
   assert.deepEqual(parseUnderstanding(understanding, previous), understanding);
+  // Strict provider schemas express an unspecified optional field as null.
+  const unspecified = {
+    ...understanding,
+    calls: understanding.calls.map((call) => ({ ...call, selectionMode: null })),
+  };
+  assert.equal(parseUnderstanding(unspecified, previous).calls[0]?.selectionMode, null);
 });
 
 void test('bad IDs and dangling call references are sent back to the model', () => {

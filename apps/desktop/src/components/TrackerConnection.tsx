@@ -7,6 +7,7 @@ import {
   trackerLabel,
 } from '../../../../packages/contracts/src/tracker-connections';
 import type { Workspace } from '../hooks/useWorkspace';
+import { CredentialStorageNote } from './CredentialStorageNote';
 
 /** Distinguish legacy readers from publishing connections and reconnect the selected identity in place. */
 export function TrackerConnection({
@@ -47,6 +48,9 @@ export function TrackerConnection({
               ? 'Finish signing in in your browser. This page updates automatically.'
               : 'This saved connection needs to reconnect before you can choose a team or publish.'}
           </p>
+          {!waiting && selected.auth !== 'none' && !selected.sessionOnly && (
+            <CredentialStorageNote connection={selected.name} />
+          )}
           <button
             className="secondary"
             disabled={connecting || waiting}

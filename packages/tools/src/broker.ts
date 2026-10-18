@@ -23,6 +23,7 @@ export const ClarificationRequestSchema = z
     blocking: z.boolean().optional(),
     assumption: z.string().trim().min(1).max(300),
     options: z.array(z.string().trim().min(1).max(160)).max(4).optional(),
+    selectionMode: z.enum(['single', 'multiple']).optional(),
     requirementId: requirementId.optional(),
     edgeCaseId: edgeCaseId.optional(),
   })
@@ -335,7 +336,7 @@ export class ToolBroker {
       defineTool({
         name: 'request_clarification',
         description:
-          'Record an unresolved human decision after investigating available context. Set blocking true for unknown core behavior, permissions, data policy, or prerequisites. Pause affected work and dependents; continue only independent work. Set blocking false only for low-impact reversible choices grounded in conventions. For a blocker, assumption describes what is paused and what the answer unlocks.',
+          'Record an unresolved human decision after investigating available context. Set blocking true for unknown core behavior, permissions, data policy, or prerequisites. Pause affected work and dependents; continue only independent work. Set blocking false only for low-impact reversible choices grounded in conventions. For a blocker, assumption describes what is paused and what the answer unlocks. Use selectionMode multiple only when the options can be combined; otherwise use single.',
         schema: ClarificationRequestSchema,
         run: async (a) => ({ recorded: true, instruction: await this.clarify(a) }),
       }),

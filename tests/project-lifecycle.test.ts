@@ -3,13 +3,20 @@ import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 
+import { VerificationConfigSchema } from '../packages/contracts/src/verification.js';
 import { reconcileDelivery } from '../packages/core/src/beta-delivery.js';
 import { Engine } from '../packages/core/src/engine.js';
 import { decideProject, readLifecycle } from '../packages/core/src/project-lifecycle.js';
 import { acquireProjectLock } from '../packages/core/src/run-lifecycle.js';
 import { atomic, Store } from '../packages/core/src/storage.js';
 import { syncTickets } from '../packages/core/src/ticket-sync.js';
+import { readAppUrl } from '../packages/core/src/verification-settings.js';
 import { createMethods, type RuntimeControls } from '../packages/core/src/worker-methods.js';
+import {
+  persistProjectVerification,
+  projectCredentialEntries,
+  readProjectVerification,
+} from '../packages/verification/src/project-credentials.js';
 import { FixtureRuntime } from './fixture-runtime.js';
 import { fixture } from './helpers.js';
 import { ticketFixture } from './ticket-fixture.js';
@@ -205,4 +212,44 @@ void test('closing an enabled tracker makes reconciliation read-only until reope
   } finally {
     await f.close();
   }
+});
+
+void test('closing can retain credentials, or forget them before closure with a retryable failure', async (t) => {
+  const f = await setup();
+  t.after(f.close);
+  const dir = f.store.project(f.project.id);
+  await persistProjectVerification(
+    dir,
+    VerificationConfigSchema.parse({
+      url: 'https://fixture.invalid/app',
+      webLogin: { loginUrl: 'https://fixture.invalid/login', successText: 'Notes' },
+      credentials: { username: 'fixture-user', password: 'fixture-password' },
+    }),
+  );
+  await f.methods.closeProject({
+    ...f.params,
+    note: 'Pause, keeping credentials.',
+    forgetCredentials: false,
+  });
+  assert.equal((await readLifecycle(f.store, f.project.id)).status, 'closed');
+  assert.equal((await readProjectVerification(dir)).credentials?.password, 'fixture-password');
+  await f.methods.reopenProject(f.params);
+  const blocked = t.mock.method(projectCredentialEntries, 'create', () => {
+    throw new Error('Synthetic locked store');
+  });
+  await assert.rejects(
+    async () =>
+      await f.methods.closeProject({ ...f.params, note: 'Finished.', forgetCredentials: true }),
+    /Could not remove saved credentials/,
+  );
+  assert.equal((await readLifecycle(f.store, f.project.id)).status, 'active');
+  blocked.mock.restore();
+  await f.methods.closeProject({ ...f.params, note: 'Finished.', forgetCredentials: true });
+  assert.equal((await readLifecycle(f.store, f.project.id)).status, 'closed');
+  await f.methods.reopenProject(f.params);
+  assert.equal((await readAppUrl(f.engine, f.project.id)).webCredentialsConfigured, false);
+  assert.equal((await readProjectVerification(dir)).credentials, undefined);
+  assert.ok(
+    !(await readFile(path.join(dir, 'verification.json'), 'utf8')).includes('fixture-password'),
+  );
 });

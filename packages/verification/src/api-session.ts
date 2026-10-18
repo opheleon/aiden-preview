@@ -88,7 +88,9 @@ export class ApiSession implements ToolProvider {
         run: ({ token }) =>
           this.step('Derived tampered token variants', '', () => this.http.tamper(token)),
       }),
-    ];
+    ].filter(
+      (tool) => !http.apiKeyOnly || !['api_identity', 'api_tamper_token'].includes(tool.name),
+    );
   }
   /** Open a video-recorded, network-disabled evidence page with no application credentials. */
   static async open(

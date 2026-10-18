@@ -2,7 +2,11 @@ import { z } from 'zod/v3';
 
 import type { WorkerMethod } from '../../contracts/src/api.js';
 import {
-  ApiVerificationSchema,
+  DeviceTargetSchema,
+  DeviceTestSchema,
+  ProjectDeviceTestSchema,
+} from '../../contracts/src/device-verification.js';
+import {
   BetaSettingsSchema,
   EstimateOverridesSchema,
   id,
@@ -12,7 +16,9 @@ import {
   ProjectSourcesSchema,
   RuntimeSchema,
 } from '../../contracts/src/index.js';
+import { PhoneSetupSchema } from '../../contracts/src/phone-setup.js';
 import { TicketSettingsSchema, TicketToolsSchema } from '../../contracts/src/tickets.js';
+import { VerificationUpdateSchema } from '../../contracts/src/verification.js';
 import { Runtimes } from '../../runtimes/src/index.js';
 import { discoverRepositories } from '../../tools/src/discovery.js';
 import { readActivity, readRunLog } from './activity.js';
@@ -22,6 +28,7 @@ import { readCalls, settleAppUrlCalls } from './calls.js';
 import { cancelCoding, codingJobs, startCodingJob } from './coding-jobs.js';
 import { confirmAction, readConfirmations } from './confirmations.js';
 import { Engine } from './engine.js';
+import { guideMethods } from './guide-methods.js';
 import { guardLifecycleMethods, lifecycleMethods } from './lifecycle-methods.js';
 import { linearTeams, publishLinearTickets } from './linear-projects.js';
 import {
@@ -60,6 +67,8 @@ export function createMethods(
   runtimes: RuntimeControls,
 ): Record<WorkerMethod, (params: unknown) => unknown> {
   return guardLifecycleMethods(engine, {
+    ...deviceMethods(engine),
+    ...guideMethods(engine),
     discoverRepositories: operation(z.object({ rootPath: z.string().min(1) }).strict(), (p) =>
       discoverRepositories(p.rootPath),
     ),
@@ -70,9 +79,17 @@ export function createMethods(
       return { ...saved, activeRunIds };
     }),
     prepare: operation(
-      z.object({ project: ProjectSchema, autoAccept: z.boolean().optional() }).strict(),
+      z
+        .object({
+          project: ProjectSchema,
+          autoAccept: z.boolean().optional(),
+          verification: VerificationUpdateSchema.optional(),
+        })
+        .strict(),
       (p) =>
-        p.autoAccept ? prepareAndLook(engine, p.project, 'intent') : engine.prepare(p.project),
+        p.autoAccept
+          ? prepareAndLook(engine, p.project, 'intent', undefined, false, p.verification)
+          : engine.prepare(p.project, p.verification ? { verification: p.verification } : {}),
     ),
     approve: operation(run.extend({ product: ProductSchema }).strict(), (p) =>
       engine.approve(p.projectId, p.runId, p.product),
@@ -139,20 +156,7 @@ export function createMethods(
     estimateOverrides: operation(project.extend({ overrides: EstimateOverridesSchema }), (p) =>
       engine.applyEstimateOverrides(p.projectId, p.overrides),
     ),
-    verify: operation(project.extend({ url: z.string().min(1).max(2000).optional() }), (p) =>
-      engine.verify(p.projectId, p.url),
-    ),
-    verificationSettings: operation(project, (p) => readAppUrl(engine, p.projectId)),
-    updateVerificationSettings: operation(
-      project.extend({
-        url: z.string().min(1).max(2000).nullable().optional(),
-        api: ApiVerificationSchema.nullable().optional(),
-      }),
-      (p) => saveVerificationSettings(engine, p.projectId, p),
-    ),
-    verification: operation(project.extend({ runId: id.optional() }), (p) =>
-      readVerification(engine, p.projectId, p.runId),
-    ),
+    ...verificationMethods(engine),
   });
 }
 
@@ -180,8 +184,19 @@ function functionMethods(engine: Engine) {
       (p) => saveMonitoredBranch(engine.store, p.projectId, p.repositoryId, p.monitoredBranch),
     ),
     look: operation(
-      project.extend({ reason: z.enum(['commit', 'morning', 'ticket']).optional() }),
-      (p) => startLook(engine, p.projectId, p.reason ?? 'you'),
+      project.extend({
+        reason: z.enum(['commit', 'morning', 'ticket']).optional(),
+        device: ProjectDeviceTestSchema.optional(),
+        verifySurfaces: z.boolean().optional(),
+      }),
+      (p) =>
+        startLook(
+          engine,
+          p.projectId,
+          p.reason ?? 'you',
+          p.device ? ProjectDeviceTestSchema.parse(p.device) : undefined,
+          p.verifySurfaces,
+        ),
     ),
     activity: operation(project, (p) => readActivity(engine.store, p.projectId)),
     calls: operation(project, async (p) => {
@@ -335,5 +350,42 @@ function ticketMethods(engine: Engine) {
       return syncTickets(engine, p.projectId);
     }),
     syncTickets: operation(project, (p) => syncTickets(engine, p.projectId)),
+  };
+}
+
+/** Validate standalone phone operations independently of project lifecycle and repository inputs. */
+function deviceMethods(engine: Engine) {
+  return {
+    phoneSetup: operation(z.object({}).strict(), () => engine.devices.setup.inspect()),
+    savePhoneSetup: operation(PhoneSetupSchema, (p) => engine.devices.setup.save(p)),
+    phoneApps: operation(z.object({ udid: DeviceTargetSchema.shape.udid }).strict(), (p) =>
+      engine.devices.setup.apps(p.udid),
+    ),
+    deviceProbe: operation(DeviceTargetSchema, (p) => engine.devices.probe(p)),
+    deviceTest: operation(DeviceTestSchema, (p) => engine.devices.start(p)),
+    deviceRuns: operation(z.object({}).strict(), () => engine.devices.list()),
+    deviceRun: operation(z.object({ runId: z.string().uuid() }).strict(), (p) =>
+      engine.devices.read(p.runId),
+    ),
+    deviceCancel: operation(z.object({ runId: z.string().uuid() }).strict(), (p) =>
+      engine.devices.cancel(p.runId),
+    ),
+  };
+}
+
+/** Keep browser verification settings and execution validated at the worker boundary. */
+function verificationMethods(engine: Engine) {
+  return {
+    verify: operation(project.extend({ url: z.string().min(1).max(2000).optional() }), (p) =>
+      engine.verify(p.projectId, p.url),
+    ),
+    verificationSettings: operation(project, (p) => readAppUrl(engine, p.projectId)),
+    updateVerificationSettings: operation(
+      project.extend(VerificationUpdateSchema.shape),
+      ({ projectId, ...update }) => saveVerificationSettings(engine, projectId, update),
+    ),
+    verification: operation(project.extend({ runId: id.optional() }), (p) =>
+      readVerification(engine, p.projectId, p.runId),
+    ),
   };
 }

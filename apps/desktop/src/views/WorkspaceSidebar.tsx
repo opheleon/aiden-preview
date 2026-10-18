@@ -1,13 +1,13 @@
 import { BookOpen, ExternalLink, MessageCircle, Plus, Settings2 } from 'lucide-react';
 import type { JSX } from 'react';
 
+import { helpLinks } from '../../../../packages/contracts/src/guide';
 import { scopeName } from '../../../../packages/contracts/src/project-name';
+import { useProjectGuide } from '../components/ProjectGuide';
 import { SidebarUpdate } from '../components/SidebarUpdate';
 import type { Workspace } from '../hooks/useWorkspace';
 import { newProject } from '../renderer/project-state';
 const api = window.aiden;
-const slackInviteUrl =
-  'https://join.slack.com/t/aidenbyopheleon/shared_invite/zt-4apsg5d7p-FDO9ae0imxj~KgauP8lpsw';
 
 /** Open a blank project. Runs keep going in the worker; this window just stops following them. */
 function startNewProject(workspace: Workspace): void {
@@ -37,6 +37,7 @@ export function WorkspaceSidebar({
   onGettingStarted: () => void;
 }): JSX.Element {
   const { projects, project, area, setArea, action } = workspace;
+  const { open } = useProjectGuide();
   return (
     <aside className="sidebar">
       <div className="sidebar-heading">
@@ -63,6 +64,12 @@ export function WorkspaceSidebar({
         )}
       </nav>
       <div className="sidebar-bottom">
+        {projects.some((p) => p.id === project.id) && (
+          <button className="sidebar-section" onClick={() => open()}>
+            <MessageCircle size={17} />
+            <span>Ask Aiden about this project</span>
+          </button>
+        )}
         <button className="sidebar-section" data-guide-trigger onClick={onGettingStarted}>
           <BookOpen size={17} />
           <span>Help / Getting started</span>
@@ -79,7 +86,7 @@ export function WorkspaceSidebar({
           title="Report a problem, suggest a feature, or get help on Slack."
           onClick={() =>
             void action(async () => {
-              await api?.openExternal(slackInviteUrl);
+              await api?.openExternal(helpLinks.slack);
             })
           }
         >
@@ -106,7 +113,7 @@ function ProjectLinks({
   workspace: Workspace;
   closed: boolean;
 }): JSX.Element {
-  const { projects, project, load, area, setArea } = workspace;
+  const { projects, project, load, area } = workspace;
   return (
     <>
       {projects
@@ -132,23 +139,6 @@ function ProjectLinks({
                   : p.name}
               </span>
             </button>
-            {p.id === project.id && (
-              <button
-                className={area === 'runs' ? 'project-sub selected' : 'project-sub'}
-                onClick={() => {
-                  workspace.setOpenRun('');
-                  setArea('runs');
-                }}
-              >
-                <span>Runs</span>
-                {workspace.activeRuns.length > 0 && (
-                  <span
-                    className="live-dot"
-                    aria-label={`${workspace.activeRuns.length} running`}
-                  />
-                )}
-              </button>
-            )}
           </div>
         ))}
     </>

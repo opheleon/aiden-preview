@@ -36,7 +36,7 @@ test('a fresh install with no projects shows no Projects label in the header', a
 test('opening a project keeps the header label away, and header navigation still switches areas', async () => {
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
-  await screen.findByRole('region', { name: 'Requirements' });
+  await screen.findByRole('region', { name: 'Project connections' });
   expectNoAreaLabel();
 
   await userEvent.click(within(header()).getByRole('button', { name: 'Settings' }));
@@ -44,7 +44,7 @@ test('opening a project keeps the header label away, and header navigation still
   expectNoAreaLabel();
 
   await userEvent.click(within(header()).getByRole('button', { name: 'Projects' }));
-  expect(await screen.findByRole('region', { name: 'Requirements' })).toBeVisible();
+  expect(await screen.findByRole('region', { name: 'Project connections' })).toBeVisible();
   expect(screen.queryByRole('heading', { name: /Application settings/ })).toBeNull();
   expectNoAreaLabel();
 });

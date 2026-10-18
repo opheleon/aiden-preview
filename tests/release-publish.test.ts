@@ -51,13 +51,18 @@ async function publishFixture(mode: string, version = '1.1.1') {
   await writeFile(path.join(root, 'gh'), ghFixture, { mode: 0o755 });
   await writeFile(calls, '');
   await writeFile(uploaded, '');
+  const channel = version.includes('-') ? 'beta' : 'latest';
   const files = [
     `Aiden-${version}-arm64.dmg`,
     `Aiden-${version}-arm64.dmg.blockmap`,
     `Aiden-${version}-arm64.zip`,
     `Aiden-${version}-arm64.zip.blockmap`,
-    version.includes('-') ? 'beta-mac.yml' : 'latest-mac.yml',
+    `${channel}-mac.yml`,
+    `Aiden-${version}-x64.exe`,
+    `Aiden-${version}-x64.exe.blockmap`,
+    `${channel}.yml`,
   ];
+  if (mode === 'missing-windows') files.splice(5, 3);
   for (const file of files) await writeFile(path.join(assets, file), 'synthetic artifact');
   const { stdout } = await exec('shasum', ['-a', '256', ...files], { cwd: assets });
   await writeFile(path.join(assets, 'SHA256SUMS.txt'), stdout);
@@ -100,7 +105,7 @@ void test('publishing uploads all attested files before publishing the exact cre
     const uploads = requests.filter((args) =>
       args.some((arg) => arg.startsWith('https://uploads.github.com/')),
     );
-    assert.equal(uploads.length, 6);
+    assert.equal(uploads.length, 9);
     assert.ok(requests.some((args) => args.includes(`prerelease=${version.includes('-')}`)));
     assert.deepEqual(requests.at(-1), [
       'api',
@@ -122,12 +127,13 @@ void test('duplicate tags, partial uploads, and corrupt or missing artifacts can
     'upload-fails',
     'missing-upload',
     'missing-local',
+    'missing-windows',
     'corrupt',
   ]) {
     const { failed, requests } = await publishFixture(mode);
     assert.equal(failed, true, mode);
     assert.ok(!requests.some((args) => args.includes('PATCH')), mode);
-    if (['existing', 'draft', 'missing-local', 'corrupt'].includes(mode)) {
+    if (['existing', 'draft', 'missing-local', 'missing-windows', 'corrupt'].includes(mode)) {
       assert.ok(!requests.some((args) => args.includes('POST')), mode);
     }
   }

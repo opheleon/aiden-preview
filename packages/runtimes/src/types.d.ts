@@ -8,7 +8,7 @@ export type RuntimeRequest = {
   prompt: string;
   schema: Record<string, unknown>;
   cwd: string;
-  tools: { url: string; token: string };
+  tools: { url: string; token: string; names?: readonly string[] };
   signal: AbortSignal;
   progress: (message: string) => void;
 };

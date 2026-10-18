@@ -22,7 +22,7 @@ import {
   verificationTarget,
 } from '../../verification/src/index.js';
 import { appendActivity } from './activity.js';
-import { blockedRequirements } from './blockers.js';
+import { blockedRequirements, requireCheckableScope } from './blockers.js';
 import { atomic, optionalJson } from './storage.js';
 import {
   type AppCheck,
@@ -253,6 +253,7 @@ export async function executeVerification(
   dir: string,
   workspace: string,
 ): Promise<void> {
+  await requireCheckableScope(context.store, run.projectId, run.baseline!.product);
   const projectDir = context.store.project(run.projectId);
   const config = await loadVerificationConfig(projectDir, process.env);
   const target = verificationTarget(run.verifyUrl ?? '', config.allowedOrigins);
@@ -349,6 +350,7 @@ function verificationRedactor(config: Verifier['config']): Verifier['redact'] {
   return redactor([
     config.credentials?.username ?? '',
     config.credentials?.password ?? '',
+    config.apiKey?.value ?? '',
     config.expiredToken ?? '',
   ]);
 }

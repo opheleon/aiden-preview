@@ -1,8 +1,9 @@
-import { MoreHorizontal, Square } from 'lucide-react';
+import { MessageCircle, MoreHorizontal, Square } from 'lucide-react';
 import { type JSX, type ReactNode, useRef } from 'react';
 
 import type { LookReason, RunManifest } from '../../../../packages/contracts/src/index';
 import { scopeName } from '../../../../packages/contracts/src/project-name';
+import { useProjectGuide } from '../components/ProjectGuide';
 import { ProjectOutcome } from '../components/ProjectOutcome';
 import type { CodingDeliveryState } from '../hooks/useCodingDelivery';
 import type { Workspace } from '../hooks/useWorkspace';
@@ -52,21 +53,16 @@ function Overflow({ workspace }: { workspace: Workspace }): JSX.Element {
 
 /** What Aiden is doing right now, with a way to stop it. */
 function LiveLine({ workspace }: { workspace: Workspace }): JSX.Element | null {
-  const { busy, live, activeRun, action, call, setArea, setOpenRun } = workspace;
+  const { busy, live, activeRun, action, call } = workspace;
+  const { open } = useProjectGuide();
   if (!busy) return null;
   return (
     <p className="live-line" aria-live="polite">
       <span className="spinner" aria-hidden="true" />
       {live || 'Aiden is working.'}
       {activeRun && (
-        <button
-          className="text-button"
-          onClick={() => {
-            setOpenRun(activeRun);
-            setArea('runs');
-          }}
-        >
-          Watch it work
+        <button className="text-button" onClick={() => open({ type: 'run' })}>
+          Show progress
         </button>
       )}
       {activeRun && (
@@ -125,6 +121,7 @@ export function BriefHeader({
   note: { text: string; label: string; run: () => void } | null;
 }): JSX.Element {
   const closed = workspace.project.lifecycle?.status === 'closed';
+  const { open } = useProjectGuide();
   const when = lastLook(workspace.runs.filter((run) => run.id === workspace.report?.id));
   return (
     <>
@@ -132,29 +129,11 @@ export function BriefHeader({
         <div>
           <h1>{scopeName(workspace.project.context, workspace.baseline?.product)}</h1>
           {when && <p className="brief-when">{when}</p>}
-          <p className="brief-when">
-            {closed ? 'Monitoring paused for' : 'Monitoring'}{' '}
-            {workspace.project.repositories
-              .map((repo) =>
-                repo.monitoredBranch
-                  ? `${repo.monitoredBranch.remote}/${repo.monitoredBranch.branch}`
-                  : 'not configured',
-              )
-              .join(', ')}{' '}
-            <button
-              className="text-button"
-              onClick={() => {
-                workspace.setSettingsTab('project');
-                workspace.setArea('settings');
-              }}
-            >
-              Change branch
-            </button>
-          </p>
+          <MonitoringLine workspace={workspace} />
         </div>
         <div className="button-row">
-          <button disabled={workspace.busy || closed} onClick={() => void workspace.lookNow()}>
-            Run check now
+          <button onClick={() => open()}>
+            <MessageCircle size={15} /> Ask Aiden
           </button>
           <Overflow workspace={workspace} />
         </div>
@@ -164,13 +143,23 @@ export function BriefHeader({
       {showStatus && attention}
       {showStatus && (
         <section className="brief-card" aria-label="Status">
-          {!progress && <h2 className="card-label">Overall progress</h2>}
+          <div className="card-label-row">
+            <h2 className="card-label">Latest check</h2>
+            <button
+              disabled={workspace.busy || closed}
+              onClick={() => {
+                open({ type: 'run' });
+                void workspace.lookNow();
+              }}
+            >
+              Run check now
+            </button>
+          </div>
           {delivery.error && <p role="alert">{delivery.error}</p>}
-          {progress ?? (
-            <p className="brief-status">
-              <strong>{headline}</strong> {lands}
-            </p>
-          )}
+          <p className="brief-status">
+            <strong>{headline}</strong> {lands}
+          </p>
+          {progress}
           {note && (
             <div className="brief-note">
               {note.text && <p>{note.text}</p>}
@@ -183,5 +172,32 @@ export function BriefHeader({
       )}
       <LiveLine workspace={workspace} />
     </>
+  );
+}
+
+/** Show branch controls only for projects with code connected. */
+function MonitoringLine({ workspace }: { workspace: Workspace }): JSX.Element | null {
+  if (!workspace.project.repositories.length) return null;
+  const closed = workspace.project.lifecycle?.status === 'closed';
+  return (
+    <p className="brief-when">
+      {closed ? 'Monitoring paused for' : 'Monitoring'}{' '}
+      {workspace.project.repositories
+        .map((repo) =>
+          repo.monitoredBranch
+            ? `${repo.monitoredBranch.remote}/${repo.monitoredBranch.branch}`
+            : 'not configured',
+        )
+        .join(', ')}{' '}
+      <button
+        className="text-button"
+        onClick={() => {
+          workspace.setSettingsTab('project');
+          workspace.setArea('settings');
+        }}
+      >
+        Change branch
+      </button>
+    </p>
   );
 }

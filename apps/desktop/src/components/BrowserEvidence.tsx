@@ -134,7 +134,7 @@ export function BrowserEvidence({
 }
 
 /** One attempt's recording, findings, proof screenshot, and steps; a step's time seeks the video. */
-function AttemptEvidence({
+export function AttemptEvidence({
   api,
   projectId,
   runId,

@@ -1,25 +1,26 @@
 import path from 'node:path';
 
 import {
-  ApiVerificationSchema,
   type CallDraft,
   type RunManifest,
   type VerificationConfig,
-  VerificationConfigSchema,
   type VerificationSettings,
 } from '../../contracts/src/index.js';
+import { type VerificationUpdate } from '../../contracts/src/verification.js';
 import {
   discoverLocalApps,
   type DiscoverOptions,
   loadVerificationConfig,
-  parseApiUrl,
-  parseAppUrl,
-  settingsFile,
   verificationTarget,
 } from '../../verification/src/index.js';
+import {
+  persistProjectVerification,
+  readProjectVerification,
+} from '../../verification/src/project-credentials.js';
 import { appendActivity } from './activity.js';
 import { recordCall } from './calls.js';
-import { atomic, optionalJson } from './storage.js';
+import { optionalJson } from './storage.js';
+import { updatedVerificationConfig } from './verification-auth-settings.js';
 import type { WorkflowContext } from './workflow-context.js';
 
 /** Choose the given URL or the project's saved one, then apply the local-or-configured origin rule. */
@@ -35,16 +36,7 @@ export async function resolveVerifyUrl(projectDir: string, url?: string): Promis
 
 /** Read the settings file as saved, without environment credentials or derived origins. */
 async function savedSettings(projectDir: string): Promise<VerificationConfig> {
-  const file = settingsFile(projectDir);
-  let raw: unknown;
-  try {
-    raw = await optionalJson(file);
-  } catch (error) {
-    if (error instanceof SyntaxError)
-      throw new Error(`${file} is not valid JSON.`, { cause: error });
-    throw error;
-  }
-  return VerificationConfigSchema.parse(raw ?? {});
+  return readProjectVerification(projectDir);
 }
 
 /** Read the project's saved app URL for display; test credentials never leave the worker. */
@@ -53,10 +45,33 @@ export async function readAppUrl(
   projectId: string,
 ): Promise<VerificationSettings> {
   const settings = await savedSettings(context.store.project(projectId));
-  return { url: settings.url ?? null, ...(settings.api ? { api: settings.api } : {}) };
+  return {
+    url: settings.url ?? null,
+    ...(settings.credentialStorage ? { credentialStorage: settings.credentialStorage } : {}),
+    ...(settings.rememberCredentials !== undefined
+      ? { rememberCredentials: settings.rememberCredentials }
+      : {}),
+    ...(settings.webLogin
+      ? {
+          webLogin: settings.webLogin,
+          webCredentialsConfigured:
+            !!settings.credentials &&
+            (!settings.credentialOrigin ||
+              settings.credentialOrigin === new URL(settings.url!).origin),
+        }
+      : {}),
+    ...(settings.api?.keyHeader
+      ? { apiKeyConfigured: settings.apiKey?.origin === new URL(settings.api.url).origin }
+      : {}),
+    ...(settings.authRevision ? { authRevision: settings.authRevision } : {}),
+    ...(settings.api ? { api: settings.api } : {}),
+    ...(settings.phone ? { phone: settings.phone } : {}),
+    ...(settings.trigger ? { trigger: settings.trigger } : {}),
+    ...(settings.manual ? { manual: true } : {}),
+  };
 }
 
-/** Save or clear the project's app URL, keeping every other setting in the owner-only file. */
+/** Save or clear the project's app URL while preserving unrelated configuration and credentials. */
 export async function saveAppUrl(
   context: Pick<WorkflowContext, 'store'>,
   projectId: string,
@@ -69,28 +84,23 @@ export async function saveAppUrl(
 export async function saveVerificationSettings(
   context: Pick<WorkflowContext, 'store'>,
   projectId: string,
-  update: {
-    url?: string | null | undefined;
-    api?: { url: string; allowMutations?: boolean | undefined } | null | undefined;
-  },
+  update: VerificationUpdate,
 ): Promise<VerificationSettings> {
   const projectDir = context.store.project(projectId);
   if (!(await optionalJson(path.join(projectDir, 'project.json'))))
     throw new Error('Save this project before setting its app URL.');
-  const settings = await savedSettings(projectDir);
-  if (update.url !== undefined) {
-    delete settings.url;
-    if (update.url !== null) settings.url = parseAppUrl(update.url.trim()).href;
-  }
-  if (update.api !== undefined) {
-    delete settings.api;
-    if (update.api !== null)
-      settings.api = ApiVerificationSchema.parse({
-        ...update.api,
-        url: parseApiUrl(update.api.url).href,
-      });
-  }
-  await atomic(settingsFile(projectDir), settings);
+  return writeVerificationSettings(context, projectId, update);
+}
+
+/** Validate and atomically save setup under the caller's project lock, preserving private credentials. */
+export async function writeVerificationSettings(
+  context: Pick<WorkflowContext, 'store'>,
+  projectId: string,
+  input: VerificationUpdate,
+): Promise<VerificationSettings> {
+  const projectDir = context.store.project(projectId);
+  const settings = updatedVerificationConfig(await savedSettings(projectDir), input);
+  await persistProjectVerification(projectDir, settings);
   return readAppUrl(context, projectId);
 }
 

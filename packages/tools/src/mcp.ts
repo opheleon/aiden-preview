@@ -17,6 +17,8 @@ import type { ToolDefinition } from './tool-definition.js';
 export interface LocalToolServer {
   url: string;
   token: string;
+  /** Exact run-scoped tools; an empty list marks a reasoning-only turn. */
+  names: readonly string[];
   close(): Promise<void>;
 }
 
@@ -153,6 +155,7 @@ export async function serveTools(broker: ToolProvider): Promise<LocalToolServer>
   return {
     url: `http://127.0.0.1:${address.port}/mcp`,
     token,
+    names: broker.definitions().map((tool) => tool.name),
     close: async () => {
       try {
         await Promise.all([...connections].map((transport) => transport.close()));

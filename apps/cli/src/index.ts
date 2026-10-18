@@ -12,6 +12,7 @@ import {
   type RunEvent,
 } from '../../../packages/contracts/src/index.js';
 import { WorkerClient } from '../../../packages/core/src/client.js';
+import { deviceCommand } from './device.js';
 const { positionals, values } = parseArgs({
   allowPositionals: true,
   options: {
@@ -141,7 +142,9 @@ async function connectionCommand(subcommand: string, connectionId: string): Prom
 }
 
 try {
-  if (command === 'doctor')
+  if (command === 'verify-device' || command === 'device-probe')
+    await deviceCommand(client, command, values.config, values.out);
+  else if (command === 'doctor')
     await output(JSON.stringify(await client.request('diagnostics'), null, 2));
   else if (command === 'discover') {
     if (!values.root) throw new Error('Use discover --root /path/to/project.');
@@ -332,7 +335,7 @@ try {
     process.stdout.write(`${saved.result.summary.line}\nReport: ${reportPath}\n`);
   } else
     process.stdout.write(
-      'Aiden\n\n  doctor\n  discover --root /path/to/project\n  login\n  report --config project.json [--format json|markdown] [--out file]\n  report --project ID\n  resume --project ID --run ID\n  validate --project ID --run ID\n  export --project ID --run ID --format markdown [--includeEstimates] --out report.md\n  integrations list\n  integrations add-linear\n  integrations add --name NAME --url URL --auth oauth|bearer|none\n  integrations connect|tools|approve|disconnect|remove --connection ID [--tools a,b]\n  sources --project ID --connection ID --source ID --historyTool TOOL --sourceArgument ARG [--label NAME]\n  estimate --project ID [--run REPORT_ID] [--refreshHistory]\n  estimation --project ID\n  estimate-overrides --project ID --config overrides.json\n  verify-url --project ID [--url URL | --clear]\n  verify --project ID [--url URL] [--out DIR]\n  calls --project ID\n  answer --project ID --call ID\n',
+      'Aiden\n\n  verify-device --config device-test.json [--out DIR]\n  device-probe --config phone.json\n  doctor\n  discover --root /path/to/project\n  login\n  report --config project.json [--format json|markdown] [--out file]\n  report --project ID\n  resume --project ID --run ID\n  validate --project ID --run ID\n  export --project ID --run ID --format markdown [--includeEstimates] --out report.md\n  integrations list\n  integrations add-linear\n  integrations add --name NAME --url URL --auth oauth|bearer|none\n  integrations connect|tools|approve|disconnect|remove --connection ID [--tools a,b]\n  sources --project ID --connection ID --source ID --historyTool TOOL --sourceArgument ARG [--label NAME]\n  estimate --project ID [--run REPORT_ID] [--refreshHistory]\n  estimation --project ID\n  estimate-overrides --project ID --config overrides.json\n  verify-url --project ID [--url URL | --clear]\n  verify --project ID [--url URL] [--out DIR]\n  calls --project ID\n  answer --project ID --call ID\n',
     );
 } catch (e) {
   process.stderr.write((e instanceof Error ? e.message : 'Command failed.') + '\n');

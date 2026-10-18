@@ -5,6 +5,7 @@ import {
   type ProjectLifecycle,
   ProjectLifecycleSchema,
 } from '../../contracts/src/index.js';
+import { forgetProjectCredentials } from '../../verification/src/project-credentials.js';
 import { codingActive, codingJobs } from './coding-jobs.js';
 import type { Engine } from './engine.js';
 import { acquireProjectLock } from './run-lifecycle.js';
@@ -35,6 +36,7 @@ export async function lifecycleView(
       'baseline.json',
       'latest.json',
       'latest-verification.json',
+      'latest-device-verification.json',
       'calls.json',
       'confirmed.json',
     ].map((file) => optionalJson(path.join(folder, file))),
@@ -65,7 +67,12 @@ async function decisionLocks(store: Store, projectId: string): Promise<() => Pro
 export async function decideProject(
   engine: Engine,
   projectId: string,
-  decision: { action: 'accepted' | 'closed' | 'reopened'; note: string; evidenceKey?: string },
+  decision: {
+    action: 'accepted' | 'closed' | 'reopened';
+    note: string;
+    evidenceKey?: string;
+    forgetCredentials?: boolean;
+  },
 ): Promise<Project> {
   const release = await decisionLocks(engine.store, projectId);
   try {
@@ -76,6 +83,8 @@ export async function decideProject(
     if (!project) throw new Error('Save the project first.');
     const view = await lifecycleView(engine.store, project);
     const saved = await readLifecycle(engine.store, projectId);
+    if (decision.action === 'closed' && decision.forgetCredentials)
+      await forgetProjectCredentials(folder);
     const at = new Date().toISOString();
     if (decision.action === 'accepted') {
       await requireOpenProject(engine.store, projectId);
@@ -91,7 +100,12 @@ export async function decideProject(
       if (saved.status === status) return { ...project, lifecycle: view };
       saved.status = status;
     }
-    saved.history.push({ ...decision, at });
+    saved.history.push({
+      action: decision.action,
+      note: decision.note,
+      ...(decision.evidenceKey ? { evidenceKey: decision.evidenceKey } : {}),
+      at,
+    });
     await atomic(path.join(folder, 'lifecycle.json'), ProjectLifecycleSchema.parse(saved));
     return { ...project, lifecycle: await lifecycleView(engine.store, project) };
   } finally {
