@@ -3,12 +3,10 @@ import { type JSX, useState } from 'react';
 import { experimentalIntegration } from '../../../../packages/contracts/src/tracker-connections';
 import type { Workspace } from '../hooks/useWorkspace';
 import { RepositorySetup } from '../views/RepositorySetup';
-import { ApiVerificationSettings } from './ApiVerificationSettings';
 import { BetaSchedule } from './BetaSchedule';
 import { BranchMonitoring } from './BranchMonitoring';
+import { useProjectGuide } from './ProjectGuide';
 import { TicketSettings } from './TicketSettings';
-import VerificationSettings from './VerificationSettings';
-const api = window.aiden;
 
 /** Choose which connected tools Aiden may read for context about this project. */
 function ContextSources({ workspace }: { workspace: Workspace }): JSX.Element | null {
@@ -66,30 +64,32 @@ function ContextSources({ workspace }: { workspace: Workspace }): JSX.Element | 
  * read for context. Changing the folder changes what Aiden looks at, so it looks again.
  */
 export function ProjectSettings({ workspace }: { workspace: Workspace }): JSX.Element {
-  const { project, projects, busy, start, verification, lookNow } = workspace;
+  const { project, projects, busy, start } = workspace;
+  const { open } = useProjectGuide();
   const saved = projects.find((p) => p.id === project.id);
   if (!saved) return <p className="fine-print">Hand a project to Aiden first.</p>;
   return (
     <div className="settings-stack">
-      <BranchMonitoring workspace={workspace} />
+      <section className="settings-stack" aria-label="Testing settings">
+        <h2>Testing settings</h2>
+        <BranchMonitoring workspace={workspace} />
+        <section className="card settings-panel" aria-label="Project verification">
+          <h2>App and API access</h2>
+          <p>Check and update this project’s test access in its conversation.</p>
+          <button disabled={busy} onClick={() => open({ type: 'verification' })}>
+            Edit verification in chat
+          </button>
+        </section>
+      </section>
       <RepositorySetup {...workspace} />
       <div className="next-row">
         <span>Saving the folder makes Aiden rewrite the requirements and run a check.</span>
-        <button
-          className="primary"
-          disabled={busy || !project.repositories.length}
-          onClick={() => void start()}
-        >
+        <button className="primary" disabled={busy} onClick={() => void start()}>
           Save and run check
         </button>
       </div>
-      <VerificationSettings key={project.id} project={project} api={api} latest={verification} />
-      <ApiVerificationSettings key={`api-${project.id}`} projectId={project.id} api={api} />
       <TicketSettings key={`tickets-${project.id}`} workspace={workspace} />
       <BetaSchedule key={`beta-${project.id}`} workspace={workspace} />
-      <button disabled={busy} onClick={() => void lookNow()}>
-        Run check now
-      </button>
       <ContextSources key={`sources-${project.id}`} workspace={workspace} />
     </div>
   );

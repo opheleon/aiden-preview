@@ -4,7 +4,13 @@ import type { BetaSettings } from '../../../../packages/contracts/src/index';
 import type { Workspace } from '../hooks/useWorkspace';
 
 /** Explicit opt-in to scheduled post-merge checks against the project's deployed beta. */
-export function BetaSchedule({ workspace }: { workspace: Workspace }): JSX.Element {
+export function BetaSchedule({
+  workspace,
+  verificationOnly = false,
+}: {
+  workspace: Workspace;
+  verificationOnly?: boolean;
+}): JSX.Element {
   const [settings, setSettings] = useState<BetaSettings>({ enabled: false, intervalMinutes: 60 });
   const [loaded, setLoaded] = useState(false);
   const { call, project, action, setNotice, setError } = workspace;
@@ -26,22 +32,26 @@ export function BetaSchedule({ workspace }: { workspace: Workspace }): JSX.Eleme
   }, [call, project.id, setError]);
   return (
     <section className="card settings-panel" aria-label="Beta verification schedule">
-      <h2>Beta capabilities</h2>
-      <label className="checkbox-row">
-        <input
-          type="checkbox"
-          checked={settings.codingAgentEnabled === true}
-          onChange={(e) => setSettings({ ...settings, codingAgentEnabled: e.target.checked })}
-        />
-        Enable experimental coding-agent dispatch
-      </label>
-      <p>
-        Off by default. Aiden prepares and tracks delivery tickets. Enable this to explicitly send
-        work to Claude Code from the project page. It can edit an isolated worktree, run local
-        tests, and create a PR using your selected billing mode. Blocking decisions still pause
-        dispatch. Turning this off prevents new jobs; existing jobs remain visible and can be
-        stopped.
-      </p>
+      {!verificationOnly && (
+        <>
+          <h2>Beta capabilities</h2>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={settings.codingAgentEnabled === true}
+              onChange={(e) => setSettings({ ...settings, codingAgentEnabled: e.target.checked })}
+            />
+            Enable experimental coding-agent dispatch
+          </label>
+          <p>
+            Off by default. Aiden prepares and tracks delivery tickets. Enable this to explicitly
+            send work to Claude Code from the project page. It can edit an isolated worktree, run
+            local tests, and create a PR using your selected billing mode. Blocking decisions still
+            pause dispatch. Turning this off prevents new jobs; existing jobs remain visible and can
+            be stopped.
+          </p>
+        </>
+      )}
       <h3>Post-merge beta verification</h3>
       <p>
         Local tests belong to the coding agent. Aiden checks the deployed beta after GitHub confirms
@@ -49,10 +59,10 @@ export function BetaSchedule({ workspace }: { workspace: Workspace }): JSX.Eleme
         selected model allowance.
       </p>
       <p>
-        Set the app or API URL above to your beta deployment. The revision endpoint must be on the
-        same origin as every configured app and API target and return JSON with the full deployed
-        Git SHA, for example <code>{'{"commit":"..."}'}</code>. Aiden waits until beta contains the
-        merge commit.
+        Set the app or API address in Project connections to your beta deployment. The revision
+        endpoint must be on the same origin as every configured app and API target and return JSON
+        with the full deployed Git SHA, for example <code>{'{"commit":"..."}'}</code>. Aiden waits
+        until beta contains the merge commit.
       </p>
       <label className="checkbox-row">
         <input

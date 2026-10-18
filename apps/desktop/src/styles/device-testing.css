@@ -1,0 +1,91 @@
+.device-testing {
+  max-width: 900px;
+  width: 100%;
+  margin-inline: auto;
+}
+
+.device-testing > .card,
+.device-testing article {
+  margin-block: 18px;
+  padding: 20px;
+}
+
+.device-testing fieldset,
+.verification-fields {
+  display: grid;
+  gap: 16px;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.device-testing legend,
+.verification-fields legend {
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.device-testing label,
+.verification-fields label {
+  display: grid;
+  gap: 6px;
+}
+
+.device-testing label:has(input[type='checkbox']),
+.verification-fields label:has(input[type='checkbox']) {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.device-testing input[type='checkbox'],
+.verification-fields input[type='checkbox'] {
+  flex: none;
+  width: auto;
+  margin-top: 4px;
+}
+
+.device-testing textarea {
+  resize: vertical;
+  min-height: 110px;
+}
+
+.device-testing p,
+.device-testing li {
+  overflow-wrap: anywhere;
+}
+
+.device-testing summary {
+  cursor: pointer;
+}
+
+.phone-fields {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.phone-fields details[open] > label {
+  margin-top: 12px;
+}
+
+.phone-setup {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.phone-instructions {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.phone-instructions h3 {
+  margin-top: 0;
+}
+
+.phone-instructions li,
+.phone-setup li {
+  margin-block: 10px;
+}

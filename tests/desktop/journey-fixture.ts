@@ -44,6 +44,7 @@ export async function desktopFixture() {
         : { args: ['dist/apps/desktop/src/main.js'] }),
       env: {
         ...env,
+        AIDEN_HEADLESS: '1',
         AIDEN_HOME: path.join(f.root, 'desktop-data'),
         AIDEN_CODEX_BINARY: binary,
         AIDEN_CLAUDE_BINARY: claude,
@@ -59,12 +60,21 @@ export async function desktopFixture() {
     await app.context().tracing.start({ screenshots: true, snapshots: true });
     const page = await app.firstWindow();
     await page.locator('[data-guide-ready="true"]').waitFor();
-    if (!showGuide && (await page.getByRole('dialog').isVisible())) {
+    expect(
+      await app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().map((window) => ({
+          visible: window.isVisible(),
+          focused: window.isFocused(),
+          focusable: window.isFocusable(),
+        })),
+      ),
+    ).toEqual([{ visible: false, focused: false, focusable: false }]);
+    if (!showGuide && (await page.getByRole('dialog').filter({ visible: true }).count())) {
       // Existing journeys start after onboarding; finish through the public UI so reloads stay clear.
       while (await page.getByRole('button', { name: 'Next', exact: true }).isVisible())
         await page.getByRole('button', { name: 'Next', exact: true }).click();
       await page.getByRole('button', { name: 'Got it', exact: true }).click();
-      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(page.getByRole('dialog').filter({ visible: true })).toHaveCount(0);
     }
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
@@ -107,9 +117,14 @@ export async function createProject(
   await app.evaluate(({ dialog }, folder) => {
     dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [folder] });
   }, root);
-  await page.getByRole('button', { name: 'Choose the project folder', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Add the project folder (optional)', exact: true })
+    .click();
   await page.getByRole('button', { name: /· 2 repositories/ }).waitFor();
   await page.getByRole('button', { name: /Hand it to Aiden/ }).click();
+  // Setup opens above the project; Back returns to the Overview.
+  await expect(page.getByRole('dialog', { name: 'Chat with Aiden' })).toBeVisible();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
   await page.getByRole('progressbar').waitFor();
   if (blocked) {
     await expect(page.getByText(/Delivery paused: resolve blocking decisions/)).toBeVisible();
@@ -119,13 +134,16 @@ export async function createProject(
 
 /** Start a new assessment from the project header. */
 export async function lookAgain(page: Page) {
+  await page.getByRole('tab', { name: 'Overview', exact: true }).click();
   await page.getByRole('button', { name: 'Run check now', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Chat with Aiden' })
+    .getByRole('button', { name: 'Back', exact: true })
+    .click();
 }
 
 /** Wait for automatically chained sizing before a journey requests another operation. */
 async function expectIdle(page: Page): Promise<void> {
-  await page.getByText('Progress details and estimates', { exact: true }).click();
   await expect(page.getByText(/estimated complexity points/)).toBeVisible();
-  await page.getByText('Progress details and estimates', { exact: true }).click();
   await expect(page.getByRole('button', { name: 'Stop', exact: true })).toHaveCount(0);
 }

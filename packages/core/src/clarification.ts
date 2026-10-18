@@ -23,6 +23,7 @@ export async function requestClarification(
       blocking: request.blocking ?? true,
       assumption: request.assumption,
       options: request.options ?? [],
+      ...(request.selectionMode ? { selectionMode: request.selectionMode } : {}),
       requirementId: request.requirementId ?? null,
       edgeCaseId: request.requirementId ? (request.edgeCaseId ?? null) : null,
       owner: 'you',

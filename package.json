@@ -1,7 +1,7 @@
 {
   "name": "opheleon-desktop-app",
   "private": true,
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Opheleon Aiden desktop workspace",
   "main": "dist/apps/desktop/src/main.js",
   "type": "module",
@@ -24,6 +24,7 @@
     "test:desktop": "pnpm run build && pnpm test:desktop:journeys && node --import tsx scripts/desktop-smoke.ts",
     "test:package:mac": "AIDEN_PACKAGED_APP=release/mac/mac-arm64/Aiden.app/Contents/MacOS/Aiden pnpm test:desktop:journeys && AIDEN_PACKAGED_APP=release/mac/mac-arm64/Aiden.app/Contents/MacOS/Aiden node --import tsx scripts/desktop-smoke.ts",
     "package:mac": "pnpm check && pnpm exec electron-builder --mac --arm64",
+    "package:win": "pnpm check && pnpm exec electron-builder --win --x64",
     "release:legacy-feed": "node --import tsx scripts/publish-legacy-feed.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -36,7 +37,8 @@
     "test:coverage": "c8 node --import tsx --import ./tests/setup.ts --test tests/*.test.ts && node --import tsx scripts/quality/check-critical-coverage.ts",
     "test:renderer": "vitest run --coverage",
     "test:desktop:journeys": "playwright test --config playwright.desktop.config.ts",
-    "eval:api": "node --import tsx scripts/api-eval.ts"
+    "eval:api": "node --import tsx scripts/api-eval.ts",
+    "demo:auth": "node --import tsx scripts/local-auth-demo.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.269",
@@ -98,7 +100,7 @@
       "node_modules/@anthropic-ai/claude-agent-sdk-*/**/*"
     ],
     "directories": {
-      "output": "release/mac",
+      "output": "release/${os}",
       "buildResources": "build"
     },
     "files": [
@@ -136,6 +138,17 @@
     },
     "dmg": {
       "sign": false
+    },
+    "win": {
+      "icon": "build/app-icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
     }
   },
   "packageManager": "pnpm@11.19.0"

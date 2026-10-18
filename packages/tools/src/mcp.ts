@@ -17,6 +17,8 @@ import type { ToolDefinition } from './tool-definition.js';
 export interface LocalToolServer {
   url: string;
   token: string;
+  /** Exact run-scoped tools; an empty list marks a reasoning-only turn. */
+  names: readonly string[];
   /**
    * Tools this endpoint serves. Zero marks a reasoning-only turn such as planning checks, so a
    * runtime must not demand Aiden tools; when absent, callers assume tools are expected.
@@ -158,6 +160,7 @@ export async function serveTools(broker: ToolProvider): Promise<LocalToolServer>
   return {
     url: `http://127.0.0.1:${address.port}/mcp`,
     token,
+    names: broker.definitions().map((tool) => tool.name),
     toolCount: broker.definitions().length,
     close: async () => {
       try {

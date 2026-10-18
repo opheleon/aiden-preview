@@ -163,6 +163,7 @@ function withEdgeCases() {
 async function openProject() {
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  await userEvent.click(screen.getByRole('tab', { name: 'Scope' }));
   return screen.findByRole('region', { name: 'Requirements' });
 }
 
@@ -172,6 +173,66 @@ function row(status: HTMLElement, id: string): HTMLElement {
   if (!line) throw new Error(`No row for ${id}`);
   return line;
 }
+
+test('app-only Overview keeps verification progress and explains unavailable effort estimates', async () => {
+  f.clearRuns();
+  f.project().repositories = [];
+  saveCheck();
+  render(<App />);
+  await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  const progress = await screen.findByRole('progressbar');
+  expect(progress).toBeVisible();
+  expect(progress).toHaveAttribute('value', '1');
+  expect(progress).toHaveAttribute('max', '2');
+  expect(screen.getByText('1 of 2 checks passed')).toBeVisible();
+  expect(screen.getByText(/Connect a code repository to estimate remaining work/)).toBeVisible();
+  expect(screen.getByText(/No target agreed yet/)).toBeVisible();
+});
+
+test('Overview exposes the current effort and time estimate without opening details', async () => {
+  f.setEstimate({
+    schemaVersion: '1.0',
+    estimatorVersion: '2',
+    id: 'synthetic-estimate',
+    projectId: report.projectId,
+    baselineId: report.baselineId,
+    reportId: report.id,
+    generatedAt: report.generatedAt,
+    runtime: report.runtime,
+    runtimeVersion: 'synthetic',
+    sourceSelectionHash: 'a'.repeat(64),
+    historyCollectedAt: null,
+    historyComplete: false,
+    historyTruncated: false,
+    historyLimitations: [],
+    requirements: [],
+    history: [],
+    receipts: [],
+    validation: 'structure-and-sources-checked',
+    forecast: {
+      referenceDate: '2026-10-17',
+      targetDate: null,
+      weeklyRate: 10,
+      rateSource: 'manual',
+      capacityPercent: 100,
+      remainingPoints: 8,
+      remainingWorkingDays: 4,
+      forecastFinish: '2026-10-23',
+      targetVarianceWorkingDays: null,
+      implementedPoints: 0,
+      totalPoints: 8,
+      implementedPercent: 0,
+      completeCoverage: true,
+      limitations: [],
+    },
+  });
+  render(<App />);
+  await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  expect(await screen.findByText(/8 estimated complexity points/)).toBeVisible();
+  expect(screen.getByText(/4 working days remaining/)).toBeVisible();
+  expect(screen.getByRole('region', { name: 'Requirements' })).toBeVisible();
+  expect(screen.getByText(/Code-based estimate from/)).not.toBeVisible();
+});
 
 /** Open a requirement's pop-up from its line and return the dialog. */
 async function openRow(status: HTMLElement, id: string, text: string): Promise<HTMLElement> {
@@ -187,8 +248,10 @@ async function closeSheet(sheet: HTMLElement, id: string): Promise<void> {
 
 test('the brief leads with status, one status per requirement, and work inside each pop-up', async () => {
   const status = await openProject();
+  await userEvent.click(screen.getByRole('tab', { name: 'Overview' }));
   expect(screen.getByText('0 of 2 requirements complete')).toBeVisible();
   expect(screen.getByRole('progressbar')).toHaveAttribute('value', '0');
+  await userEvent.click(screen.getByRole('tab', { name: 'Scope' }));
   expect(within(row(status, 'REQ-1')).getByText('In progress')).toBeVisible();
   expect(within(row(status, 'REQ-2')).getByText('Not started')).toBeVisible();
   // The line carries nothing but the text and the chip; the chip explains itself on hover.
@@ -218,7 +281,7 @@ test('app failures produce work items while blocking decisions suppress dependen
   const status = await openProject();
   expect(within(row(status, 'REQ-1')).getByText('In progress')).toBeVisible();
   expect(within(row(status, 'REQ-2')).getByText('Blocked')).toBeVisible();
-  expect(screen.getByText('0 of 2 requirements complete')).toBeVisible();
+  await userEvent.click(screen.getByRole('tab', { name: 'Overview' }));
   expect(screen.getByRole('region', { name: 'Needs you' })).toHaveTextContent(
     'Decide: Can two books share a title?',
   );
@@ -454,11 +517,13 @@ test('coding events update delivery automatically without completing requirement
   });
   try {
     await openProject();
+    await userEvent.click(screen.getByRole('tab', { name: 'Overview' }));
     const status = screen.getByRole('region', { name: 'Status' });
     expect(status).not.toHaveTextContent('Coding finished');
     saved = true;
     act(() => f.emit({ type: 'coding', projectId: report.projectId, runId: job.id }));
     await waitFor(() => expect(status).toHaveTextContent('Coding finished. PR open'));
+    await userEvent.click(screen.getByRole('tab', { name: 'Scope' }));
     expect(screen.getByRole('region', { name: 'Requirements' })).not.toHaveTextContent(
       'Coding finished',
     );
@@ -484,4 +549,48 @@ test('coding events update delivery automatically without completing requirement
   } finally {
     f.api.request.mockImplementation(original);
   }
+});
+
+test('web-only projects show their completed check and open criterion evidence without a code report', async () => {
+  f.project().repositories = [];
+  f.clearRuns();
+  f.addRun({ id: 'verify-run', kind: 'verify', status: 'completed' });
+  saveCheck();
+  render(<App />);
+  await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  expect(await screen.findByText('App check finished.')).toBeVisible();
+  expect(screen.queryByText('No check finished yet.')).toBeNull();
+  await userEvent.click(screen.getByRole('tab', { name: 'Activity' }));
+  const results = screen.getByRole('region', { name: 'App check results' });
+  expect(within(results).getByText('REQ-1: Passed')).toBeVisible();
+  expect(within(results).getByText('REQ-2: Could not verify')).toBeVisible();
+  await userEvent.click(within(results).getByRole('button', { name: 'View evidence for REQ-2' }));
+  expect(await screen.findByRole('dialog', { name: 'Browser check' })).toBeVisible();
+  expect(screen.getByText('Synthetic backend-only explanation')).toBeVisible();
+  await userEvent.click(screen.getByRole('button', { name: 'Close browser check' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Ask Aiden' }));
+  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  expect(within(chat).queryByRole('button', { name: 'View results' })).toBeNull();
+  const chatResults = within(chat).getByRole('region', { name: 'App check results' });
+  await userEvent.click(within(chatResults).getByText(/Users can create books/));
+  expect(within(chat).getByText('Synthetic backend-only explanation')).toBeVisible();
+  await userEvent.click(within(chatResults).getByText(/Users can list books/));
+  await userEvent.click(await within(chat).findByText('Evidence from attempt 2'));
+  expect(await within(chat).findByLabelText('Recording of attempt 2')).toBeVisible();
+  expect(chat).toBeVisible();
+  expect(f.api.openVerificationReport).not.toHaveBeenCalled();
+});
+
+test('web-only results from superseded requirements do not appear as current evidence', async () => {
+  f.project().repositories = [];
+  f.clearRuns();
+  f.addRun({ id: 'verify-run', kind: 'verify', status: 'completed' });
+  saveCheck('old-baseline');
+  render(<App />);
+  await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  expect(await screen.findByText('No check finished yet.')).toBeVisible();
+  expect(screen.queryByRole('region', { name: 'App check results' })).toBeNull();
+  await userEvent.click(screen.getByRole('button', { name: 'Ask Aiden' }));
+  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  expect(within(chat).queryByRole('region', { name: 'App check results' })).toBeNull();
 });

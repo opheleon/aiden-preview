@@ -71,6 +71,7 @@ The project folder can hold many repositories, and Aiden only reads the ones you
 A call is a decision only a person can make: a product choice, a policy, a number, or who something is for.
 - question: one precise question.
 - options: two to four concrete answers when they exist; an empty list when the answer is open.
+- selectionMode: "single" for alternatives that cannot be combined; "multiple" when the person can choose several compatible options. Keep mutually exclusive choices in single-selection questions.
 - blocking: true when an answer is necessary to define correct behavior or safely proceed; false only for a low-impact reversible detail supported by conventions.
 - assumption: for a blocker, describe what is paused and what the answer unlocks, without selecting an answer. For a non-blocker, state the supported reversible default.
 - owner: "you" for the person who set the intent; "someone else" when it needs a designer, customer, legal, or another team.
@@ -80,7 +81,10 @@ When the person is following another team's project rather than building it, sco
 </calls>
 
 <examples>
+Question "Which calendar views should the first release include?" has options ["Day", "Week", "Month"] and selectionMode "multiple" because the views can coexist. Question "Who makes the final decision on a meeting time?" has options ["The organizer", "Every participant"] and selectionMode "single" because these are alternative decision rules. For a multiple-selection answer, incorporate every selected option into the requirements.
+
 Intent "Let people drag events to reschedule them":
+
 - REQ-1 "Dragging an event to another time slot moves it there and keeps its details."
 - REQ-1 edge cases: E1 "Dragging an event into the next month keeps it on the new date." E2 "A viewer without edit rights cannot drag another person's event." E3 "If saving the move fails, the event returns to its original slot and the user sees why."
 - Call: question "When an event is moved, should attendees be notified?", options ["Notify attendees", "Move silently"], blocking true, assumption "Notification behavior and event delivery wait for this answer", owner "you", requirementId "REQ-1", edgeCaseId null.

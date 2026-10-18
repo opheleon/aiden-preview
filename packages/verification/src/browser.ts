@@ -14,11 +14,15 @@ import {
 } from '../../contracts/src/index.js';
 import { ToolObservation, type ToolProvider } from '../../tools/src/mcp.js';
 import { defineTool, type ToolDefinition } from '../../tools/src/tool-definition.js';
+import type { PrivateBrowserState } from './browser-login.js';
 import { checkers, checkLabel } from './page-checks.js';
 
 /** Inputs for one fresh browser context; credentials are used only for typing and redaction. */
 export interface SessionOptions {
   start: URL;
+  storageState?: PrivateBrowserState | undefined;
+  /** Trusted, origin-bound login; only cookies cross into the recorded browser. */
+  signIn?: (() => Promise<PrivateBrowserState>) | undefined;
   allowedOrigins: readonly string[];
   credentials?: { username: string; password: string } | undefined;
   stepLimit: number;
@@ -57,13 +61,50 @@ export class BrowserSession implements ToolProvider {
     readonly page: Page,
     private readonly options: SessionOptions,
   ) {
-    this.tools = [...this.actionTools(), ...this.inputTools()];
+    this.tools = [...this.actionTools(), ...this.inputTools(), ...this.signInTools()].filter(
+      (tool) =>
+        !(options.storageState || options.signIn) || tool.name !== 'browser_type_credential',
+    );
+  }
+
+  /** Reauthenticate in an unrecorded, fixed-origin browser without exposing secret inputs. */
+  private signInTools(): ToolDefinition[] {
+    const signIn = this.options.signIn;
+    if (!signIn) return [];
+    return [
+      defineTool({
+        name: 'browser_sign_in',
+        description:
+          'Sign in again with the configured test account. Aiden submits the saved credentials on its configured login page in a private browser, then opens the app here with the new session. No credentials or login recording are returned. This does not test the current form state.',
+        schema: z.object({ reason }).strict(),
+        readOnly: false,
+        run: ({ reason }) =>
+          this.step('Signed in with the saved test account privately', reason, async () => {
+            let state: PrivateBrowserState;
+            try {
+              state = await signIn();
+            } catch {
+              throw new Error(
+                'Saved test credentials are configured, but private sign-in failed. Check the login setup or account. Do not report missing credentials.',
+              );
+            }
+            await this.context.clearCookies();
+            await this.context.addCookies(state.cookies);
+            await this.page.goto(this.options.start.href, {
+              waitUntil: 'domcontentloaded',
+              timeout: 15000,
+            });
+            return 'Aiden submitted the saved account on the configured login form in a fresh private browser and verified authenticated access. The new session is now open here. Check the visible app state for proof.';
+          }),
+      }),
+    ];
   }
 
   /** Create a recorded context, block navigation outside allowed origins, and load the start URL. */
   static async open(browser: Browser, options: SessionOptions): Promise<BrowserSession> {
     const context = await browser.newContext({
       viewport,
+      ...(options.storageState ? { storageState: options.storageState } : {}),
       recordVideo: { dir: options.dir, size: viewport },
       acceptDownloads: false,
       serviceWorkers: 'block',

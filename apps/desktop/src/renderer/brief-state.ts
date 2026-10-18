@@ -49,6 +49,8 @@ export function briefState(input: {
   hasBaseline: boolean;
   hasReport: boolean;
   runs: RunManifest[];
+  activeKind?: RunManifest['kind'] | undefined;
+  hasCode?: boolean;
 }): BriefState {
   const stopped = input.busy ? null : stoppedWork(input.runs);
   const recovery: Recovery = stopped?.kind === 'prepare' ? 'rewrite' : 'look';
@@ -72,12 +74,7 @@ export function briefState(input: {
         };
   }
   if (!input.hasReport) {
-    if (input.busy)
-      return {
-        headline: 'Running the first check.',
-        lands: 'It assesses the code. Beta verification follows merge.',
-        note: null,
-      };
+    if (input.busy) return pendingCheck(input.activeKind);
     return stopped
       ? {
           headline:
@@ -89,7 +86,10 @@ export function briefState(input: {
         }
       : {
           headline: 'No check finished yet.',
-          lands: 'Aiden looks when your code changes, and every morning.',
+          lands:
+            input.hasCode === false
+              ? 'Choose how to verify the work, then run a check.'
+              : 'Aiden looks when your code changes, and every morning.',
           note: null,
         };
   }
@@ -99,4 +99,22 @@ export function briefState(input: {
       ? "The latest check didn't finish, so this is from the one before."
       : 'Aiden could not rewrite the requirements, so this uses the previous version.';
   return { note: { text: `${what} ${stopReason(stopped)}`, recovery } };
+}
+
+/** Describe the work actually running before a first result exists. */
+function pendingCheck(kind: RunManifest['kind'] | undefined): BriefState {
+  const headlines = {
+    estimate: 'Planning the work.',
+    prepare: 'Aiden is writing the requirements.',
+    report: 'Running the first check.',
+    verify: 'Running the first check.',
+  };
+  return {
+    headline: kind ? headlines[kind] : 'Running the first check.',
+    lands:
+      kind === 'verify'
+        ? 'Checking the configured app and API against your requirements.'
+        : 'You can follow progress or return to the setup chat.',
+    note: null,
+  };
 }

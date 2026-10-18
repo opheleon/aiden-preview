@@ -13,6 +13,10 @@ export class FixtureRuntime implements AgentRuntime {
   /** Replaces the ask-why answer; null returns output that fails the schema. */
   whyAnswer: string | null = 'FIXTURE answer from the run record, not live model output.';
   invalid = false;
+  /** Replaces the Guide reply; synthetic, not live model output. */
+  guideReply: Record<string, unknown> | null = null;
+  /** Runtime configuration of each call, for tests that check billing is preserved. */
+  configs: unknown[] = [];
   clarification = false;
   clarificationBlocking = false;
   /** Holds the understand stage until the promise settles, for tests that act mid-rewrite. */
@@ -41,11 +45,16 @@ export class FixtureRuntime implements AgentRuntime {
               ? 'triage'
               : r.prompt.includes("answering a person's question")
                 ? 'ask-why'
-                : r.prompt.includes('Assess every reviewed')
-                  ? 'assess'
-                  : 'summary';
+                : r.prompt.includes('condensing the older part')
+                  ? 'guide-summary'
+                  : r.prompt.includes("Aiden's project Guide")
+                    ? 'guide'
+                    : r.prompt.includes('Assess every reviewed')
+                      ? 'assess'
+                      : 'summary';
     this.calls.push(stage);
     this.inputs.push(data);
+    this.configs.push(r.config);
     if (this.pause && stage === 'assess')
       await new Promise((_, reject) =>
         r.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }),
@@ -56,11 +65,12 @@ export class FixtureRuntime implements AgentRuntime {
         r.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }),
       );
     const client = new Client({ name: 'fixture-only', version: '1' });
-    await client.connect(
-      new StreamableHTTPClientTransport(new URL(r.tools.url), {
-        requestInit: { headers: { Authorization: `Bearer ${r.tools.token}` } },
-      }) as Transport,
-    );
+    if (r.tools.names?.length !== 0)
+      await client.connect(
+        new StreamableHTTPClientTransport(new URL(r.tools.url), {
+          requestInit: { headers: { Authorization: `Bearer ${r.tools.token}` } },
+        }) as Transport,
+      );
     try {
       let value: any;
       if (stage === 'estimate-original') {
@@ -140,7 +150,15 @@ export class FixtureRuntime implements AgentRuntime {
             dependsOn: [],
           },
         ];
-      } else if (stage === 'ask-why')
+      } else if (stage === 'guide')
+        value = this.guideReply ?? {
+          reply: 'FIXTURE Guide reply, not live model output.',
+          widgets: [],
+          actions: [],
+        };
+      else if (stage === 'guide-summary')
+        value = { summary: 'FIXTURE summary of the earlier conversation, not live model output.' };
+      else if (stage === 'ask-why')
         value = this.whyAnswer === null ? { answer: '' } : { answer: this.whyAnswer };
       else if (stage === 'triage')
         value = {

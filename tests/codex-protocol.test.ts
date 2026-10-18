@@ -40,10 +40,21 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', li
   if (m.method === 'account/read') result={account:{type:mode==='wrong-auth'?'other':api?'apiKey':'chatgpt'}};
   if (m.method === 'model/list') result=mode==='bad-models'?{data:'invalid'}:
     {data:[{model:'synthetic-model',displayName:'Synthetic model',isDefault:mode!=='no-default'}],nextCursor:mode==='repeated-models'?'repeat':null};
-  if (m.method === 'config/read') result={config:{mcp_servers:{inherited:{command:'never-run'}}}};
-  if (m.method === 'thread/start') result={thread:{id:'synthetic-thread'}};
+  if (m.method === 'config/read') result={config:{mcp_servers:{inherited:{command:'never-run',tool_timeout_sec:null}}}};
+  if (m.method === 'thread/start') {
+    for (const [name, override] of Object.entries(m.params.config.mcp_servers)) {
+      const server = {...(name === 'inherited' ? {command:'never-run'} : {}), ...override};
+      if (!server.command && !server.url) {
+        send({id:m.id,error:{message:'invalid transport in mcp_servers'}}); return;
+      }
+      if ('tool_timeout_sec' in server && typeof server.tool_timeout_sec !== 'number') {
+        send({id:m.id,error:{message:'invalid tool timeout'}}); return;
+      }
+    }
+    result={thread:{id:'synthetic-thread'}};
+  }
   if (m.method === 'mcpServerStatus/list') result={data:mode==='missing-tools'?[]:
-    mode==='foreign-tools'?[{name:'foreign',tools:{shell:{}}}]:[{name:'aiden',tools:{repo_read:{}}}],
+    mode==='foreign-tools'?[{name:'foreign',tools:{shell:{}}}]:mode==='empty-tools'?[{name:'aiden',tools:{}}]:[{name:'aiden',tools:{repo_read:{}}}],
     nextCursor:mode==='repeated-tools'?'repeat':null};
   send({id:m.id,result});
   if (m.method === 'turn/start' && mode !== 'hang-turn') {
@@ -258,5 +269,43 @@ void test('model discovery rejects repeated pages and malformed model data', asy
     } finally {
       await fixture.close();
     }
+  }
+});
+
+void test('reasoning-only Guide turns disable MCP and accept an intentionally empty tool inventory', async () => {
+  for (const mode of ['empty-tools', 'missing-tools', 'success', 'foreign-tools']) {
+    const f = await codexFixture(mode);
+    try {
+      const request = { ...f.request, tools: { ...f.request.tools, names: [] } };
+      if (mode === 'success' || mode === 'foreign-tools') {
+        await assert.rejects(f.runtime.run(request), /Unexpected MCP/);
+        assert.doesNotMatch(await readFile(f.calls, 'utf8'), /turn\/start/);
+      } else {
+        const result = await f.runtime.run(request);
+        assert.deepEqual(result.value, { fixture: true });
+        const calls = (await readFile(f.calls, 'utf8'))
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line));
+        const thread = calls.find((call) => call.method === 'thread/start').params;
+        assert.deepEqual(thread.config.mcp_servers.aiden, {
+          url: f.request.tools.url,
+          enabled: false,
+        });
+        assert.equal(calls.filter((call) => call.method === 'turn/start').length, 1);
+      }
+    } finally {
+      await f.close();
+    }
+  }
+  const f = await codexFixture('empty-tools');
+  try {
+    await assert.rejects(
+      f.runtime.run({ ...f.request, tools: { ...f.request.tools, names: ['repo_read'] } }),
+      /unavailable/,
+    );
+    assert.doesNotMatch(await readFile(f.calls, 'utf8'), /turn\/start/);
+  } finally {
+    await f.close();
   }
 });

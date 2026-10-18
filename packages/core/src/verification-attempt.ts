@@ -22,6 +22,7 @@ import {
   serveTools,
   type ToolProvider,
 } from '../../tools/src/mcp.js';
+import { privateBrowserLogin } from '../../verification/src/browser-login.js';
 import {
   ApiHttp,
   ApiSession,
@@ -31,6 +32,7 @@ import {
   ProofViewer,
   reviewableProof,
 } from '../../verification/src/index.js';
+import { configuredApiKey } from '../../verification/src/policy.js';
 import { recordStep } from './activity.js';
 import { workflowRoot } from './model-stage.js';
 import type { AppCheck } from './triage.js';
@@ -102,13 +104,19 @@ async function reviewScreenshot(
   requirement: AppCheck,
   proof: PageCheck,
   file: string,
+  steps: VerificationAttempt['steps'],
 ): Promise<VisionJudgment | null> {
   progress(v, `${requirement.key}: reviewing the proof screenshot`);
   return turn(
     v,
     'verify-vision.md',
     VisionJudgmentSchema,
-    { criterion: requirement.text, outlinedElement: `${proof.role} "${proof.name}"` },
+    {
+      criterion: requirement.text,
+      outlinedElement: `${proof.role} "${proof.name}"`,
+      check: proof,
+      steps: steps.map(({ action, result, atMs }) => ({ action, result, atMs })),
+    },
     new ProofViewer(file),
   );
 }
@@ -137,8 +145,7 @@ export async function attempt(
         persona: requirement.persona,
         startUrl: api ? v.config.api!.url : v.target.href,
         ...(api ? { allowMutations: v.config.api!.allowMutations } : {}),
-        credentialsAvailable: Boolean(v.config.credentials),
-        ...(api ? { expiredTokenAvailable: Boolean(v.config.expiredToken) } : {}),
+        ...authenticationInput(v.config, api),
         stepLimit: v.config.stepLimit,
       },
       session,
@@ -173,6 +180,23 @@ export async function attempt(
   };
 }
 
+/** Describe available authentication without including private values in model input. */
+function authenticationInput(config: VerificationConfig, api: boolean) {
+  if (api && config.api?.keyHeader)
+    return {
+      credentialsAvailable: false,
+      authentication: 'api-key',
+      apiKeyHandle: '@secret:apiKey',
+      apiKeyHeader: config.api.keyHeader,
+      expiredTokenAvailable: false,
+    };
+  return {
+    credentialsAvailable: Boolean(config.credentials),
+    ...(!api && config.webLogin ? { authentication: 'private-web-login' } : {}),
+    ...(api ? { expiredTokenAvailable: Boolean(config.expiredToken) } : {}),
+  };
+}
+
 /** Open the matching recorded tool session for the configured verification method. */
 async function openSession(
   v: Verifier,
@@ -187,8 +211,9 @@ async function openSession(
           v.config.api!.url,
           v.config.api!.allowMutations,
           v.signal,
-          v.config.credentials,
-          v.config.expiredToken,
+          v.config.api?.keyHeader ? undefined : v.config.credentials,
+          v.config.api?.keyHeader ? undefined : v.config.expiredToken,
+          configuredApiKey(v.config),
         ),
         dir,
         requirement.text,
@@ -198,7 +223,13 @@ async function openSession(
     : await BrowserSession.open(v.browser, {
         start: v.target,
         allowedOrigins: v.config.allowedOrigins,
-        credentials: v.config.credentials,
+        credentials: v.config.webLogin ? undefined : v.config.credentials,
+        signIn: v.config.webLogin
+          ? () => privateBrowserLogin(v.browser, v.target, v.config)
+          : undefined,
+        storageState: v.config.webLogin
+          ? await privateBrowserLogin(v.browser, v.target, v.config)
+          : undefined,
         stepLimit: v.config.stepLimit,
         dir,
         criterion: requirement.text,
@@ -228,7 +259,13 @@ async function reviewEvidence(
           },
           noTools,
         )
-      : await reviewScreenshot(v, requirement, proof, path.join(dir, proof.screenshot))
+      : await reviewScreenshot(
+          v,
+          requirement,
+          proof,
+          path.join(dir, proof.screenshot),
+          session.steps,
+        )
     : null;
 }
 /** Incomplete API coverage remains unverified even when the agent claims a verdict. */

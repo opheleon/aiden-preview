@@ -1,5 +1,6 @@
 import path from 'node:path';
 
+import type { ProjectDeviceTest } from '../../contracts/src/device-verification.js';
 import {
   type Baseline,
   type Call,
@@ -9,6 +10,7 @@ import {
   ProjectSchema,
   type RunManifest,
 } from '../../contracts/src/index.js';
+import type { VerificationUpdate } from '../../contracts/src/verification.js';
 import { publicError } from '../../runtimes/src/index.js';
 import { monitoredHead } from '../../tools/src/remote-branches.js';
 import { parseAppUrl } from '../../verification/src/index.js';
@@ -17,9 +19,10 @@ import { answerCall, answeredDecisions, readCalls, settleAppUrlCalls } from './c
 import type { Engine } from './engine.js';
 import { initializeMonitoring } from './monitoring.js';
 import { readLifecycle } from './project-lifecycle.js';
+import { verifyConfiguredSurfaces } from './project-verification.js';
 import { atomic, hash, json, optionalJson } from './storage.js';
 import { syncTickets } from './ticket-sync.js';
-import { findRunningApp, saveAppUrl } from './verification-settings.js';
+import { findRunningApp, readAppUrl, saveAppUrl } from './verification-settings.js';
 
 /** What a person can change about the intent: the sentence or brief itself, or what done means. */
 export type IntentChange = { context: string } | { product: Product };
@@ -133,6 +136,8 @@ export async function startLook(
   engine: Engine,
   projectId: string,
   reason: LookReason,
+  device?: ProjectDeviceTest,
+  verifySurfaces = false,
 ): Promise<{ runId: string }> {
   const { baseline } = await engine.state(projectId);
   const decisions = await answeredDecisions(engine.store, projectId);
@@ -149,13 +154,23 @@ export async function startLook(
         );
   // Recover corrections persisted before a worker restart, including legacy projects. Rewrite
   // before starting a fresh report against the superseded scope.
-  if (changed) return prepareAndLook(engine, await savedProject(engine, projectId), 'answer');
+  if (changed)
+    return prepareAndLook(
+      engine,
+      await savedProject(engine, projectId),
+      'answer',
+      device,
+      verifySurfaces,
+    );
+  const project = await savedProject(engine, projectId);
+  if (!project.repositories.length) return lookWithoutCode(engine, projectId, reason);
   const started = await engine.report(projectId, reason);
   afterRun(
     engine,
     projectId,
     started.runId,
     async (run) => {
+      await verifyConfiguredSurfaces(engine, run, verifySurfaces, device);
       await syncTickets(engine, projectId);
       if (!run.baseline?.product.deliveryPlan) return false;
       const blockers = await blockedRequirements(engine.store, projectId, run.baseline.product);
@@ -177,7 +192,6 @@ export async function startLook(
     projectId,
     'Local checks belong to the coding agent. Configure scheduled beta verification in Settings.',
   );
-  const project = await savedProject(engine, projectId);
   const looked: Looked = {
     at: new Date().toISOString(),
     repositories: await readHeads(engine, project),
@@ -191,8 +205,15 @@ export async function prepareAndLook(
   engine: Engine,
   project: Project,
   reason: LookReason,
+  device?: ProjectDeviceTest,
+  verifySurfaces = false,
+  verification?: VerificationUpdate,
 ): Promise<{ runId: string }> {
-  const started = await engine.prepare(project, { autoAccept: true, reason });
+  const started = await engine.prepare(project, {
+    autoAccept: true,
+    reason,
+    ...(verification ? { verification } : {}),
+  });
   afterRun(
     engine,
     project.id,
@@ -201,13 +222,69 @@ export async function prepareAndLook(
       await syncTickets(engine, project.id);
       // An answer that arrived during the rewrite changes scope again, so rewrite before looking.
       if (takeWaitingAnswer(engine, project.id))
-        await prepareAndLook(engine, await savedProject(engine, project.id), 'answer');
-      else await startLook(engine, project.id, reason);
+        await prepareAndLook(
+          engine,
+          await savedProject(engine, project.id),
+          'answer',
+          device,
+          verifySurfaces,
+        );
+      else if (project.repositories.length || (await hasAppCheck(engine, project.id)))
+        await startLook(engine, project.id, reason, device, verifySurfaces);
+      else return sizeWithoutCode(engine, project.id);
       return true;
     },
     'Aiden updated the requirements, but could not start a check.',
   );
   return started;
+}
+
+/** Whether the project has a saved web or API check that can run without repository code. */
+async function hasAppCheck(engine: Engine, projectId: string): Promise<boolean> {
+  const settings = await readAppUrl(engine, projectId);
+  return Boolean(settings.url || settings.api);
+}
+
+/**
+ * Check a project that has no connected code. A saved web or API check runs directly against the
+ * app; without one there is nothing to check yet, so Aiden says what it needs instead.
+ * Example: an intent-only project with an app URL gets a browser check, then sizing.
+ */
+async function lookWithoutCode(
+  engine: Engine,
+  projectId: string,
+  reason: LookReason,
+): Promise<{ runId: string }> {
+  if (!(await hasAppCheck(engine, projectId)))
+    throw new Error(
+      'Aiden has nothing to check yet. Connect the project folder or set up a web or API check in the Guide.',
+    );
+  const started = await engine.verify(projectId, undefined, reason);
+  afterRun(
+    engine,
+    projectId,
+    started.runId,
+    async () => {
+      await syncTickets(engine, projectId);
+      return sizeWithoutCode(engine, projectId);
+    },
+    'The app check finished, but remaining-work sizing could not start.',
+  );
+  return started;
+}
+
+/**
+ * Size the remaining work from the requirements alone when no code check can run. Returns whether
+ * sizing started, which then ends the chain itself; open decisions or no delivery plan skip it.
+ */
+async function sizeWithoutCode(engine: Engine, projectId: string): Promise<boolean> {
+  const { baseline } = await engine.state(projectId);
+  if (!baseline?.product.deliveryPlan) return false;
+  const blockers = await blockedRequirements(engine.store, projectId, baseline.product);
+  if ([...blockers.values()].some((calls) => calls.length)) return false;
+  const estimate = await engine.estimate(projectId);
+  afterRun(engine, projectId, estimate.runId, endsChain, 'Remaining-work sizing did not finish.');
+  return true;
 }
 
 /** Read the saved project definition. */

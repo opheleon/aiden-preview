@@ -53,7 +53,6 @@ export function ProjectHistory({
       }
       onOpenRun={(runId) => {
         workspace.setOpenRun(runId);
-        workspace.setArea('runs');
       }}
       onWatch={(key) => {
         const result = check?.result.criteria.find((c) => resultKey(c) === key);

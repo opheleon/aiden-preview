@@ -55,7 +55,12 @@ async function stageFixture(
     signal: controller.signal,
     dir: root,
     workspace: root,
-    tools: { url: 'http://127.0.0.1:1/mcp', token: 'synthetic', close: () => Promise.resolve() },
+    tools: {
+      url: 'http://127.0.0.1:1/mcp',
+      token: 'synthetic',
+      names: [],
+      close: () => Promise.resolve(),
+    },
   };
   return {
     root,

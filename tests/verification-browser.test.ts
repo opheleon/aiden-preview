@@ -45,6 +45,34 @@ let browser: Browser;
 let origin: string;
 const folders = new WeakMap<BrowserSession, string>();
 
+void test('private sign-in refuses model destinations and hides unexpected credential errors', async () => {
+  let calls = 0;
+  const secret = 'private-login-secret-not-for-tools';
+  const s = await session({
+    signIn: () => {
+      calls++;
+      throw new Error(secret);
+    },
+  });
+  try {
+    assert.ok(!s.definitions().some((tool) => tool.name === 'browser_type_credential'));
+    await assert.rejects(
+      s.call('browser_sign_in', {
+        reason: 'Do not redirect credentials',
+        url: 'https://other.invalid',
+      }),
+      /Unrecognized key/,
+    );
+    assert.equal(calls, 0);
+    const failed = await act(s, 'browser_sign_in');
+    assert.match(failed, /Saved test credentials are configured, but private sign-in failed/);
+    assert.ok(!JSON.stringify({ failed, steps: s.steps }).includes(secret));
+    assert.equal(calls, 1);
+  } finally {
+    await s.close();
+  }
+});
+
 before(async () => {
   server = createServer((request, response) => {
     response.writeHead(200, { 'content-type': 'text/html' });

@@ -1,0 +1,59 @@
+/* Progress and evidence belong to the conversation, without an extra navigation surface. */
+.guide-checks,
+.guide-check-results {
+  display: grid;
+  gap: 12px;
+}
+
+.guide-checks p {
+  margin: 0;
+}
+
+.guide-check-progress {
+  display: grid;
+  gap: 4px;
+}
+
+.guide-check-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.guide-check-heading .text-button {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 4px 6px;
+  color: var(--muted);
+}
+
+.guide-check-live {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.guide-check-result {
+  border-bottom: 1px solid var(--border);
+  padding: 10px 0;
+}
+
+.guide-check-result summary {
+  cursor: pointer;
+  line-height: 1.6;
+}
+
+.guide-check-result p,
+.guide-check-evidence {
+  margin-top: 12px;
+}
+
+.guide-check-evidence {
+  font-size: 13px;
+}
+
+.guide-check-evidence video,
+.guide-check-evidence img {
+  max-width: 100%;
+}

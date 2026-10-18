@@ -145,3 +145,55 @@ void test('a browser check that cannot start is reported on the finished assessm
     await rm(root, { recursive: true, force: true });
   }
 });
+
+void test('standalone device methods validate inputs before reaching phone controls', async () => {
+  const calls: string[] = [];
+  const devices = {
+    probe: (value: unknown) => {
+      calls.push('probe');
+      return value;
+    },
+    start: (value: unknown) => {
+      calls.push('start');
+      return value;
+    },
+    list: () => {
+      calls.push('list');
+      return [];
+    },
+    read: (value: string) => {
+      calls.push('read');
+      return value;
+    },
+    cancel: (value: string) => {
+      calls.push('cancel');
+      return value;
+    },
+  };
+  const methods = createMethods({ devices } as unknown as Engine, {} as RuntimeControls);
+  const target = {
+    udid: '00008110-0011223344556677',
+    bundleId: 'com.example.app',
+    serverUrl: 'http://127.0.0.1:4723',
+  };
+  assert.throws(() => methods.deviceProbe({ ...target, serverUrl: 'https://foreign.example' }));
+  assert.throws(() => methods.deviceRun({ runId: '../../other' }));
+  assert.throws(() => methods.phoneApps({ udid: '--help' }));
+  assert.throws(() => methods.savePhoneSetup({ teamId: 'bad', capabilities: {} }));
+  assert.throws(() => methods.phoneSetup({ root: '/tmp' }));
+  assert.throws(() => methods.deviceTest({ target, allowInteractions: false }));
+  assert.deepEqual(calls, []);
+  await methods.deviceProbe(target);
+  await methods.deviceTest({
+    name: 'Notes',
+    target,
+    buildLabel: '42',
+    criteria: ['Save a note'],
+    runtime: { provider: 'codex', auth: 'subscription' },
+    allowInteractions: true,
+  });
+  await methods.deviceRuns({});
+  await methods.deviceRun({ runId: reportRunId });
+  await methods.deviceCancel({ runId: reportRunId });
+  assert.deepEqual(calls, ['probe', 'start', 'list', 'read', 'cancel']);
+});

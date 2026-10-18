@@ -22,7 +22,13 @@ The build job checks that the tag matches `package.json`, requires the aggregate
 
 The publish job, which runs no project code, writes `SHA256SUMS.txt`, creates a build provenance attestation for every file, and publishes the release with notes generated from merged pull requests. It rejects existing releases for the tag, verifies local checksums and uploaded asset completeness, and publishes the exact draft ID it created. electron-updater reads `latest-mac.yml` and the ZIP from the release; the DMG is for new installs.
 
-Running the workflow manually from the Actions tab is a dry run: an unsigned build uploaded as a workflow artifact, with nothing published.
+Running the workflow manually from the Actions tab is a dry run: unsigned builds uploaded as workflow artifacts, with nothing published.
+
+### Windows x64
+
+A parallel job on a GitHub-hosted Windows runner builds an NSIS installer, `Aiden-<version>-x64.exe`, and its update manifest (`latest.yml`, or `beta.yml` for beta tags). The job checks that the bundled Claude executable and native keyring are unpacked from the archive. The publish job refuses to release unless both the macOS and Windows files are present, and the Windows files share the same checksums and provenance attestation.
+
+Windows builds are unsigned because no code-signing certificate is configured, so SmartScreen warns on first launch. Signing carries an ongoing cost (for example, Azure Trusted Signing or an OV certificate). The packaged-app journeys use POSIX provider fixtures and run only on macOS. Until those fixtures are portable, the Windows installer has not been exercised end to end in CI.
 
 ### Permanent installer link
 
@@ -71,9 +77,19 @@ pnpm package:mac
 pnpm test:package:mac
 ```
 
-Artifacts are written to `release/mac`. Local builds are for testing; published builds come only from the release workflow.
+Artifacts are written to `release/mac`. `pnpm package:win` builds the Windows installer into `release/win`; run it on Windows so the Windows native dependencies are installed. Local builds are for testing; published builds come only from the release workflow.
 
 ## Development checks
+
+### Credential permission identity
+
+macOS controls the Keychain permission dialog. The application explains its purpose beside connection controls: it is saving or unlocking that connection's sign-in. Do not imitate the system password dialog inside the app.
+
+Development uses the Electron executable, including for the credential worker, so the OS can identify it as Electron despite `app.setName('Aiden')`. Verify the requesting name and icon using the signed packaged application. Keep its signing identity stable across upgrades. The existing credential service name, `com.opheleon.aiden.mcp`, remains for compatibility; replacing it with a readable name requires a credential migration, not simply changing the string.
+
+Before release, record the native permission dialog from a disposable connection in the signed app, confirm the Aiden identity, and test access again after restart and upgrade. Also verify that declining access leaves a clear recovery path. Synthetic desktop tests do not establish these native permission behaviors.
+
+### Update checks
 
 Unpackaged development builds report that automatic updates are disabled. To exercise the GitHub feed explicitly, build first and launch with `AIDEN_FORCE_DEV_UPDATES=1`; `dev-app-update.yml` supplies the feed. Do not use that flag during ordinary development.
 
@@ -120,4 +136,4 @@ Before sharing the next signed candidate:
 
 The deterministic package tests use substitute providers. They verify the real desktop/worker boundary and native executable packaging, but cannot establish fresh provider authentication, provider permissions, or signed updater installation on an end-user Mac.
 
-The beta scope is Apple Silicon macOS. Windows/Linux installers, Intel macOS, hosted services, and VM isolation are later work. Track ongoing implementation in issues and user-facing changes in [CHANGELOG.md](../CHANGELOG.md).
+The beta scope is Apple Silicon macOS, with an unsigned, early Windows x64 installer. Linux installers, Intel macOS, hosted services, and VM isolation are later work. Track ongoing implementation in issues and user-facing changes in [CHANGELOG.md](../CHANGELOG.md).

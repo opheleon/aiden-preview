@@ -52,6 +52,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec install-electron
+      - name: Install verification browser
+        run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:desktop
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: failure()

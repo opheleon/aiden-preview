@@ -12,6 +12,8 @@ export const CallDraftSchema = z
     edgeCaseId: edgeCaseId.nullable(),
     question: z.string().trim().min(1).max(400),
     options: z.array(z.string().trim().min(1).max(160)).max(4),
+    /** Absent or unspecified modes allow one answer; multiple explicitly permits combining choices. */
+    selectionMode: z.enum(['single', 'multiple']).nullish(),
     blocking: z.boolean().optional(),
     assumption: z.string().trim().min(1).max(300),
     owner: z.enum(['you', 'someone else']),

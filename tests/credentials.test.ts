@@ -27,6 +27,7 @@ function vaultFixture() {
   const vault = new SecretVault(true, () => entry as CredentialEntry);
   return {
     vault,
+    open: () => new SecretVault(true, () => entry as CredentialEntry),
     set(value_: string) {
       value = value_;
     },
@@ -42,16 +43,16 @@ void test('credential vault validates OS data and reports session fallback witho
   assert.equal(await f.vault.write('one', { bearer: 'secret' }), 'keyring');
   assert.deepEqual(await f.vault.read('one'), { bearer: 'secret' });
   f.set('{bad');
-  assert.deepEqual(await f.vault.read('one'), {});
+  assert.deepEqual(await f.open().read('one'), {});
   f.set('{"bearer":12}');
-  assert.deepEqual(await f.vault.read('one'), {});
+  assert.deepEqual(await f.open().read('one'), {});
   f.fail(true);
   assert.equal(await f.vault.write('one', { bearer: 'memory' }), 'session');
   const read = await f.vault.read('one');
   read.bearer = 'changed';
   assert.equal((await f.vault.read('one')).bearer, 'memory');
-  await f.vault.remove('one');
-  assert.deepEqual(await f.vault.read('one'), {});
+  await assert.rejects(f.vault.remove('one'), /Could not remove/);
+  assert.equal((await f.vault.read('one')).bearer, 'memory');
   f.fail(false);
   await f.vault.write('one', { bearer: 'temporary' }, true);
   assert.equal((await f.vault.read('one')).bearer, 'temporary');
@@ -107,4 +108,66 @@ void test('production credential adapter treats a nonexistent test identity as s
   const vault = new SecretVault();
   // Random identity only: no existing account is queried and nothing is written to the OS store.
   assert.deepEqual(await vault.read(`aiden-missing-test-${randomUUID()}`), {});
+});
+
+void test('concurrent and repeated credential reads share one OS prompt and return isolated copies', async () => {
+  let reads = 0;
+  let release!: (value: string) => void;
+  const pending = new Promise<string>((resolve) => {
+    release = resolve;
+  });
+  const vault = new SecretVault(true, () => ({
+    getPassword: () => {
+      reads++;
+      return pending;
+    },
+    setPassword: async () => {},
+    deleteCredential: () => Promise.resolve(true),
+  }));
+  const requests = [vault.read('one'), vault.read('one'), vault.read('one')];
+  assert.equal(reads, 1);
+  release('{"bearer":"private-test-token"}');
+  const result = await Promise.all(requests);
+  result[0]!.bearer = 'changed';
+  assert.equal((await vault.read('one')).bearer, 'private-test-token');
+  assert.equal(result[1]!.bearer, 'private-test-token');
+  assert.equal(reads, 1);
+  await vault.write('one', { bearer: 'rotated' });
+  assert.equal((await vault.read('one')).bearer, 'rotated');
+  assert.equal(reads, 1);
+  await vault.remove('one');
+  assert.deepEqual(await vault.read('one'), {});
+  assert.equal(reads, 1);
+});
+
+void test('dismissed Keychain access waits for an explicit retry and stale reads cannot restore removed secrets', async () => {
+  let reads = 0;
+  const vault = new SecretVault(true, () => ({
+    getPassword: () => {
+      reads++;
+      return Promise.reject(new Error('permission dismissed'));
+    },
+    setPassword: async () => {},
+    deleteCredential: () => Promise.resolve(true),
+  }));
+  await vault.read('one');
+  await vault.read('one');
+  assert.equal(reads, 1);
+  vault.retryRead('one');
+  await vault.read('one');
+  assert.equal(reads, 2);
+  let release!: (value: string) => void;
+  const pending = new Promise<string>((resolve) => {
+    release = resolve;
+  });
+  const slow = new SecretVault(true, () => ({
+    getPassword: () => pending,
+    setPassword: async () => {},
+    deleteCredential: () => Promise.resolve(true),
+  }));
+  const read = slow.read('one');
+  await slow.remove('one');
+  release('{"bearer":"revoked-token"}');
+  assert.deepEqual(await read, {});
+  assert.deepEqual(await slow.read('one'), {});
 });

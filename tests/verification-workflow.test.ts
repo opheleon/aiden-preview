@@ -72,6 +72,9 @@ class ScriptedVerifier implements AgentRuntime {
     };
     try {
       if (vision) {
+        assert.ok(input.steps.length > 0, 'the reviewer sees recorded browser actions');
+        assert.ok(input.steps.every((step: object) => !('reasoning' in step)));
+        assert.equal(input.check.screenshot.startsWith('proof-'), true);
         this.turns.push(`vision:${input.criterion}`);
         const shown = await client.callTool({ name: 'view_proof_screenshot', arguments: {} });
         assert.equal((shown.content as { mimeType?: string }[])[1]?.mimeType, 'image/png');
@@ -186,7 +189,10 @@ void test('verification runs every approved requirement through the engine and p
     assert.equal(await readVerification({ store }, f.project.id), null);
 
     // The saved app URL is used when no URL is passed, and saving keeps the test credentials.
-    assert.deepEqual(await saveAppUrl({ store }, f.project.id, url), { url });
+    assert.deepEqual(await saveAppUrl({ store }, f.project.id, url), {
+      url,
+      credentialStorage: 'keyring',
+    });
     assert.equal((await stat(settingsFile(projectDir))).mode & 0o777, 0o600);
     const run = await e.verify(f.project.id);
     await e.wait(run.runId);
@@ -273,6 +279,14 @@ void test('verification runs every approved requirement through the engine and p
       /Could not open http:\/\/127\.0\.0\.1:\d+\. Start the app and try again\./,
     );
     assert.equal((await stored(store, f.project.id)).result.runId, run.runId);
+    // Legacy plaintext still requires owner-only permissions before migration can read it.
+    await writeFile(
+      settingsFile(projectDir),
+      JSON.stringify({
+        ...(await json<Record<string, unknown>>(settingsFile(projectDir))),
+        credentials: { username, password },
+      }),
+    );
     await chmod(settingsFile(projectDir), 0o644);
     await assert.rejects(e.verify(f.project.id, url), /chmod 600/);
   } finally {
@@ -313,9 +327,10 @@ void test('the app URL is saved per project, validated, cleared, and never expos
   );
   assert.deepEqual(await saveAppUrl({ store }, 'app-url-project', ' https://beta.example.test '), {
     url: 'https://beta.example.test/',
+    credentialStorage: 'keyring',
   });
   const shown = await readAppUrl({ store }, 'app-url-project');
-  assert.deepEqual(shown, { url: 'https://beta.example.test/' });
+  assert.deepEqual(shown, { url: 'https://beta.example.test/', credentialStorage: 'keyring' });
   assert.equal(JSON.stringify(shown).includes(password), false);
   assert.equal(await resolveVerifyUrl(projectDir), 'https://beta.example.test/');
   assert.equal(
@@ -328,7 +343,7 @@ void test('the app URL is saved per project, validated, cleared, and never expos
     string,
     unknown
   >;
-  assert.deepEqual(kept.credentials, { username, password });
+  assert.equal(kept.credentials, undefined, 'removing the app also forgets its credentials');
   assert.deepEqual(kept.allowedOrigins, ['https://auth.example.test']);
   assert.equal('url' in kept, false);
   await assert.rejects(resolveVerifyUrl(projectDir), /Save this project's app URL/);

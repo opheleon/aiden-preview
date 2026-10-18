@@ -143,8 +143,10 @@ test('an existing plan can connect later, publish, and resync its linked tickets
       /is marked Done, but its requirements are incomplete/,
     );
     await expect(page.getByRole('button', { name: 'Stop', exact: true })).toHaveCount(0);
+    await page.getByRole('tab', { name: 'Scope', exact: true }).click();
     await page.locator('.feature-summary').first().click();
     await expect(page.locator('.feature-summary').first()).toContainText('Delivery deviation');
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click();
     await page.setViewportSize({ width: 950, height: 760 });
     await attention.scrollIntoViewIfNeeded();
     await expect(attention).toBeInViewport();

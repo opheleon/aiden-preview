@@ -8,6 +8,7 @@ import type {
 } from '../../../../packages/contracts/src/api.js';
 import type { McpConnection, McpTool } from '../../../../packages/contracts/src/index';
 import { experimentalIntegration } from '../../../../packages/contracts/src/tracker-connections';
+import { CredentialStorageNote } from '../components/CredentialStorageNote';
 
 interface IntegrationConnectionCardProps {
   connection: McpConnection;
@@ -54,6 +55,9 @@ export function IntegrationConnectionCard(
         </span>
       </div>
       {connection.message && <p className="muted">{connection.message}</p>}
+      {connection.auth !== 'none' && !connection.sessionOnly && (
+        <CredentialStorageNote connection={connection.name} />
+      )}
       <div className="button-row">
         <button
           className="secondary"

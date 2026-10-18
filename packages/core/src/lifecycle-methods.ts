@@ -26,8 +26,12 @@ export function lifecycleMethods(
       });
     },
     closeProject: (input: unknown) => {
-      const p = project.extend({ note }).parse(input);
-      return decideProject(engine, p.projectId, { action: 'closed', note: p.note });
+      const p = project.extend({ note, forgetCredentials: z.boolean().optional() }).parse(input);
+      return decideProject(engine, p.projectId, {
+        action: 'closed',
+        note: p.note,
+        ...(p.forgetCredentials !== undefined ? { forgetCredentials: p.forgetCredentials } : {}),
+      });
     },
     reopenProject: (input: unknown) => {
       const p = project.parse(input);
@@ -56,6 +60,11 @@ const writes = new Set<WorkerMethod>([
   'updateMonitoredBranch',
   'answerCall',
   'editIntent',
+  'askGuide',
+  'guideEvent',
+  'configureGuideVerification',
+  'confirmRequirements',
+  'skipSetupStep',
   'confirmAction',
   'explain',
   'askWhy',

@@ -45,6 +45,10 @@ test('planned projects show one ordered work hierarchy and actions remain inside
   f.setReport({ ...report, baseline: product });
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  expect(screen.getByRole('progressbar')).toBeVisible();
+  expect(screen.getByRole('region', { name: 'Browse books' })).toBeVisible();
+  expect(screen.getByText('Remaining effort:')).toBeVisible();
+  await userEvent.click(screen.getByRole('tab', { name: 'Scope' }));
   const browse = await screen.findByRole('region', { name: 'Browse books' });
   expect(browse).toHaveTextContent('Delivery deviation');
   const create = screen.getByRole('region', { name: 'Create books' });
@@ -65,10 +69,11 @@ test('planned projects show one ordered work hierarchy and actions remain inside
     'href',
     '#feature-F-1',
   );
+  await userEvent.click(screen.getByRole('tab', { name: 'Overview' }));
   expect(screen.getByRole('progressbar')).toHaveAttribute('max', '2');
-  expect(screen.getByText(/No target agreed yet/)).not.toBeVisible();
-  await userEvent.click(screen.getByText('Progress details and estimates'));
+  expect(screen.getByText('Remaining effort:')).toBeVisible();
   expect(screen.getByText(/No target agreed yet/)).toBeVisible();
+  await userEvent.click(screen.getByRole('tab', { name: 'Scope' }));
   expect(screen.queryByRole('region', { name: 'Needs you' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'Copy work item' })).toBeNull();
   await userEvent.click(
@@ -224,6 +229,7 @@ test('a blocking decision pauses its feature, dependents wait on it, and tickets
   Object.assign(navigator, { clipboard: { writeText: copy } });
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  await userEvent.click(screen.getByRole('tab', { name: 'Scope' }));
   const browse = await screen.findByRole('region', { name: 'Browse books' });
   const create = screen.getByRole('region', { name: 'Create books' });
   expect(within(browse).getByText('Blocked')).toHaveAttribute(
@@ -233,9 +239,11 @@ test('a blocking decision pauses its feature, dependents wait on it, and tickets
   expect(create).toHaveTextContent('Waiting on prerequisites');
   expect(create).not.toHaveTextContent('Blocked by a decision');
   expect(screen.queryByRole('button', { name: 'Copy work item' })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('tab', { name: 'Overview' }));
   expect(
     screen.getByText('Delivery paused: resolve blocking decisions in Needs you.'),
   ).toBeVisible();
+  await userEvent.click(screen.getByRole('tab', { name: 'Scope' }));
   await userEvent.click(within(create).getByRole('heading', { name: 'F-2 Create books' }));
   const row = within(create).getByText(/Users can create books/, { selector: '.row-title' });
   expect(row.closest('li')).toHaveTextContent('Waiting');

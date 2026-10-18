@@ -8,6 +8,7 @@ import {
   readOnlyLinear,
 } from '../../../../packages/contracts/src/tracker-connections';
 import type { DesktopBridge } from '../bridge';
+import { CredentialStorageNote } from '../components/CredentialStorageNote';
 import type { Area, SettingsTab } from '../hooks/useWorkspaceState';
 import type { UpdatePreferences, UpdateStatus } from '../updater';
 import { DesktopUpdateSettings } from '../views/DesktopUpdateSettings';
@@ -122,6 +123,7 @@ export function SettingsView(props: SettingsViewProps): React.JSX.Element {
                 Automatic ticket writes are authorized separately for a destination in Project
                 settings.
               </p>
+              <CredentialStorageNote connection="Linear" />
             </div>
             <TrackerConnections {...props} />
           </section>

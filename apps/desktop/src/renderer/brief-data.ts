@@ -27,20 +27,27 @@ export function briefData(workspace: Workspace): {
   const product = report?.baseline ?? baseline?.product;
   const check = report
     ? matchingCheck(verification, report, runs.find((r) => r.id === report.id)?.createdAt)
-    : null;
+    : standaloneCheck(workspace);
   const facts = report
     ? requirementFacts(report, check, calls, workspace.confirmed)
     : new Map<string, RequirementFacts>();
   const stateMap = new Map([...facts].map(([id, f]) => [id, requirementState(f)]));
   const actions = actionItems({ report, check, calls, project, confirmed: workspace.confirmed });
   const unverified = report ? risks(report, check) : [];
-  const state = briefState({ busy, hasBaseline: !!baseline, hasReport: !!report, runs });
+  const state = briefState({
+    busy,
+    hasBaseline: !!baseline,
+    hasReport: !!report || !!check,
+    runs,
+    hasCode: project.repositories.length > 0,
+    activeKind: runs.find((run) => workspace.activeRuns.includes(run.id))?.kind,
+  });
   const status = report
     ? briefStatus([...stateMap.values()], {
         pm: actions.filter((a) => a.role === 'PM').length,
         dev: actions.filter((a) => a.role === 'Dev').length,
       })
-    : { headline: state.headline ?? '', lands: state.lands ?? '' };
+    : standaloneStatus(check, state);
   const update = [
     status.headline,
     status.lands,
@@ -48,4 +55,24 @@ export function briefData(workspace: Workspace): {
     ...unverified.map((r) => `Risk: ${r.label} ${r.text} (${r.reason})`),
   ].join('\n');
   return { report, product, check, stateMap, actions, unverified, state, status, update };
+}
+
+/** Summarize app-only results or the next setup step without inventing code progress. */
+function standaloneStatus(
+  check: ReturnType<typeof matchingCheck>,
+  state: ReturnType<typeof briefState>,
+): ReturnType<typeof briefStatus> {
+  return check
+    ? { headline: 'App check finished.', lands: check.result.summary.line }
+    : { headline: state.headline ?? '', lands: state.lands ?? '' };
+}
+
+/** A completed app check can stand alone when no code repository is connected. */
+function standaloneCheck(workspace: Workspace): ReturnType<typeof matchingCheck> {
+  const { verification, baseline, project } = workspace;
+  if (!verification || verification.result.partial) return null;
+  return verification.result.projectId === project.id &&
+    verification.result.baselineId === baseline?.id
+    ? verification
+    : null;
 }

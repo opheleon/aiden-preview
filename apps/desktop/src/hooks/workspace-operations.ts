@@ -103,11 +103,10 @@ async function start(state: WorkspaceState, call: Call): Promise<void> {
       throw new Error(
         'Tell Aiden what you are building. Paste or type anything that describes it.',
       );
-    if (!state.project.repositories.length)
-      throw new Error('Choose the project folder. Aiden needs a Git repository inside it.');
     const project = { ...state.project, name: scopeName(state.project.context) };
     state.setBusy(true);
     state.setLive('Planning features and their requirements…');
+    // Verification is set up in the Guide after the start, not on the start screen.
     const r = await call('prepare', { project, autoAccept: true });
     state.setActiveRun(r.runId);
     state.setProject(project);
@@ -116,12 +115,12 @@ async function start(state: WorkspaceState, call: Call): Promise<void> {
   });
 }
 
-/** Ask Aiden to look now instead of waiting for the next commit or morning. */
+/** Run an explicit project check against current code and every configured app or API surface. */
 async function lookNow(state: WorkspaceState, call: Call): Promise<void> {
   await action(state, async () => {
     state.setBusy(true);
     state.setLive('Starting a check…');
-    const r = await call('look', { projectId: state.project.id });
+    const r = await call('look', { projectId: state.project.id, verifySurfaces: true });
     state.setActiveRun(r.runId);
   });
 }

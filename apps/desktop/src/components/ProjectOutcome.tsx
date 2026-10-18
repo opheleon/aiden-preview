@@ -14,6 +14,7 @@ export function OutcomeDialog({
 }): JSX.Element {
   const dialog = useRef<HTMLDialogElement>(null);
   const [note, setNote] = useState('');
+  const [forgetCredentials, setForgetCredentials] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [evidenceKey] = useState(workspace.project.lifecycle?.evidenceKey ?? '');
@@ -36,7 +37,7 @@ export function OutcomeDialog({
       const project =
         mode === 'accept'
           ? await workspace.call('acceptOutcome', { projectId, note, evidenceKey })
-          : await workspace.call('closeProject', { projectId, note });
+          : await workspace.call('closeProject', { projectId, note, forgetCredentials });
       workspace.setProject((current) => (current.id === projectId ? project : current));
       workspace.setProjects((projects) => projects.map((p) => (p.id === projectId ? project : p)));
       dismiss();
@@ -87,6 +88,23 @@ export function OutcomeDialog({
             }
           />
         </label>
+        {mode === 'close' && (
+          <>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={forgetCredentials}
+                disabled={saving}
+                onChange={(event) => setForgetCredentials(event.target.checked)}
+              />
+              Forget saved test credentials
+            </label>
+            <p className="fine-print">
+              Remove this project's test passwords and API keys. Reopening will need fresh
+              credentials. Shared connections such as Linear stay connected.
+            </p>
+          </>
+        )}
         {error && <p role="alert">{error}</p>}
         <div className="button-row">
           <button type="button" disabled={saving} onClick={dismiss}>

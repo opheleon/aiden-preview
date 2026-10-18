@@ -11,6 +11,7 @@ export * from './calls.js';
 export * from './delivery-jobs.js';
 export * from './delivery-plan.js';
 export * from './estimation.js';
+export * from './guide.js';
 export * from './ids.js';
 export * from './integrations.js';
 export * from './project-lifecycle.js';
@@ -58,24 +59,22 @@ export const ProjectSchema = z
     context: z.string().min(1),
     rootPath: z.string().min(1).optional(),
     discoveryWarnings: z.array(z.string()).optional(),
-    repositories: z
-      .array(
-        z
-          .object({
-            id,
-            path: z.string().min(1),
-            notes: z.string(),
-            monitoredBranch: z
-              .object({
-                remote: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/),
-                branch: z.string().min(1).max(1024),
-              })
-              .strict()
-              .optional(),
-          })
-          .strict(),
-      )
-      .min(1),
+    repositories: z.array(
+      z
+        .object({
+          id,
+          path: z.string().min(1),
+          notes: z.string(),
+          monitoredBranch: z
+            .object({
+              remote: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/),
+              branch: z.string().min(1).max(1024),
+            })
+            .strict()
+            .optional(),
+        })
+        .strict(),
+    ),
     runtime: RuntimeSchema,
     sources: ProjectSourcesSchema.optional(),
     /** Worker-derived lifecycle; trusted decisions live in a separate file. */

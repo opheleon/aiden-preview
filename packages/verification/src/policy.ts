@@ -1,7 +1,7 @@
-import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 
-import { type VerificationConfig, VerificationConfigSchema } from '../../contracts/src/index.js';
+import type { VerificationConfig } from '../../contracts/src/index.js';
+import { readProjectVerification } from './project-credentials.js';
 
 const loopback = new Set(['localhost', '127.0.0.1', '[::1]']);
 
@@ -27,7 +27,7 @@ export function parseAppUrl(raw: string): URL {
     throw new Error('Only http and https URLs can be verified.');
   if (url.username || url.password)
     throw new Error(
-      'Remove credentials from the URL. Use the verification settings file or environment variables instead.',
+      'Remove credentials from the URL. Use the private verification form or environment variables instead.',
     );
   return url;
 }
@@ -50,27 +50,17 @@ export function verificationTarget(raw: string, allowedOrigins: readonly string[
   return url;
 }
 
-/** Read optional settings; credential files must be private, and environment credentials take precedence. */
+/** Load project credentials from secure storage or memory, then apply explicit environment overrides. */
 export async function loadVerificationConfig(
   projectDir: string,
   env: NodeJS.ProcessEnv,
 ): Promise<VerificationConfig> {
-  const file = settingsFile(projectDir);
-  let raw: unknown = {};
-  try {
-    raw = JSON.parse(await readFile(file, 'utf8'));
-  } catch (error) {
-    if (error instanceof SyntaxError)
-      throw new Error(`${file} is not valid JSON.`, { cause: error });
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-  }
-  const config = VerificationConfigSchema.parse(raw);
+  const config = await readProjectVerification(projectDir);
   // Saving an app URL is how the user configures a non-local origin, so it joins the allowlist.
   if (config.url)
     config.allowedOrigins = [...config.allowedOrigins, parseAppUrl(config.url).origin];
   if (config.api) config.allowedOrigins.push(parseApiUrl(config.api.url).origin);
-  if ((config.credentials || config.expiredToken) && ((await stat(file)).mode & 0o077) !== 0)
-    throw new Error(`Run chmod 600 on ${file} before storing test credentials in it.`);
+  if (config.credentialsForgotten) return config;
   const username = env.AIDEN_VERIFY_USERNAME;
   const password = env.AIDEN_VERIFY_PASSWORD;
   if (username && password) config.credentials = { username, password };
@@ -85,4 +75,14 @@ export function redactor(secrets: readonly string[]): (text: string) => string {
   const values = secrets.filter(Boolean).sort((a, b) => b.length - a.length);
   return (text) =>
     values.reduce((out, secret) => out.split(secret).join('[test credential]'), text);
+}
+
+/** Resolve an API key only for the origin to which the person explicitly supplied it. */
+export function configuredApiKey(
+  config: VerificationConfig,
+): { value: string; header: 'X-API-Key' | 'Authorization' } | undefined {
+  if (!config.api?.keyHeader) return undefined;
+  if (!config.apiKey || config.apiKey.origin !== new URL(config.api.url).origin)
+    throw new Error('Enter an API key for this API before checking access.');
+  return { value: config.apiKey.value, header: config.api.keyHeader };
 }

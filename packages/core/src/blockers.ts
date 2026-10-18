@@ -85,3 +85,16 @@ export async function requireDefinedScope(
       'Resolve blocking scope decisions before starting delivery or sizing the plan. Independent investigation and tickets can continue.',
     );
 }
+
+/** A fully blocked app check must ask for clarification instead of publishing an empty success. */
+export async function requireCheckableScope(
+  store: Store,
+  projectId: string,
+  product: Product,
+): Promise<void> {
+  const blocked = await blockedRequirements(store, projectId, product);
+  if (!product.requirements.some((requirement) => !blocked.get(requirement.id)?.length))
+    throw new Error(
+      'Answer the questions in the setup chat before checking the app. No requirements are ready to test yet.',
+    );
+}

@@ -1,12 +1,15 @@
 import type { JSX } from 'react';
 
+import { BetaSchedule } from './components/BetaSchedule';
 import { FirstUseGuide } from './components/FirstUseGuide';
+import { ProjectGuide } from './components/ProjectGuide';
 import { ProjectSettings } from './components/ProjectSettings';
 import RuntimeSettings from './components/RuntimeSettings';
 import { useFirstUse } from './hooks/useFirstUse';
 import { useWorkspace } from './hooks/useWorkspace';
 import { ApplicationHeader } from './views/ApplicationHeader';
 import { Brief } from './views/Brief';
+import { DeviceTesting } from './views/DeviceTesting';
 import { Runs } from './views/Runs';
 import { SetIntent } from './views/SetIntent';
 import { SettingsView } from './views/SettingsView';
@@ -45,36 +48,46 @@ export default function App(): JSX.Element {
     />
   );
   return (
-    <div className="app" data-guide-ready={!guide.loading}>
-      <ApplicationHeader {...workspace} />
-      <WorkspaceSidebar workspace={workspace} onGettingStarted={guide.show} />
-      <main className={!saved && area !== 'settings' ? 'setup-view' : ''}>
-        {area === 'settings' ? (
-          <SettingsView
-            {...workspace}
-            runtimeControls={runtimeControls}
-            projectSettings={<ProjectSettings workspace={workspace} />}
-            feedback={<WorkspaceFeedback workspace={workspace} />}
-            api={api}
-          />
-        ) : area === 'runs' && saved ? (
-          <div className="content">
-            <WorkspaceFeedback workspace={workspace} />
-            <Runs workspace={workspace} />
-          </div>
-        ) : (
-          <div className={saved ? 'content' : 'content starter-content'}>
-            <WorkspaceFeedback workspace={workspace} />
-            {saved ? (
-              <Brief key={workspace.project.id} workspace={workspace} />
-            ) : (
-              <SetIntent workspace={workspace} />
-            )}
-          </div>
-        )}
-      </main>
-      <WorkspaceDialogs workspace={workspace} />
-      {guide.open && <FirstUseGuide guide={guide} />}
-    </div>
+    <ProjectGuide workspace={workspace} onHelp={guide.show}>
+      <div className="app" data-guide-ready={!guide.loading}>
+        <ApplicationHeader {...workspace} />
+        <WorkspaceSidebar workspace={workspace} onGettingStarted={guide.show} />
+        <main className={!saved && area !== 'settings' ? 'setup-view' : ''}>
+          {area === 'devices' && saved ? (
+            <DeviceTesting
+              api={api}
+              key={project.id}
+              project={project}
+              busy={busy}
+              schedule={<BetaSchedule workspace={workspace} verificationOnly />}
+            />
+          ) : area === 'settings' ? (
+            <SettingsView
+              {...workspace}
+              runtimeControls={runtimeControls}
+              projectSettings={<ProjectSettings workspace={workspace} />}
+              feedback={<WorkspaceFeedback workspace={workspace} />}
+              api={api}
+            />
+          ) : area === 'runs' && saved ? (
+            <div className="content">
+              <WorkspaceFeedback workspace={workspace} />
+              <Runs workspace={workspace} />
+            </div>
+          ) : (
+            <div className={saved ? 'content' : 'content starter-content'}>
+              <WorkspaceFeedback workspace={workspace} />
+              {saved ? (
+                <Brief key={workspace.project.id} workspace={workspace} />
+              ) : (
+                <SetIntent workspace={workspace} />
+              )}
+            </div>
+          )}
+        </main>
+        <WorkspaceDialogs workspace={workspace} />
+        {guide.open && <FirstUseGuide guide={guide} />}
+      </div>
+    </ProjectGuide>
   );
 }

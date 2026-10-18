@@ -14,7 +14,7 @@ if (process.argv.includes('--version')) {
 }
 const f = JSON.parse(readFileSync(fixturePath, 'utf8')) as Awaited<ReturnType<typeof fixture>>;
 const controller = new AbortController();
-let server: { url: string; http_headers: { Authorization: string } };
+let server: { enabled?: boolean; url: string; http_headers: { Authorization: string } };
 const send = (value: unknown) => process.stdout.write(JSON.stringify(value) + '\n');
 async function turn(params: any) {
   const control = JSON.parse(readFileSync(controlPath!, 'utf8'));
@@ -22,10 +22,16 @@ async function turn(params: any) {
   runtime.clarification = !!control.clarification;
   runtime.clarificationBlocking = !!control.blocking;
   runtime.pause = !!control.pause;
+  if (control.pauseUnderstand) runtime.holdUnderstand = new Promise(() => {});
+  runtime.guideReply = control.guideReply ?? null;
+  runtime.understanding = control.understanding ?? null;
   const pending = runtime.run({
     config: { provider: 'codex', auth: 'subscription' },
     cwd: f.root,
-    tools: { url: server.url, token: server.http_headers.Authorization.replace(/^Bearer /, '') },
+    tools:
+      server.enabled === false
+        ? { url: 'http://127.0.0.1:1/mcp', token: 'unused-fixture-only', names: [] }
+        : { url: server.url, token: server.http_headers.Authorization.replace(/^Bearer /, '') },
     prompt: params.input[0].text,
     schema: params.outputSchema,
     signal: controller.signal,
@@ -35,6 +41,8 @@ async function turn(params: any) {
   appendFileSync(callsPath!, runtime.calls[0] + '\n');
   try {
     const result = await pending;
+    if (runtime.calls[0] === 'guide' && control.guideDelayMs)
+      await new Promise((resolve) => setTimeout(resolve, control.guideDelayMs));
     send({
       method: 'item/completed',
       params: {
@@ -82,7 +90,10 @@ input.on('line', (line) => {
       result = { thread: { id: 'synthetic-thread' } };
       break;
     case 'mcpServerStatus/list':
-      result = { data: [{ name: 'aiden', tools: { repo_read: {} } }], nextCursor: null };
+      result = {
+        data: server.enabled === false ? [] : [{ name: 'aiden', tools: { repo_read: {} } }],
+        nextCursor: null,
+      };
       break;
   }
   send({ id: message.id, result });

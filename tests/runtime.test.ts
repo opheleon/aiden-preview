@@ -37,6 +37,22 @@ void test('Finder provider discovery includes Homebrew without leaking credentia
   );
 });
 
+void test('Windows providers receive system and profile locations without unrelated credentials', () => {
+  const source = {
+    PATH: 'C:\\Windows\\system32;C:\\Program Files\\Git\\cmd',
+    SystemRoot: 'C:\\Windows',
+    PATHEXT: '.COM;.EXE;.BAT;.CMD',
+    USERPROFILE: 'C:\\Users\\synthetic',
+    APPDATA: 'C:\\Users\\synthetic\\AppData\\Roaming',
+    TEMP: 'C:\\Users\\synthetic\\AppData\\Local\\Temp',
+    ANTHROPIC_API_KEY: 'unrelated-key',
+  };
+  const expected: Record<string, string> = { ...source };
+  delete expected.ANTHROPIC_API_KEY;
+  assert.deepEqual(cleanEnvironment(source, 'win32'), expected);
+  assert.deepEqual(cleanEnvironment(source, 'darwin').SystemRoot, undefined);
+});
+
 void test('structured output accepts JSON fences and rejects malformed whitespace-heavy output', () => {
   for (const value of ['{"ok":true}', '```json\n{"ok":true}\n```', '```\n{"ok":true}\n```']) {
     assert.deepEqual(parseJson(` \n${value}\n `), { ok: true });

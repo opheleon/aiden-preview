@@ -14,12 +14,15 @@ import {
   type RunEvent,
   type RunManifest,
 } from '../../contracts/src/index.js';
+import type { VerificationUpdate } from '../../contracts/src/verification.js';
 import { ConnectionManager } from '../../integrations/src/index.js';
 import { type AgentRuntime, Runtimes } from '../../runtimes/src/index.js';
 import { validateProjectRepositories } from '../../tools/src/discovery.js';
 import type { DiscoverOptions } from '../../verification/src/index.js';
 import { commitBaseline } from './baseline.js';
+import { requireCheckableScope } from './blockers.js';
 import { closeCoding } from './coding-jobs.js';
+import { DeviceVerification } from './device-verification.js';
 import {
   exportReport,
   listProjects,
@@ -43,12 +46,15 @@ import {
 } from './run-lifecycle.js';
 import { atomic, hash, json, optionalJson, Store } from './storage.js';
 import { savedProduct } from './understanding.js';
+import { writeVerificationSettings } from './verification-settings.js';
 import { resolveVerifyUrl } from './verification-settings.js';
 import type { WorkflowContext } from './workflow-context.js';
 
 /** Own project locks and explicit run lifecycles while keeping accepted artifacts separate from in-flight work. */
 export class Engine {
+  private closing = false;
   private active = new Map<string, ActiveRun>();
+  readonly devices: DeviceVerification;
   /** How Aiden probes localhost for a running app; tests replace `fetch` so no socket opens. */
   discover: DiscoverOptions = {};
   /** Bind storage, provider, and integration dependencies without starting provider execution. */
@@ -57,7 +63,9 @@ export class Engine {
     public runtime: AgentRuntime = new Runtimes(path.join(store.root, 'providers')),
     public emit: (event: RunEvent) => void = () => {},
     public integrations = new ConnectionManager(store.root),
-  ) {}
+  ) {
+    this.devices = new DeviceVerification(store.root, runtime);
+  }
   /** List saved project metadata; a new home returns no projects, while corruption remains an error. */
   async projects(): Promise<Project[]> {
     return listProjects(this.store);
@@ -96,12 +104,13 @@ export class Engine {
    */
   async prepare(
     input: Project,
-    options: Pick<RunExtras, 'autoAccept' | 'reason'> = {},
+    options: Pick<RunExtras, 'autoAccept' | 'reason'> & { verification?: VerificationUpdate } = {},
   ): Promise<{ runId: string }> {
     const parsed = ProjectSchema.parse(input);
     delete parsed.lifecycle;
     const project = await validateProjectRepositories(parsed);
-    return this.start(project, 'prepare', undefined, options);
+    const { verification, ...extra } = options;
+    return this.start(project, 'prepare', undefined, extra, verification);
   }
   /** Start analysis only when the approved context still matches the saved project intent. */
   async report(projectId: string, reason?: LookReason): Promise<{ runId: string }> {
@@ -185,6 +194,7 @@ export class Engine {
     const folder = this.store.project(projectId);
     const project = ProjectSchema.parse(await json(path.join(folder, 'project.json')));
     const baseline = await json<Baseline>(path.join(folder, 'baseline.json'));
+    await requireCheckableScope(this.store, projectId, baseline.product);
     const verifyUrl = await resolveVerifyUrl(folder, url);
     return this.start(project, 'verify', baseline, {
       ...delivery,
@@ -198,10 +208,12 @@ export class Engine {
     kind: RunManifest['kind'],
     baseline?: Baseline,
     extra: RunExtras = {},
+    verification?: VerificationUpdate,
   ): Promise<{ runId: string }> {
     const release = await this.lockFor(project.id, kind);
     try {
       await requireOpenProject(this.store, project.id);
+      if (verification) await writeVerificationSettings(this, project.id, verification);
       const run = await createRun(this.store, project, kind, baseline, extra);
       this.launch(run, release);
       return { runId: run.id };
@@ -255,7 +267,10 @@ export class Engine {
   }
   /** Whether this worker is executing any run for the project. */
   isBusy(projectId: string): boolean {
-    return [...this.active.values()].some((a) => a.projectId === projectId);
+    return (
+      this.devices.isBusy(projectId) ||
+      [...this.active.values()].some((a) => a.projectId === projectId)
+    );
   }
   /** Signal cancellation for active work; accepted report pointers remain owned by workflow commit guards. */
   cancel(runId: string): { cancelled: boolean } {
@@ -349,10 +364,13 @@ export class Engine {
   }
   /** Track one bounded workflow and retain failure details in its manifest without automatic retries. */
   private launch(run: RunManifest, release: () => Promise<void>): void {
+    if (this.closing) throw new Error('Aiden is shutting down.');
     launchRun(this.workflowContext(), run, release, this.active);
   }
   /** Cancel and await active runs before clearing provider keys and closing integration sessions. */
   async dispose(): Promise<void> {
+    this.closing = true;
+    await this.devices.dispose();
     await closeCoding(this);
     for (const a of this.active.values()) a.controller.abort(new RunStopped(stopReasons.shutdown));
     await Promise.all([...this.active.values()].map((a) => a.done));

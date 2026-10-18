@@ -12,7 +12,9 @@ Linear is optional. Connect it in Settings → Integrations whenever you want Ai
 
 ## Set the intent
 
-Start from a customer call, a brief, or a sentence. Select the plus button beside Projects, tell Aiden what you’re building, and choose the folder containing its code. Then select Hand it to Aiden.
+Start from a customer call, a brief, or a sentence. Select the plus button beside Projects, tell Aiden what you’re building, and select Hand it to Aiden. Adding the project folder is optional; you can connect your code later.
+
+The project opens a setup chat with Aiden above the project. The Guide plays back the requirements Aiden understood, takes your corrections, and asks how to check the work: connect the code, a web app, an API, an iPhone app, or checking it yourself. See [Project Guide](guide.md).
 
 Aiden writes down what done means in plain language, checks the work, and plans usable steps toward the outcome. The project takes its name from what you’re building. Each step should produce something you can test; a foundation step needs a plan for checking it before other work builds on it.
 
@@ -30,7 +32,7 @@ Aiden creates a Linear project for this project and writes tickets from the deli
 
 Start in Overview for where the project stands, what’s left, and what’s in the way. Aiden brings questions to Needs you. Answer the question when a decision is yours; the answer goes into the project and unlocks the affected work. Independent investigation can continue while a decision is open.
 
-Refine Scope as you learn. Aiden checks again and updates the project. Activity shows what changed, and Runs has the check details. Progress details and estimates explains the size of the remaining work and any available forecast. When there isn’t enough history to give a date, Aiden leaves the forecast unavailable.
+Refine Scope as you learn: Change opens the selected requirement in chat for clarification and review. Activity shows what changed, with check details under All runs. Progress details and estimates explains the size of the remaining work and any available forecast. When there isn’t enough history to give a date, Aiden leaves the forecast unavailable.
 
 ## Accept the outcome
 

@@ -54,13 +54,18 @@ async function publishFixture(mode: string, version = '1.1.1') {
   await writeFile(path.join(root, 'gh'), ghFixture, { mode: 0o755 });
   await writeFile(calls, '');
   await writeFile(uploaded, '');
+  const channel = version.includes('-') ? 'beta' : 'latest';
   const files = [
     `Aiden-${version}-arm64.dmg`,
     `Aiden-${version}-arm64.dmg.blockmap`,
     `Aiden-${version}-arm64.zip`,
     `Aiden-${version}-arm64.zip.blockmap`,
-    version.includes('-') ? 'beta-mac.yml' : 'latest-mac.yml',
+    `${channel}-mac.yml`,
+    `Aiden-${version}-x64.exe`,
+    `Aiden-${version}-x64.exe.blockmap`,
+    `${channel}.yml`,
   ];
+  if (mode === 'missing-windows') files.splice(5, 3);
   for (const file of files) await writeFile(path.join(assets, file), 'synthetic artifact');
   await exec('/bin/bash', ['-c', aliasScript], {
     cwd: assets,
@@ -115,7 +120,7 @@ void test('publishing uploads all attested files before publishing the exact cre
     const uploads = requests.filter((args) =>
       args.some((arg) => arg.startsWith('https://uploads.github.com/')),
     );
-    assert.equal(uploads.length, 7);
+    assert.equal(uploads.length, 10);
     assert.ok(uploads.some((args) => args.includes('Aiden-arm64.dmg')));
     assert.ok(requests.some((args) => args.includes(`prerelease=${version.includes('-')}`)));
     assert.deepEqual(requests.at(-1), [
@@ -138,6 +143,7 @@ void test('duplicate tags, partial uploads, and corrupt or missing artifacts can
     'upload-fails',
     'missing-upload',
     'missing-local',
+    'missing-windows',
     'missing-alias',
     'different-alias',
     'corrupt',
@@ -150,6 +156,7 @@ void test('duplicate tags, partial uploads, and corrupt or missing artifacts can
         'existing',
         'draft',
         'missing-local',
+        'missing-windows',
         'missing-alias',
         'different-alias',
         'corrupt',

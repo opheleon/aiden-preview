@@ -69,9 +69,14 @@ test('project loading restores what Aiden knows without starting work, then vali
   await act(() => result.current.start());
   expect(result.current.error).toContain('Tell Aiden what you are building');
   expect(result.current.busy).toBe(false);
+  // A project folder is optional: the intent alone starts Aiden.
   act(() => result.current.setProject({ ...project, name: ' ', repositories: [] }));
   await act(() => result.current.start());
-  expect(result.current.error).toContain('Choose the project folder');
+  expect(result.current.error).toBe('');
+  expect(f.request).toHaveBeenCalledWith(
+    'prepare',
+    expect.objectContaining({ project: expect.objectContaining({ repositories: [] }) }),
+  );
 });
 
 test('repository rescans retain notes and cancelling folder selection leaves inputs intact', async () => {

@@ -2,6 +2,12 @@ import { vi } from 'vitest';
 
 import type { DesktopBridge } from '../../apps/desktop/src/bridge';
 import type { WorkerResult } from '../../packages/contracts/src/api';
+import {
+  type GuideMessage,
+  type GuideView,
+  type SetupFacts,
+  setupProgress,
+} from '../../packages/contracts/src/guide';
 import type {
   ActivityEntry,
   Baseline,
@@ -51,6 +57,18 @@ export function appFixture() {
   let connections: McpConnection[] = [];
   let appUrl: string | null = null;
   let verification: WorkerResult<'verification'> = null;
+  let estimate: WorkerResult<'estimation'> = null;
+  // Synthetic Guide state; replies here are fixtures, never recorded agent output.
+  let setupFacts: SetupFacts;
+  let guideMessages: GuideMessage[] = [];
+  /** The Guide view the worker would return for the current synthetic facts. */
+  const guideView = (): GuideView => ({
+    thread: { messages: guideMessages },
+    setup: setupProgress(setupFacts),
+  });
+  /** Append a synthetic Guide line. */
+  const guideLine = (from: GuideMessage['from'], text: string, widgets?: GuideMessage['widgets']) =>
+    guideMessages.push({ at: report.generatedAt, from, text, ...(widgets ? { widgets } : {}) });
   // Like the preload bridge, every subscriber receives each event.
   const listeners = new Set<(event: RunEvent) => void>();
   // Runs this fixture's worker started; runs added by other processes stay out of activeRunIds.
@@ -119,6 +137,23 @@ export function appFixture() {
     connections = [];
     appUrl = null;
     verification = null;
+    estimate = null;
+    setupFacts = {
+      baselineId: report.baselineId,
+      state: {
+        baselineId: report.baselineId,
+        requirementsConfirmedAt: report.generatedAt,
+        skipped: [],
+      },
+      repositories: 1,
+      url: null,
+      api: false,
+      phone: false,
+      manual: false,
+      completedChecks: 1,
+      trackerLinked: false,
+    };
+    guideMessages = [];
     listeners.clear();
     active = new Set(ready ? [] : ['prepare-run']);
   }
@@ -132,7 +167,7 @@ export function appFixture() {
         case 'betaSettings':
           return { enabled: false, intervalMinutes: 60 };
         case 'estimation':
-          return null;
+          return estimate;
         case 'projects':
           return [project];
         case 'diagnostics':
@@ -224,11 +259,29 @@ export function appFixture() {
           return connections;
         case 'verificationSettings':
           return { url: appUrl };
+        case 'configureGuideVerification':
+          if (p.save) {
+            appUrl = p.update.url;
+            setupFacts = {
+              ...setupFacts,
+              url: appUrl,
+              api: !!p.update.api,
+              phone: !!p.update.phone,
+              manual: !!p.update.manual,
+            };
+          }
+          return {
+            message: p.save
+              ? 'Access checked and verification setup confirmed.'
+              : 'Access checked. You can confirm this setup.',
+          };
         case 'updateVerificationSettings':
           if (p.url?.startsWith('file:'))
             throw new Error('Only http and https URLs can be verified.');
-          appUrl = p.url;
-          return { url: appUrl };
+          if (p.url !== undefined) appUrl = p.url;
+          if (p.url) setupFacts = { ...setupFacts, url: p.url };
+          if (p.manual) setupFacts = { ...setupFacts, manual: true };
+          return { url: appUrl, ...(p.manual ? { manual: true } : {}) };
         case 'verify':
           runs.push({
             ...runs[0]!,
@@ -312,6 +365,49 @@ export function appFixture() {
         case 'integrationRemove':
           connections = [];
           return { removed: true };
+        case 'guide':
+          return guideView();
+        case 'askGuide':
+          if (p.text === 'fail') {
+            guideLine('you', p.text);
+            throw new Error('The Guide could not answer that. Try asking another way.');
+          }
+          if (p.text) guideLine('you', p.text);
+          if (p.kickoff)
+            guideLine('aiden', 'Synthetic playback of the requirements. Does this look right?', [
+              { type: 'confirm-requirements' },
+            ]);
+          else if (
+            setupFacts.state.requirementsConfirmedAt &&
+            !setupFacts.url &&
+            !setupFacts.manual
+          )
+            guideLine('aiden', 'Synthetic reply: how should Aiden check the work?', [
+              { type: 'verify-options', recommended: 'web' },
+            ]);
+          else guideLine('aiden', 'Synthetic Guide reply.');
+          return guideView();
+        case 'confirmRequirements':
+          setupFacts = {
+            ...setupFacts,
+            state: {
+              ...setupFacts.state,
+              baselineId: setupFacts.baselineId ?? undefined,
+              requirementsConfirmedAt: report.generatedAt,
+            },
+          };
+          return guideView();
+        case 'skipSetupStep':
+          setupFacts = {
+            ...setupFacts,
+            state: { ...setupFacts.state, skipped: [...setupFacts.state.skipped, p.step] },
+          };
+          return guideView();
+        case 'guideEvent':
+          guideLine('event', p.text);
+          return guideView();
+        case 'testAppUrl':
+          return { reachable: true, message: 'Synthetic app answered (HTTP 200).' };
         default:
           throw new Error(`Unexpected fixture operation: ${method}`);
       }
@@ -384,6 +480,9 @@ export function appFixture() {
     setVerification: (value: WorkerResult<'verification'>) => {
       verification = value;
     },
+    setEstimate: (value: WorkerResult<'estimation'>) => {
+      estimate = value;
+    },
     setReport: (value: Report) => {
       current = value;
     },
@@ -399,5 +498,15 @@ export function appFixture() {
     setBaseline: (value: Baseline | null) => {
       baseline = value;
     },
+    /** Make the synthetic project a fresh one whose setup has not started. */
+    setSetupPending: () => {
+      setupFacts = {
+        ...setupFacts,
+        state: { skipped: [] },
+        repositories: 0,
+        completedChecks: 0,
+      };
+    },
+    guideMessages: () => guideMessages,
   };
 }

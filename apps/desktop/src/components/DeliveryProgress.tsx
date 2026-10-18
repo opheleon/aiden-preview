@@ -54,8 +54,20 @@ export function DeliveryProgress({
         current={current}
         allDone={counts.done === counts.total}
       />
+      {blocked ? (
+        <p>
+          <strong>Remaining effort:</strong> Waiting for blocking scope decisions. Independent
+          tickets can continue.
+        </p>
+      ) : (
+        <RemainingEffort workspace={workspace} report={report} estimate={estimate} />
+      )}
+      <p>
+        <strong>Agreed timing:</strong>{' '}
+        {product.milestones.length ? product.milestones.join(' · ') : 'No target agreed yet.'}
+      </p>
       <details className="progress-details">
-        <summary>Progress details and estimates</summary>
+        <summary>Progress details</summary>
         <div className="progress-detail-content">
           <p>{verificationSummary(states)}</p>
           {features.length > 0 && (
@@ -64,19 +76,6 @@ export function DeliveryProgress({
               complete.
             </p>
           )}
-          {!job &&
-            (blocked ? (
-              <p>
-                <strong>Remaining effort:</strong> Waiting for blocking scope decisions. Independent
-                tickets can continue.
-              </p>
-            ) : (
-              <RemainingEffort workspace={workspace} report={report} estimate={estimate} />
-            ))}
-          <p>
-            <strong>Agreed timing:</strong>{' '}
-            {product.milestones.length ? product.milestones.join(' · ') : 'No target agreed yet.'}
-          </p>
           {!job && <p className="row-sub">{progressChange(report, previous)}</p>}
         </div>
       </details>
@@ -119,13 +118,18 @@ function RemainingEffort({
             : 'Not established yet.'}
       </p>
       {sized && (
-        <details className="estimate-basis">
-          <summary>How this is estimated</summary>
-          <p className="row-sub">
-            Code-based estimate from {new Date(sized.generatedAt).toLocaleDateString()}. Browser
-            failures may require additional work. {sized.forecast.limitations.join(' ')}
+        <>
+          <p>
+            <strong>Estimated time:</strong> {estimatedTime(sized)}
           </p>
-        </details>
+          <details className="estimate-basis">
+            <summary>How this is estimated</summary>
+            <p className="row-sub">
+              Code-based estimate from {new Date(sized.generatedAt).toLocaleDateString()}. Browser
+              failures may require additional work. {sized.forecast.limitations.join(' ')}
+            </p>
+          </details>
+        </>
       )}
       {!sized &&
         report &&
@@ -214,4 +218,12 @@ function NextStep({
         : 'Aiden is establishing the next delivery step.'}
     </p>
   );
+}
+
+/** Preserve an unavailable duration instead of treating points as days. */
+function estimatedTime(estimate: EstimationSnapshot): string {
+  const { remainingWorkingDays, forecastFinish } = estimate.forecast;
+  if (remainingWorkingDays == null) return 'Not enough delivery history to estimate time yet.';
+  const finish = forecastFinish ? ` · estimated finish ${forecastFinish}` : '';
+  return `${remainingWorkingDays} working days remaining${finish}.`;
 }

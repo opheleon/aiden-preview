@@ -13,6 +13,7 @@ const bridge: DesktopBridge = {
   chooseContext: () => ipcRenderer.invoke('aiden:chooseContext'),
   openExternal: (url) => ipcRenderer.invoke('aiden:openExternal', url),
   saveExport: (params) => ipcRenderer.invoke('aiden:export', params),
+  openDeviceReport: (runId) => ipcRenderer.invoke('aiden:openDeviceReport', runId),
   openVerificationReport: (params) => ipcRenderer.invoke('aiden:openVerificationReport', params),
   verificationMedia: (params) => ipcRenderer.invoke('aiden:verificationMedia', params),
   getFirstUseState: () => ipcRenderer.invoke('guide:state'),

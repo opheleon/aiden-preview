@@ -1,5 +1,77 @@
 # Changelog
 
+## 1.2.4
+
+- Preserve cancellation status when a device check finishes during a concurrent status read.
+
+- Keep requested web/API setup fields visible after settings load, including in smaller chat windows. Install the login-test browser in desktop CI and explicitly normalize public credential-presence flags used in access fingerprints.
+
+- Show explicit setup status and a close button in project chat. Keep confirmed requirements confirmed when a code connection only refreshes the overview; genuine scope changes still require review.
+
+- Confirm local-code and manual-check setup directly. Show access checks only for app/API/device targets, and update the actions automatically when selections change.
+
+- Keep generic run introductions out of chat progress and move branch controls into Project settings under Testing settings, alongside app and API access.
+
+- Keep chat progress compact with an animated status, adjacent Stop control, and one current activity line instead of repeated logs and internal stage labels.
+
+- Show Aiden's introduction before clarification choices become available, preserving pending selections while a reply is being prepared.
+
+- Keep completed check results and follow-up questions visible together when reopening chat through Show progress.
+
+- Restore visible project progress, remaining effort, timing, and the delivery plan on Overview. Keep supporting evidence expandable, and show app-only verification progress with an explicit explanation when code-based estimates are unavailable.
+
+- Reuse configured web test credentials through private sign-in during checks, including after sign-out. Keep credential entry unrecorded and outside model tools, and distinguish an unavailable account from a failed login or an unsupported form-state check.
+
+- Simplify project navigation into Overview, Scope, and Activity. Open connection edits and requirement changes in the existing project chat, return to the previous page with Back, and run code plus configured app/API checks from one action. Keep advanced settings accessible and detailed delivery evidence folded away.
+
+- Simplify project setup into four clearly marked steps with hover and keyboard-focus tooltips, a visible next action, and separate optional extras. Explanations leave the chat layout, drafts, and setup inputs in place.
+
+- Keep live check updates, results, and expandable recordings inside the project chat instead of navigating away to Runs or a separate report.
+
+- Select setup answers inline and submit them together without filling the message box. Support multiple selections for questions with compatible choices.
+
+- Keep clarification conversational with one composer, inline answer choices, and animated response feedback.
+
+- Resolve blocking scope questions directly in setup chat before confirming requirements. Incorporate answers before review, and prevent fully blocked app checks from reporting an empty success.
+
+- Detect web sign-in from the page and a reusable session automatically, removing the required confirmation-text field from setup.
+
+- Make the setup chat Thinking indicator visibly shimmer while a reply is pending, with a still label for reduced-motion preferences.
+
+- Keep setup chat concise, show ongoing checks and result links inline, and show web/API-only results on the project overview. Include recorded browser transitions and non-secret API authentication metadata in independent evidence review.
+
+- Fix setup chat failing with an invalid Codex transport configuration when tool connections are disabled.
+
+- Store remembered project test credentials in OS secure storage, migrate legacy plaintext on use, and offer memory-only storage. Remove credentials with their login/API setup, default project closure to forgetting test credentials, and keep failed removals retryable without touching shared connections.
+
+- Explain device permission requests beside connection controls so people know Aiden is accessing that connection's saved sign-in.
+
+- Show a quiet Thinking indicator throughout setup replies and keep retry controls beside errors. Allow reasoning-only Codex turns without an MCP tool server. Cache integration credential reads in worker memory to avoid repeated OS permission requests.
+
+- Hide iPhone setup while retaining its implementation; add API-key setup, private web sign-in checks, and a runnable SQLite-backed local authentication example.
+
+- Setup uses a plain multi-select checklist and checks access to selected web, API, and iPhone targets before confirmation. Failed checks preserve saved settings.
+
+- Open project setup and support as a reusable chat overlay with Back, visible setup TODOs, inline controls, and a persistent composer.
+
+- Start a project from the intent alone. The project folder and Git are optional; a project without code skips the code check and is sized from its requirements, or checked through a saved web or API check.
+
+- Add a per-project setup and support chat. It plays back the requirements for confirmation, asks how to check the work with inline folder, web, API, iPhone, and manual setup cards, and keeps a resumable setup checklist derived from saved project state. Afterwards it answers questions about runs and setup, makes stated setup changes, and points to Slack for help. One thread per project is condensed as it grows, and it always uses the project's own provider and billing mode.
+
+- Build an unsigned Windows x64 installer alongside the macOS release, with its own update manifest, checksums, and provenance. Pass Windows system and profile variables to provider processes.
+
+- Add customer-facing TestFlight instructions, including an external hosted-iPhone walkthrough and a clear distinction from Aiden’s connected-phone automation.
+
+- Explain physical iPhone testing directly beside its controls, with USB and unlock instructions, one-time setup guidance, connection versus verification steps, and what happens during a run.
+
+- Run automated desktop verification in hidden, non-activating windows while retaining screenshots and traces.
+
+- Simplify iPhone verification with device/app pickers, detected builds, shared connection diagnostics and Apple signing preferences, and automatic lifecycle management for an installed local Appium server. Keep existing connections under Advanced settings.
+
+- Add per-project verification configuration in the Guide and in Settings: browser, API, and installed iPhone targets, manual runs, and opt-in verification after successful project assessments.
+
+- Add installed TestFlight build verification after a project’s repository assessment, with requirement-linked code and UI evidence, local Appium control, screenshot fallback, independent visual review, cancellation, and portable evidence.
+
 ## 1.2.3
 
 - Make the overview readable at a glance: each requirement is one line with one status chip, and opening it shows everything Aiden knows in a pop-up, including its ticket, actions, verification gaps, and evidence. Delivery findings are one line each and open the affected requirement. A feature's outcome, rationale, and test plan sit behind an (i) button, and the chip explains how Aiden knows on hover.

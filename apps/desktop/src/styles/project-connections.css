@@ -1,0 +1,53 @@
+.project-connection-row,
+.project-requirement-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-connection-row {
+  padding: 8px 0;
+}
+
+.project-requirement-heading > span {
+  min-width: 0;
+}
+
+.project-requirement-heading > button {
+  flex-shrink: 0;
+}
+
+.guide-context {
+  border-left: 2px solid var(--border);
+  padding-left: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.guide-connection-actions {
+  display: grid;
+  gap: 8px;
+  max-width: 420px;
+}
+
+.guide-connection-actions button {
+  text-align: left;
+}
+
+.project-chat-action > p {
+  margin: 0 0 16px;
+}
+
+.project-run-history > summary {
+  padding: 12px 0;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+@media (width <= 600px) {
+  .project-connection-row,
+  .project-requirement-heading {
+    flex-wrap: wrap;
+  }
+}

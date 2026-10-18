@@ -61,7 +61,7 @@ test('dispatch uses the selected project repository and task, then shows externa
   const f = fixture();
   render(<DeliveryHarness workspace={f.workspace} />);
   await waitFor(() => expect(f.call).toHaveBeenCalledWith('codingJobs', { projectId: 'project' }));
-  fireEvent.click(screen.getByText('Send work to Claude Code'));
+  fireEvent.click(await screen.findByText('Send work to Claude Code'));
   expect(screen.getByRole('button', { name: 'Start Claude Code' })).toBeDisabled();
   fireEvent.change(screen.getByLabelText('Coding task'), { target: { value: 'Fix the issue' } });
   fireEvent.click(screen.getByRole('button', { name: 'Start Claude Code' }));

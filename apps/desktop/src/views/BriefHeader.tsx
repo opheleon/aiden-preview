@@ -1,8 +1,9 @@
-import { MoreHorizontal, Square } from 'lucide-react';
+import { MessageCircle, MoreHorizontal, Square } from 'lucide-react';
 import { type JSX, type ReactNode, useRef, useState } from 'react';
 
 import type { LookReason, RunManifest } from '../../../../packages/contracts/src/index';
 import { scopeName } from '../../../../packages/contracts/src/project-name';
+import { useProjectGuide } from '../components/ProjectGuide';
 import { OutcomeDialog, outcomeReady, ProjectOutcome } from '../components/ProjectOutcome';
 import type { CodingDeliveryState } from '../hooks/useCodingDelivery';
 import type { Workspace } from '../hooks/useWorkspace';
@@ -10,16 +11,14 @@ import { timeAgo } from '../renderer/time';
 const api = window.aiden;
 
 /**
- * The overflow menu: exports, settings, the monitored branch, and the project's outcome decision
+ * The overflow menu: exports, settings, and the project's outcome decision
  * stay one click away without taking space on the brief.
  */
 function Overflow({
   workspace,
-  monitoring,
   onOutcome,
 }: {
   workspace: Workspace;
-  monitoring: string;
   onOutcome: (mode: 'accept' | 'close') => void;
 }): JSX.Element {
   const { project, report, action, setNotice, setArea, setSettingsTab } = workspace;
@@ -48,16 +47,6 @@ function Overflow({
         </button>
         <button role="menuitem" disabled={!report} onClick={choose(() => exportAs('json'))}>
           Export JSON
-        </button>
-        <button
-          role="menuitem"
-          onClick={choose(() => {
-            setSettingsTab('project');
-            setArea('settings');
-          })}
-        >
-          Change branch
-          <small>Monitoring {monitoring}</small>
         </button>
         {outcomeReady(workspace) && !closed && (
           <>
@@ -93,21 +82,16 @@ function Overflow({
 
 /** What Aiden is doing right now, with a way to stop it. */
 function LiveLine({ workspace }: { workspace: Workspace }): JSX.Element | null {
-  const { busy, live, activeRun, action, call, setArea, setOpenRun } = workspace;
+  const { busy, live, activeRun, action, call } = workspace;
+  const { open } = useProjectGuide();
   if (!busy) return null;
   return (
     <p className="live-line" aria-live="polite">
       <span className="spinner" aria-hidden="true" />
       {live || 'Aiden is working.'}
       {activeRun && (
-        <button
-          className="text-button"
-          onClick={() => {
-            setOpenRun(activeRun);
-            setArea('runs');
-          }}
-        >
-          Watch it work
+        <button className="text-button" onClick={() => open({ type: 'run' })}>
+          Show progress
         </button>
       )}
       {activeRun && (
@@ -163,16 +147,7 @@ function TitleLines({
       )}
       {inline && (
         <p className="brief-when">
-          {closed ? 'Monitoring paused for' : 'Monitoring'} {monitoring}{' '}
-          <button
-            className="text-button"
-            onClick={() => {
-              workspace.setSettingsTab('project');
-              workspace.setArea('settings');
-            }}
-          >
-            Change branch
-          </button>
+          {closed ? 'Monitoring paused for' : 'Monitoring'} {monitoring}
         </p>
       )}
     </div>
@@ -196,15 +171,29 @@ function StatusCard({
   note: { text: string; label: string; run: () => void } | null;
 }): JSX.Element {
   const closed = workspace.project.lifecycle?.status === 'closed';
+  const { open } = useProjectGuide();
   return (
     <section className="brief-card" aria-label="Status">
+      <div className="card-label-row">
+        <h2 className="card-label">Latest check</h2>
+        <button
+          disabled={workspace.busy || closed}
+          onClick={() => {
+            open({ type: 'run' });
+            void workspace.lookNow();
+          }}
+        >
+          Run check now
+        </button>
+      </div>
       {!progress && <h2 className="card-label">Overall progress</h2>}
       {delivery.error && <p role="alert">{delivery.error}</p>}
-      {progress ?? (
+      {(!workspace.report || !progress) && (
         <p className="brief-status">
           <strong>{headline}</strong> {lands}
         </p>
       )}
+      {progress}
       {note && (
         <div className="brief-note">
           {note.text && <p>{note.text}</p>}
@@ -247,17 +236,17 @@ export function BriefHeader({
   note: { text: string; label: string; run: () => void } | null;
 }): JSX.Element {
   const [outcome, setOutcome] = useState<'accept' | 'close'>();
-  const closed = workspace.project.lifecycle?.status === 'closed';
+  const { open } = useProjectGuide();
   const monitoring = monitoringLabel(workspace.project.repositories);
   return (
     <>
       <header className="brief-top">
         <TitleLines workspace={workspace} monitoring={monitoring} />
         <div className="button-row">
-          <button disabled={workspace.busy || closed} onClick={() => void workspace.lookNow()}>
-            Run check now
+          <button onClick={() => open()}>
+            <MessageCircle size={15} /> Ask Aiden
           </button>
-          <Overflow workspace={workspace} monitoring={monitoring} onOutcome={setOutcome} />
+          <Overflow workspace={workspace} onOutcome={setOutcome} />
         </div>
       </header>
       <ProjectOutcome key={workspace.project.id} workspace={workspace} quiet={!allDone} />

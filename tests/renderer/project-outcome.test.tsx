@@ -76,6 +76,7 @@ test('closing is independent of acceptance, cancel returns focus, and reopen is 
   expect(f.call).toHaveBeenCalledWith('closeProject', {
     projectId: 'project',
     note: 'Cancelled this initiative.',
+    forgetCredentials: true,
   });
   f.project.lifecycle!.status = 'closed';
   view.rerender(<ProjectOutcome workspace={f} />);
@@ -121,4 +122,29 @@ test('a brand-new project offers no outcome until a check has run, unless it has
   };
   rerender(<ProjectOutcome workspace={closed} />);
   expect(screen.getByRole('button', { name: 'Reopen project' })).toBeVisible();
+});
+
+test('failed credential cleanup leaves closing retryable and retaining credentials is an explicit choice', async () => {
+  const f = fixture();
+  f.call.mockRejectedValueOnce(
+    new Error('Could not remove saved credentials. Unlock secure storage and try again.'),
+  );
+  render(<ProjectOutcome workspace={f} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Close project' }));
+  expect(screen.getByLabelText('Forget saved test credentials')).toBeChecked();
+  await userEvent.type(screen.getByLabelText('Closing note'), 'Paused for later.');
+  const submit = within(screen.getByRole('dialog')).getByRole('button', { name: 'Close project' });
+  await userEvent.click(submit);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Unlock secure storage');
+  expect(screen.getByRole('dialog')).toBeVisible();
+  expect(screen.getByLabelText('Closing note')).toHaveValue('Paused for later.');
+  expect(screen.getByLabelText('Forget saved test credentials')).toBeChecked();
+  await userEvent.click(screen.getByLabelText('Forget saved test credentials'));
+  await userEvent.click(submit);
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(f.call).toHaveBeenLastCalledWith('closeProject', {
+    projectId: 'project',
+    note: 'Paused for later.',
+    forgetCredentials: false,
+  });
 });
