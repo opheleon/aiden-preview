@@ -51,6 +51,9 @@ class FixtureLauncher {
     } catch (IOException) { }
   }
   static int Main(string[] args) {
+    // Framework Process eagerly flushes its stdin writer's encoding preamble. Suppress it.
+    // Unicode encoding can be set without a console; all actual traffic uses raw byte streams.
+    Console.InputEncoding = new UnicodeEncoding(false, false);
     var config = File.ReadAllLines(Process.GetCurrentProcess().MainModule.FileName + ".args")
       .Select(line => Encoding.UTF8.GetString(Convert.FromBase64String(line))).ToArray();
     IntPtr job = CreateJobObject(IntPtr.Zero, null);
