@@ -10,7 +10,7 @@ export type Guide = {
   /** A message sent but not answered yet, shown until the reply arrives. */
   asking: string;
   error: string;
-  /** Requirements exist and the Guide has not played them back yet. */
+  /** A first scope draft exists and the Guide has not introduced its questions or review yet. */
   ready: boolean;
   /** Play back the requirements once; the chat calls it when it comes on screen. */
   playback: () => void;
@@ -97,7 +97,7 @@ export function useGuide(workspace: Workspace): Guide {
   );
 
   const answered = view?.thread.messages.some((m) => m.from === 'aiden') ?? false;
-  const ready = !!view && !!baseline && !answered && !view.clarifications?.length;
+  const ready = !!view && !!baseline && !answered;
 
   return {
     view,

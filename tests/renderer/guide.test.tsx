@@ -6,8 +6,12 @@ import type { GuideView } from '../../packages/contracts/src/guide';
 import { appFixture, openCall } from './app-fixture';
 import { report } from './fixtures';
 const f = appFixture();
+const request = f.request.getMockImplementation()!;
 const { default: App } = await import('../../apps/desktop/src/App');
-beforeEach(() => f.reset());
+beforeEach(() => {
+  f.reset();
+  f.request.mockImplementation(request);
+});
 
 /** Open the synthetic project as a fresh one: no confirmed requirements and no finished check. */
 async function openFreshProject() {
@@ -301,6 +305,87 @@ test('private login and key fields go directly to the worker, and editing a secr
   expect(JSON.stringify(chatRequests)).not.toContain('fixture-key');
   expect(JSON.stringify(localStorage)).not.toContain('fixture-password');
   expect(JSON.stringify(localStorage)).not.toContain('fixture-key');
+});
+
+test('clarification choices wait for the introduction and retain selections through a follow-up reply', async () => {
+  const original = f.request.getMockImplementation()!;
+  let release!: () => void;
+  let pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  f.request.mockImplementation(async (method, params) => {
+    if (method === 'askGuide') await pending;
+    const result = await original(method, params);
+    return method === 'guide' || method === 'askGuide'
+      ? { ...(result as GuideView), clarifications: [openCall()] }
+      : result;
+  });
+  await openFreshProject();
+  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  expect(await within(chat).findByRole('status', { name: 'Aiden is thinking' })).toBeVisible();
+  expect(within(chat).queryByRole('group', { name: 'Answer choices' })).toBeNull();
+  await act(async () => {
+    release();
+    await pending;
+  });
+  expect(await within(chat).findByText(/Synthetic playback of the requirements/)).toBeVisible();
+  await userEvent.click(await within(chat).findByRole('button', { name: 'Allow duplicates' }));
+  pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await userEvent.type(
+    within(chat).getByLabelText('Message the Guide'),
+    'Explain the options{Enter}',
+  );
+  expect(within(chat).queryByRole('group', { name: 'Answer choices' })).toBeNull();
+  await act(async () => {
+    release();
+    await pending;
+  });
+  expect(await within(chat).findByRole('button', { name: 'Allow duplicates' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  f.request.mockImplementation(original);
+});
+
+test('progress replaces the current activity without repeating logs or showing internal stage labels', async () => {
+  f.setSetupPending();
+  f.clearRuns();
+  f.startRun(
+    { id: 'preparing', kind: 'prepare', project: f.project(), projectId: f.project().id },
+    [],
+  );
+  f.setActivity([
+    {
+      at: report.generatedAt,
+      runId: 'preparing',
+      kind: 'look',
+      summary: 'Reading your goal to write the requirements.',
+    },
+  ]);
+  render(<App />);
+  await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  const progress = within(chat).getByRole('region', { name: 'Checks in this chat' });
+  act(() =>
+    f.emit({ type: 'progress', runId: 'preparing', stage: 'understand', message: 'Understand...' }),
+  );
+  expect(within(progress).queryByText('Understand...')).toBeNull();
+  expect(
+    within(progress).getAllByText('Reading your goal to write the requirements.'),
+  ).toHaveLength(1);
+  act(() =>
+    f.emit({
+      type: 'progress',
+      runId: 'preparing',
+      message: 'Reviewing the sign-in requirements.',
+    }),
+  );
+  expect(within(progress).getByText('Reviewing the sign-in requirements.')).toBeVisible();
+  expect(within(progress).queryByText('Reading your goal to write the requirements.')).toBeNull();
+  await userEvent.click(within(progress).getByRole('button', { name: 'Stop' }));
+  expect(f.request).toHaveBeenCalledWith('cancel', { runId: 'preparing' });
 });
 
 test('a running check streams progress and partial results in chat without losing the draft', async () => {

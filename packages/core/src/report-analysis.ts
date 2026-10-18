@@ -24,6 +24,7 @@ import { fetchMonitoredBranch } from '../../tools/src/remote-branches.js';
 import { appendActivity } from './activity.js';
 import { applyBlockers, blockerOrigins } from './blockers.js';
 import { openDecisions as readOpenDecisions, readCalls } from './calls.js';
+import { linkedWork, repositoryRemotes } from './linked-work.js';
 import type { ModelStage } from './model-stage.js';
 import { atomic, json, optionalJson } from './storage.js';
 import type { WorkflowContext } from './workflow-context.js';
@@ -46,6 +47,8 @@ export async function assessReport(
   checkpoint: Checkpoint,
 ): Promise<void> {
   const baseline = run.baseline!;
+  // Read remotes from the person's checkouts; the frozen copies used for analysis have none.
+  broker.remotes = await repositoryRemotes(run.project.repositories, signal);
   const frozen = await freezeInventory(context, run, signal, dir, broker, checkpoint);
   await checkpoint('discover');
   // The choice is saved so a resumed look and later report checks see the same snapshots.
@@ -67,6 +70,15 @@ export async function assessReport(
         FindingsSchema,
         {
           baseline: eligible,
+          intent: run.project.context,
+          linkedWork: await linkedWork(
+            run.project.context,
+            broker.remotes,
+            (id) => broker.repo(id).path,
+            discovery.snapshots,
+            signal,
+            broker.fetchPulls,
+          ),
           discovery,
           previousReport: run.latestAtStart
             ? await context.getReport(run.projectId, run.latestAtStart)

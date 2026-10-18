@@ -8,7 +8,8 @@ export type RuntimeRequest = {
   prompt: string;
   schema: Record<string, unknown>;
   cwd: string;
-  tools: { url: string; token: string; names?: readonly string[] };
+  /** Loopback endpoint and its exact tools; zero tools marks a reasoning-only turn. */
+  tools: { url: string; token: string; names?: readonly string[]; toolCount?: number };
   signal: AbortSignal;
   progress: (message: string) => void;
 };

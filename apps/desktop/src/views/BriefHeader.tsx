@@ -1,18 +1,31 @@
 import { MessageCircle, MoreHorizontal, Square } from 'lucide-react';
-import { type JSX, type ReactNode, useRef } from 'react';
+import { type JSX, type ReactNode, useRef, useState } from 'react';
 
 import type { LookReason, RunManifest } from '../../../../packages/contracts/src/index';
 import { scopeName } from '../../../../packages/contracts/src/project-name';
 import { useProjectGuide } from '../components/ProjectGuide';
-import { ProjectOutcome } from '../components/ProjectOutcome';
+import { OutcomeDialog, outcomeReady, ProjectOutcome } from '../components/ProjectOutcome';
 import type { CodingDeliveryState } from '../hooks/useCodingDelivery';
 import type { Workspace } from '../hooks/useWorkspace';
 import { timeAgo } from '../renderer/time';
 const api = window.aiden;
 
-/** The overflow menu: the few things that are not touch points stay one click away. */
-function Overflow({ workspace }: { workspace: Workspace }): JSX.Element {
+/**
+ * The overflow menu: exports, settings, the monitored branch, and the project's outcome decision
+ * stay one click away without taking space on the brief.
+ */
+function Overflow({
+  workspace,
+  monitoring,
+  onOutcome,
+}: {
+  workspace: Workspace;
+  monitoring: string;
+  onOutcome: (mode: 'accept' | 'close') => void;
+}): JSX.Element {
   const { project, report, action, setNotice, setArea, setSettingsTab } = workspace;
+  const lifecycle = project.lifecycle;
+  const closed = lifecycle?.status === 'closed';
   const menu = useRef<HTMLDetailsElement>(null);
   /** Close the menu, then act, so the next open starts fresh. */
   const choose = (fn: () => void) => () => {
@@ -37,6 +50,34 @@ function Overflow({ workspace }: { workspace: Workspace }): JSX.Element {
         <button role="menuitem" disabled={!report} onClick={choose(() => exportAs('json'))}>
           Export JSON
         </button>
+        <button
+          role="menuitem"
+          onClick={choose(() => {
+            setSettingsTab('project');
+            setArea('settings');
+          })}
+        >
+          Change branch
+          <small>Monitoring {monitoring}</small>
+        </button>
+        {outcomeReady(workspace) && !closed && (
+          <>
+            <button
+              role="menuitem"
+              disabled={workspace.busy || !workspace.baseline || !lifecycle}
+              onClick={choose(() => onOutcome('accept'))}
+            >
+              {lifecycle?.acceptanceCurrent ? 'Update acceptance' : 'Accept outcome'}
+            </button>
+            <button
+              role="menuitem"
+              disabled={workspace.busy}
+              onClick={choose(() => onOutcome('close'))}
+            >
+              Close project
+            </button>
+          </>
+        )}
         <button
           role="menuitem"
           onClick={choose(() => {
@@ -95,6 +136,98 @@ function lastLook(runs: RunManifest[]): string {
 }
 
 /**
+ * The project name and when Aiden last looked. The monitored branch is a tooltip on that line
+ * unless it needs attention: not configured yet, or paused because the project is closed.
+ */
+function TitleLines({
+  workspace,
+  monitoring,
+}: {
+  workspace: Workspace;
+  monitoring: string;
+}): JSX.Element {
+  const closed = workspace.project.lifecycle?.status === 'closed';
+  const when = lastLook(workspace.runs.filter((run) => run.id === workspace.report?.id));
+  const inline = closed || !workspace.project.repositories.some((repo) => repo.monitoredBranch);
+  return (
+    <div>
+      <h1>{scopeName(workspace.project.context, workspace.baseline?.product)}</h1>
+      {when && (
+        <p className="brief-when" title={inline ? undefined : `Monitoring ${monitoring}`}>
+          {when}
+        </p>
+      )}
+      {inline && (
+        <p className="brief-when">
+          {closed ? 'Monitoring paused for' : 'Monitoring'} {monitoring}{' '}
+          <button
+            className="text-button"
+            onClick={() => {
+              workspace.setSettingsTab('project');
+              workspace.setArea('settings');
+            }}
+          >
+            Change branch
+          </button>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Where the project stands, what stopped, and the button that recovers from it. */
+function StatusCard({
+  workspace,
+  headline,
+  lands,
+  progress,
+  delivery,
+  note,
+}: {
+  workspace: Workspace;
+  headline: string;
+  lands: string;
+  progress: ReactNode;
+  delivery: CodingDeliveryState;
+  note: { text: string; label: string; run: () => void } | null;
+}): JSX.Element {
+  const closed = workspace.project.lifecycle?.status === 'closed';
+  const { open } = useProjectGuide();
+  return (
+    <section className="brief-card" aria-label="Status">
+      <div className="card-label-row">
+        <h2 className="card-label">Latest check</h2>
+        <button
+          disabled={workspace.busy || closed}
+          onClick={() => {
+            open({ type: 'run' });
+            void workspace.lookNow();
+          }}
+        >
+          Run check now
+        </button>
+      </div>
+      {!progress && <h2 className="card-label">Overall progress</h2>}
+      {delivery.error && <p role="alert">{delivery.error}</p>}
+      {(!workspace.report || !progress) && (
+        <p className="brief-status">
+          <strong>{headline}</strong> {lands}
+        </p>
+      )}
+      {progress}
+      {note && (
+        <div className="brief-note">
+          {note.text && <p>{note.text}</p>}
+          <button className="secondary" disabled={workspace.busy || closed} onClick={note.run}>
+            {note.label}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
  * The top of the brief: the project and when Aiden last looked, then one card with where it
  * stands, what it is waiting on, anything that stopped, and what Aiden is doing right now.
  */
@@ -108,6 +241,7 @@ export function BriefHeader({
   delivery,
   navigation,
   showStatus = true,
+  allDone = false,
 }: {
   workspace: Workspace;
   headline: string;
@@ -116,88 +250,62 @@ export function BriefHeader({
   attention?: ReactNode;
   navigation?: ReactNode;
   showStatus?: boolean;
+  /** Every requirement is done, so the outcome decision is offered on the brief itself. */
+  allDone?: boolean;
   delivery: CodingDeliveryState;
   /** Work that stopped early: what happened, and the button that recovers from it. */
   note: { text: string; label: string; run: () => void } | null;
 }): JSX.Element {
-  const closed = workspace.project.lifecycle?.status === 'closed';
+  const [outcome, setOutcome] = useState<'accept' | 'close'>();
   const { open } = useProjectGuide();
-  const when = lastLook(workspace.runs.filter((run) => run.id === workspace.report?.id));
+  const monitoring = monitoringLabel(workspace.project.repositories);
   return (
     <>
       <header className="brief-top">
-        <div>
-          <h1>{scopeName(workspace.project.context, workspace.baseline?.product)}</h1>
-          {when && <p className="brief-when">{when}</p>}
-          <MonitoringLine workspace={workspace} />
-        </div>
+        <TitleLines workspace={workspace} monitoring={monitoring} />
         <div className="button-row">
           <button onClick={() => open()}>
             <MessageCircle size={15} /> Ask Aiden
           </button>
-          <Overflow workspace={workspace} />
+          <Overflow workspace={workspace} monitoring={monitoring} onOutcome={setOutcome} />
         </div>
       </header>
-      <ProjectOutcome key={workspace.project.id} workspace={workspace} />
+      <ProjectOutcome key={workspace.project.id} workspace={workspace} quiet={!allDone} />
+      {outcome && (
+        <OutcomeDialog workspace={workspace} mode={outcome} dismiss={() => setOutcome(undefined)} />
+      )}
       {navigation}
       {showStatus && attention}
       {showStatus && (
-        <section className="brief-card" aria-label="Status">
-          <div className="card-label-row">
-            <h2 className="card-label">Latest check</h2>
-            <button
-              disabled={workspace.busy || closed}
-              onClick={() => {
-                open({ type: 'run' });
-                void workspace.lookNow();
-              }}
-            >
-              Run check now
-            </button>
-          </div>
-          {delivery.error && <p role="alert">{delivery.error}</p>}
-          <p className="brief-status">
-            <strong>{headline}</strong> {lands}
-          </p>
-          {progress}
-          {note && (
-            <div className="brief-note">
-              {note.text && <p>{note.text}</p>}
-              <button className="secondary" disabled={workspace.busy || closed} onClick={note.run}>
-                {note.label}
-              </button>
-            </div>
-          )}
-        </section>
+        <StatusCard
+          workspace={workspace}
+          headline={headline}
+          lands={lands}
+          progress={progress}
+          delivery={delivery}
+          note={note}
+        />
       )}
       <LiveLine workspace={workspace} />
     </>
   );
 }
 
-/** Show branch controls only for projects with code connected. */
-function MonitoringLine({ workspace }: { workspace: Workspace }): JSX.Element | null {
-  if (!workspace.project.repositories.length) return null;
-  const closed = workspace.project.lifecycle?.status === 'closed';
-  return (
-    <p className="brief-when">
-      {closed ? 'Monitoring paused for' : 'Monitoring'}{' '}
-      {workspace.project.repositories
-        .map((repo) =>
-          repo.monitoredBranch
-            ? `${repo.monitoredBranch.remote}/${repo.monitoredBranch.branch}`
-            : 'not configured',
-        )
-        .join(', ')}{' '}
-      <button
-        className="text-button"
-        onClick={() => {
-          workspace.setSettingsTab('project');
-          workspace.setArea('settings');
-        }}
-      >
-        Change branch
-      </button>
-    </p>
-  );
+/**
+ * Which branch each repository follows. With several repositories each branch is named by its
+ * folder ("rolldown on origin/main, vite on origin/main"); before any branch is chosen, one
+ * "not configured" stands for the whole project instead of one per repository.
+ */
+export function monitoringLabel(repositories: Workspace['project']['repositories']): string {
+  if (!repositories.some((repo) => repo.monitoredBranch)) return 'not configured';
+  return repositories
+    .map((repo) => {
+      const name = repo.path.split('/').at(-1);
+      const branch = repo.monitoredBranch
+        ? `${repo.monitoredBranch.remote}/${repo.monitoredBranch.branch}`
+        : null;
+      if (repositories.length === 1) return branch ?? 'not configured';
+      return branch ? `${name} on ${branch}` : `${name} not configured`;
+    })
+    .join(', ');
 }

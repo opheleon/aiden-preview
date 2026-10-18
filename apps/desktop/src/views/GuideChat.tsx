@@ -101,8 +101,14 @@ function CurrentGuideControls({
   onHelp: () => void;
 }): JSX.Element | null {
   const state = conversationState(guide);
-  if (state.clarifying) return <GuideClarification guide={guide} busy={workspace.busy} />;
-  if (guide.thinking || state.waiting || workspace.busy) return null;
+  const awaitingReply = guide.thinking || (guide.ready && !guide.error);
+  if (state.clarifying)
+    return (
+      <div hidden={awaitingReply}>
+        <GuideClarification guide={guide} busy={workspace.busy} />
+      </div>
+    );
+  if (awaitingReply || state.waiting || workspace.busy) return null;
   const widgets =
     guide.view?.setup.next === 'confirm'
       ? workspace.busy
@@ -153,7 +159,7 @@ export function GuideChat({
   const requestedAction = useRef<HTMLDivElement>(null);
   const { ready, playback } = guide;
   useEffect(() => {
-    if (visible && ready && !entry) playback();
+    if (visible && ready && (!entry || entry.type === 'run')) playback();
   }, [visible, ready, playback, entry]);
   const { view, thinking, asking } = guide;
   const missingRequirement = requirementMissing(entry, workspace);

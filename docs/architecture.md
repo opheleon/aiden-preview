@@ -23,7 +23,7 @@ flowchart LR
 
 The Electron renderer is sandboxed with no Node access; an allowlisted bridge connects it to the trusted worker. The worker handles repositories, normal Git authentication, provider authentication, and application data. Provider executables are trusted: tool restrictions do not contain a compromised runtime.
 
-Source files, commit messages, branch names, and repository instructions are untrusted evidence. Authenticated, run-scoped tools enforce repository, snapshot, path, and approved external-read boundaries. Report validation checks structure and recorded evidence, but cannot guarantee the model's conclusions or eliminate prompt injection.
+Source files, commit messages, branch names, and repository instructions are untrusted evidence. Authenticated, run-scoped tools enforce repository, snapshot, path, and approved external-read boundaries. Report validation checks structure and recorded evidence, but cannot guarantee the model's conclusions or eliminate prompt injection. During assessment, repo_pull_requests may search pull requests on a selected repository's github.com remote through GitHub's public API, without credentials; each request carries the repository name and search text, and results are untrusted leads, never evidence of merged code.
 
 Local snapshots, external records, and reports may contain private data. Protect `AIDEN_HOME`; selected context and evidence are sent to the chosen provider. Integration credentials stay in the worker's credential store or session memory, outside project files, prompts, renderer persistence, receipts, and logs. Report vulnerabilities using the [security policy](../.github/SECURITY.md).
 

@@ -1,7 +1,6 @@
 /* Progress and evidence belong to the conversation, without an extra navigation surface. */
 .guide-checks,
-.guide-check-results,
-.guide-check-progress {
+.guide-check-results {
   display: grid;
   gap: 12px;
 }
@@ -10,16 +9,29 @@
   margin: 0;
 }
 
-.guide-check-activity {
-  margin: 0;
-  padding-left: 20px;
+.guide-check-progress {
+  display: grid;
+  gap: 4px;
+}
+
+.guide-check-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.guide-check-heading .text-button {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 4px 6px;
   color: var(--muted);
-  font-size: 13px;
-  line-height: 1.6;
 }
 
 .guide-check-live {
-  font-size: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .guide-check-result {

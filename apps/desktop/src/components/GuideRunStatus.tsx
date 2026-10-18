@@ -32,33 +32,28 @@ export function GuideRunStatus({
       {ids.map((id) => {
         const run = workspace.runs.find((item) => item.id === id);
         const live = workspace.liveByRun[id] || (ids.length === 1 ? workspace.live : '');
-        const lines = workspace.activity
-          .filter((entry) => entry.runId === id && entry.summary !== live)
-          .slice(0, 3)
-          .reverse();
+        const detail = currentActivity(
+          live,
+          workspace.activity.find((entry) => entry.runId === id)?.summary,
+        );
         return (
           <div key={id} className="guide-check-progress">
-            <p className="guide-thinking" role="status" aria-label="Project work in progress">
-              <span>{run ? activeTitles[run.kind] : 'Starting the check'}</span>
-            </p>
-            <button
-              className="text-button"
-              onClick={() =>
-                void workspace.action(async () => {
-                  await workspace.call('cancel', { runId: id });
-                })
-              }
-            >
-              Stop
-            </button>
-            {lines.length > 0 && (
-              <ul className="guide-check-activity">
-                {lines.map((entry) => (
-                  <li key={`${entry.at}:${entry.summary}`}>{entry.summary}</li>
-                ))}
-              </ul>
-            )}
-            {live && <p className="guide-check-live">{live}</p>}
+            <div className="guide-check-heading">
+              <p className="guide-thinking" role="status" aria-label="Project work in progress">
+                <span>{run ? activeTitles[run.kind] : 'Starting the check'}</span>
+              </p>
+              <button
+                className="text-button"
+                onClick={() =>
+                  void workspace.action(async () => {
+                    await workspace.call('cancel', { runId: id });
+                  })
+                }
+              >
+                Stop
+              </button>
+            </div>
+            {detail && <p className="guide-check-live">{detail}</p>}
           </div>
         );
       })}
@@ -70,4 +65,9 @@ export function GuideRunStatus({
       <GuideCheckResults workspace={workspace} activeIds={ids} />
     </section>
   );
+}
+
+/** Keep one current update; terse worker placeholders such as "Understand..." add no context. */
+function currentActivity(live: string, latest?: string): string | undefined {
+  return [live, latest].find((line) => line?.trim() && !/^[a-z]+(?:\.{3}|…)$/i.test(line.trim()));
 }

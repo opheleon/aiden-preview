@@ -35,23 +35,25 @@ test('one handoff produces a brief with evidence, exports, restart, cancellation
     await expect(page.getByRole('button', { name: 'Start Claude Code' })).toHaveCount(0);
     await page.getByRole('tab', { name: 'Scope', exact: true }).click();
     await page.locator('.feature-summary').first().click();
-    await page.locator('.req-row > summary').first().click();
-    await expect(
-      page.locator('#requirement-REQ-1').getByText('Delivery ticket · F-1 · Not published'),
-    ).toBeVisible();
-    await page.locator('.req-row > summary').first().click();
+    await page.locator('.req-row .req-open').first().click();
+    const sheet = page.getByRole('dialog', { name: 'Requirement REQ-1' });
+    await expect(sheet.getByText('Delivery ticket · F-1 · Not published')).toBeVisible();
+    await sheet.getByRole('button', { name: 'Close requirement REQ-1' }).click();
+    await expect(sheet).toHaveCount(0);
     await page.getByRole('tab', { name: 'Activity', exact: true }).click();
     await expect(page.getByRole('region', { name: 'Activity' })).toContainText(
       'Wrote 2 requirements',
     );
-    await page.getByRole('tab', { name: 'Scope', exact: true }).click();
-    await page.locator('.req-row > summary').first().click();
-    await page
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click();
+    await page.locator('.req-row .req-open').first().click();
+    await sheet
       .getByRole('button', { name: /app.txt:1/ })
       .first()
       .click();
     await expect(page.getByRole('dialog', { name: 'Code evidence' })).toContainText('GET /books');
     await page.getByRole('button', { name: 'Close evidence' }).click();
+    await expect(sheet).toBeVisible();
+    await sheet.getByRole('button', { name: 'Close requirement REQ-1' }).click();
     await expect(page.getByRole('button', { name: 'Stop', exact: true })).toHaveCount(0);
     const jsonFile = path.join(fixture.root, 'export.json');
     await app.evaluate(({ dialog }, file) => {
@@ -210,15 +212,12 @@ test('blocking scope pauses assessment and sizing until answered, with a draft t
     expect(await fixture.calls()).not.toContain('estimate-original');
     await page.getByRole('tab', { name: 'Scope', exact: true }).click();
     await page.locator('.feature-summary').first().click();
-    await page.locator('.req-row > summary').first().click();
-    await expect(
-      page.locator('#requirement-REQ-1').getByText('Blocked ticket · F-1 · Not published'),
-    ).toBeVisible();
-    await expect(
-      page.locator('#requirement-REQ-1').getByText(/Resolve decisions before implementation/),
-    ).toBeVisible();
-    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.locator('.req-row .req-open').first().click();
+    const sheet = page.getByRole('dialog', { name: 'Requirement REQ-1' });
+    await expect(sheet.getByText('Blocked ticket · F-1 · Not published')).toBeVisible();
+    await expect(sheet.getByText(/Resolve decisions before implementation/)).toBeVisible();
     await page.screenshot({ path: info.outputPath('blocked-ticket.png'), fullPage: true });
+    await sheet.getByRole('button', { name: 'Close requirement REQ-1' }).click();
     await page.getByRole('tab', { name: 'Activity', exact: true }).click();
     await page.getByText('All runs', { exact: true }).click();
     const blockedRun = page

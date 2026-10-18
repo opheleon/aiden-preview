@@ -172,6 +172,7 @@ test('clarification is a conversation with one composer and review comes before 
   await writeFile(
     fixture.control,
     JSON.stringify({
+      guideDelayMs: 1500,
       understanding: {
         overview: fixture.f.product.overview,
         milestones: fixture.f.product.milestones,
@@ -207,6 +208,11 @@ test('clarification is a conversation with one composer and review comes before 
     await page.getByLabel('What are you building?').fill('Users can list and create books.');
     await page.getByRole('button', { name: /Hand it to Aiden/ }).click();
     const chat = page.getByRole('dialog', { name: 'Chat with Aiden' });
+    await expect(chat.getByRole('status', { name: 'Aiden is thinking' })).toBeVisible();
+    await expect(chat.getByRole('group', { name: 'Answer choices' })).toHaveCount(0);
+    await expect(
+      chat.getByText('Synthetic clarification: let’s settle access first.'),
+    ).toBeVisible();
     await expect(chat.getByText('Which views should the calendar include?')).toBeVisible();
     await expect(chat.getByRole('button', { name: 'Looks right' })).toHaveCount(0);
     await expect(chat.getByRole('textbox')).toHaveCount(1);

@@ -91,7 +91,30 @@ void test('navigation stays on frozen commits and only evidence reads create rec
       { matches: '' },
     );
     const history: any = await f.broker.call('repo_history', f.location);
-    assert.match(history.history, /Fixture implementation/);
+    assert.match(history.history, /^[a-f0-9]{40,64} \d{4}-\d{2}-\d{2} Fixture implementation/m);
+    assert.deepEqual(
+      await f.broker.call('repo_history', { ...f.location, match: 'no-such-subject' }),
+      { history: '' },
+    );
+    const matched: any = await f.broker.call('repo_history', {
+      ...f.location,
+      match: 'FIXTURE',
+      path: 'app.txt',
+      since: '2000-01-01',
+      limit: 5,
+    });
+    assert.match(matched.history, /Fixture implementation/);
+    await assert.rejects(
+      f.broker.call('repo_history', { ...f.location, path: '../outside' }),
+      /Unsafe path/,
+    );
+    await assert.rejects(f.broker.call('repo_history', { ...f.location, since: 'last week' }));
+    const introduced: any = await f.broker.call('repo_history', { ...f.location, changed: 'GET' });
+    assert.match(introduced.history, /Fixture implementation/);
+    assert.deepEqual(
+      await f.broker.call('repo_history', { ...f.location, changed: 'never-written-text' }),
+      { history: '' },
+    );
     assert.deepEqual(
       await f.broker.call('repo_diff', {
         repositoryId: 'frontend',
@@ -258,6 +281,8 @@ void test('tool calls read as plain steps that use folder names', () => {
     describeToolCall('repo_files', { repositoryId: 'repo-1', prefix: 'src' }, names),
     describeToolCall('repo_search', { repositoryId: 'repo-1', query: 'drag' }, names),
     describeToolCall('repo_history', { repositoryId: 'repo-9' }, names),
+    describeToolCall('repo_history', { repositoryId: 'repo-1', match: 'bundled' }, names),
+    describeToolCall('repo_history', { repositoryId: 'repo-1', changed: 'is in beta' }, names),
     describeToolCall('repo_diff', { repositoryId: 'repo-1' }, names),
     describeToolCall('repo_inventory', {}, names),
     describeToolCall('artifact_write', {}, names),
@@ -271,6 +296,8 @@ void test('tool calls read as plain steps that use folder names', () => {
     'Listed files in calendar-ui/src',
     'Searched calendar-ui for "drag"',
     'Read the commit history of repo-9',
+    'Searched the commit history of calendar-ui for "bundled"',
+    'Looked for when "is in beta" changed in calendar-ui',
     'Compared two commits in calendar-ui',
     'Listed the repositories and their branches',
     'Updated its working notes',

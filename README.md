@@ -8,7 +8,7 @@ You set the intent, make the calls, and accept the outcome.
 
 **Preview · Apple Silicon macOS · Apache 2.0**
 
-[Download](https://github.com/opheleon/aiden-preview/releases) · [Getting started](docs/getting-started.md) · [Join our Slack](https://join.slack.com/t/aidenbyopheleon/shared_invite/zt-4apsg5d7p-FDO9ae0imxj~KgauP8lpsw)
+[Download for macOS](https://github.com/opheleon/aiden-preview/releases/latest/download/Aiden-arm64.dmg) · [Getting started](docs/getting-started.md) · [Join our Slack](https://join.slack.com/t/aidenbyopheleon/shared_invite/zt-4apsg5d7p-FDO9ae0imxj~KgauP8lpsw)
 
 ![Aiden project overview using synthetic fixture data](docs/screenshots/report-fixture.png)
 
@@ -26,7 +26,7 @@ Aiden monitors projects while the app is open. Code assessments, app checks, and
 
 ## Install
 
-Download the Apple Silicon macOS DMG from [GitHub Releases](https://github.com/opheleon/aiden-preview/releases), open it, and drag Aiden into Applications. You'll need Git and a supported provider runtime. Windows, Linux, and Intel Macs are outside the current preview scope.
+[Download the latest Apple Silicon macOS DMG](https://github.com/opheleon/aiden-preview/releases/latest/download/Aiden-arm64.dmg), open it, and drag Aiden into Applications. Older versions and checksums are on [GitHub Releases](https://github.com/opheleon/aiden-preview/releases). You'll need Git and a supported provider runtime. Windows, Linux, and Intel Macs are outside the current preview scope.
 
 To verify a download, get `SHA256SUMS.txt` from the same release and run these commands, replacing the example DMG filename:
 

@@ -30,6 +30,12 @@ A parallel job on a GitHub-hosted Windows runner builds an NSIS installer, `Aide
 
 Windows builds are unsigned because no code-signing certificate is configured, so SmartScreen warns on first launch. Signing carries an ongoing cost (for example, Azure Trusted Signing or an OV certificate). The packaged-app journeys use POSIX provider fixtures and run only on macOS. Until those fixtures are portable, the Windows installer has not been exercised end to end in CI.
 
+### Permanent installer link
+
+Each release also includes `Aiden-arm64.dmg`, an exact copy of its signed and notarized versioned DMG. The alias is included in the checksums and provenance, and publication verifies that the two files match. Versioned installers and automatic-update manifests keep their existing names.
+
+The marketing site can use `https://github.com/opheleon/aiden-preview/releases/latest/download/Aiden-arm64.dmg` to download the latest stable Apple Silicon installer without updating its URL for every release. GitHub excludes pre-releases from `latest`. Before switching the site, publish a stable release containing the alias and verify that the permanent link downloads it; older releases do not contain this filename.
+
 ### Repository secrets
 
 | Secret                         | Value                                                                        |

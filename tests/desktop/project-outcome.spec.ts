@@ -12,7 +12,10 @@ test('acceptance preserves progress; closing persists across restart and reopeni
     await createProject(desktop.app, desktop.page, f.root);
     const page = desktop.page;
     const progress = await page.getByRole('progressbar').getAttribute('aria-valuenow');
-    await page.getByRole('button', { name: 'Accept outcome', exact: true }).click();
+    // Before any decision the outcome lives in the menu; afterwards the decision gets a card.
+    await expect(page.getByRole('region', { name: 'Project outcome' })).toHaveCount(0);
+    await page.getByLabel('More').click();
+    await page.getByRole('menuitem', { name: 'Accept outcome' }).click();
     const dialog = page.getByRole('dialog', { name: 'Accept outcome' });
     await expect(
       dialog.getByRole('button', { name: 'Accept outcome', exact: true }),

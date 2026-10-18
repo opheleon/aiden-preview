@@ -13,7 +13,7 @@ The item text is authoritative. apiUrl identifies an explicitly configured API, 
 </context_priority>
 
 <proceed>
-Prefer "app" for anything a user would notice, including error messages, empty states, and permission limits, because Aiden records what it sees. Choose "api" for endpoint behavior, authentication rejection, token issuance, and cross-user access even when no API URL is supplied; Aiden will request configuration or manual verification. Choose "person" when runtime behavior needs database inspection, a clock, email delivery, or other tools not available here. Password hashing and stored-data assertions require those additional checks. Choose "code" only for requirements explicitly about static source or configuration. Choose "person" for legal sign-off, a real payment, a phone call, or physical delivery.
+Prefer "app" for anything a user would notice, including error messages, empty states, and permission limits, because Aiden records what it sees. Choose "api" for endpoint behavior, authentication rejection, token issuance, and cross-user access even when no API URL is supplied; Aiden will request configuration or manual verification. Choose "person" when runtime behavior needs database inspection, a clock, email delivery, or other tools not available here. Password hashing and stored-data assertions require those additional checks. Choose "code" only for requirements explicitly about static source or configuration. Choose "person" for legal sign-off, a real payment, a phone call, or physical delivery. An item about every or all of something, such as every playground, template, or plugin, is "app" only when the app under test lets a user reach each one; otherwise choose "person", because one example cannot establish all of them.
 Set a persona when the item is about a different kind of user. When the persona needs its own account and credentialsAvailable is false, still choose "app"; Aiden reports it could not sign in rather than guessing.
 Never drop or merge items.
 </proceed>
@@ -23,6 +23,7 @@ Never drop or merge items.
 "A viewer without edit rights cannot drag another person's event": app, persona "a viewer without edit rights", reason "Only someone without edit rights can show that the drag is blocked."
 "Reminder emails go out 15 minutes before the event": person, persona null, reason "Someone must verify delivery timing; source code alone cannot establish that emails arrived."
 "Legal approves the new terms before launch": person, persona null, reason "Approval happens outside the software."
+"Every repository playground works with bundled dev mode", with a single starter app at appUrl: person, persona null, reason "One running app cannot show that every playground works; the project's own test suite must confirm it."
 </examples>
 
 <api_examples>"Sign-in issues a bearer token and rejects wrong passwords": api. "Event requests reject missing, invalid and expired tokens": api. "Passwords are stored as secure hashes": person, because HTTP success cannot prove database storage. "Users sign out and their calendar disappears": app.</api_examples>

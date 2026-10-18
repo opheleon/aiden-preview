@@ -1,5 +1,4 @@
-import { ChevronRight } from 'lucide-react';
-import { type JSX, type ReactNode, useState } from 'react';
+import { type JSX, useState } from 'react';
 
 import type { CriterionResult, Product, Report } from '../../../../packages/contracts/src/index';
 import type { TicketState } from '../../../../packages/contracts/src/tickets';
@@ -10,7 +9,7 @@ import type { TrackerTickets } from '../hooks/useTrackerTickets';
 import type { Workspace } from '../hooks/useWorkspace';
 import type { ActionItem, Risk } from '../renderer/action-items';
 import type { DeliveryAttention } from '../renderer/delivery-attention';
-import { type FeatureProgress, featureProgress } from '../renderer/delivery-progress';
+import { featureProgress } from '../renderer/delivery-progress';
 import {
   type Check,
   type ItemState,
@@ -19,13 +18,31 @@ import {
   requirementState,
 } from '../renderer/requirement-status';
 import { ActionItems, Risks } from './ActionItems';
-import { AttentionBadge } from './DeliveryAttention';
-import { DeliveryPlanEditor } from './DeliveryPlanEditor';
 import { DeliveryTicket } from './DeliveryTicket';
+import { FeatureSection } from './FeatureSection';
+import { PlanDialogs } from './PlanDialogs';
 import { RequirementRow } from './RequirementRow';
-import { TicketPublishing } from './TicketPublishing';
+import { RequirementSheet } from './RequirementSheet';
+import { TicketAlerts } from './TicketPublishing';
 
-/** Ordered features own requirements, which in turn own actions, verification gaps, and evidence. */
+/** A requirement no check has reached yet. */
+const unchecked: ItemState = { label: 'Not checked', tone: 'neutral', how: 'Not checked yet.' };
+
+/** What the plan knows about one requirement, shared by its row and its pop-up. */
+export interface RequirementView {
+  item: Product['requirements'][number];
+  feature: string | undefined;
+  facts: RequirementFacts | undefined;
+  state: ItemState;
+  attention: DeliveryAttention | undefined;
+  work: ActionItem[];
+  ticket: JSX.Element | null;
+}
+
+/**
+ * Ordered features own requirements, shown as one line each. A requirement's actions, ticket,
+ * verification gaps, and evidence open in a pop-up; plan editing and ticket publishing do too.
+ */
 export function DeliveryPlan({
   workspace,
   product,
@@ -37,6 +54,8 @@ export function DeliveryPlan({
   deliveryNote,
   tracker,
   attention,
+  open,
+  onOpen,
 }: {
   workspace: Workspace;
   tracker: TrackerTickets;
@@ -48,8 +67,11 @@ export function DeliveryPlan({
   risks: Risk[];
   onWatch: (result: CriterionResult) => void;
   deliveryNote?: string | undefined;
+  /** The requirement whose pop-up is open, if any. */
+  open: string | null;
+  onOpen: (id: string | null) => void;
 }): JSX.Element {
-  const [editing, setEditing] = useState(false);
+  const [dialog, setDialog] = useState<'plan' | 'tickets' | null>(null);
   const facts = report
     ? requirementFacts(report, check, workspace.calls, workspace.confirmed)
     : new Map<string, RequirementFacts>();
@@ -58,70 +80,41 @@ export function DeliveryPlan({
   const progress = featureProgress(product, states);
   const tickets = deliveryTickets(product, report, workspace.calls);
   const focus = progress.find((f) => !f.complete && !f.blocked && !f.waitingOn.length)?.feature.id;
-  /** Render a scoped requirement with all its work in the same expandable row. */
-  const requirement = (id: string) => {
+  /** Gather one requirement's row and pop-up inputs from the plan, report, and tracker. */
+  const view = (id: string): RequirementView => {
     const item = product.requirements.find((r) => r.id === id)!;
-    const f = facts.get(id);
     const feature = product.deliveryPlan?.find((entry) => entry.requirementIds.includes(id));
-    const discrepancy = attention.find((a) => a.requirementIds.includes(id));
-    const ticket = (
-      <FeatureTicket
-        tickets={tickets}
-        tracker={tracker.state}
-        featureId={feature?.id ?? tickets[product.requirements.indexOf(item)]!.id}
-      />
-    );
-    if (!report || !f)
-      return (
-        <UncheckedRequirement
-          key={id}
-          id={id}
-          text={item.text}
-          attention={discrepancy}
-          blocked={!!blockers.get(id)?.direct.length}
-          waiting={!!blockers.get(id)?.inherited.length}
-        >
-          {ticket}
-        </UncheckedRequirement>
-      );
-    const work = actions.filter((a) => a.requirementId === id);
+    const featureId = feature?.id ?? tickets[product.requirements.indexOf(item)]!.id;
+    const f = facts.get(id);
+    return {
+      item,
+      feature: feature?.title,
+      facts: f,
+      // A checked requirement explains its own decision; an unchecked one shows the plan's view.
+      state: f ? requirementState(f) : (states.get(id) ?? unchecked),
+      attention: attention.find((a) => a.requirementIds.includes(id)),
+      work: actions.filter((a) => a.requirementId === id),
+      ticket: <FeatureTicket tickets={tickets} tracker={tracker.state} featureId={featureId} />,
+    };
+  };
+  /** One line on the brief for a requirement. */
+  const row = (id: string): JSX.Element => {
+    const v = view(id);
     return (
       <RequirementRow
         key={id}
-        requirement={item}
-        report={report}
-        attention={discrepancy}
-        state={requirementState(f)}
-        main={f.main}
-        edges={f.edges}
-        triage={check?.result.triage ?? []}
+        id={id}
+        text={v.item.text}
+        state={v.state}
+        main={v.facts?.main}
         onWatch={onWatch}
-        actionCount={work.length}
-        onOpenEvidence={(index, evidenceIndex) =>
-          void workspace.action(async () =>
-            workspace.setEvidence(
-              await workspace.call('evidence', {
-                projectId: workspace.project.id,
-                runId: report.id,
-                index,
-                evidenceIndex,
-              }),
-            ),
-          )
-        }
-      >
-        {ticket}
-        <ActionItems
-          embedded
-          items={work}
-          onAnswer={workspace.answerCall}
-          onWatch={onWatch}
-          onDone={workspace.confirm}
-        />
-        <Risks risks={risks.filter((r) => r.requirementId === id)} />
-      </RequirementRow>
+        onOpen={onOpen}
+        actionCount={v.work.length}
+        attention={v.attention}
+      />
     );
   };
+  const opened = open && product.requirements.some((r) => r.id === open) ? view(open) : null;
   return (
     <section className="brief-card delivery-plan" aria-label="Requirements">
       {deliveryNote && (
@@ -132,26 +125,12 @@ export function DeliveryPlan({
       <PlanHeader
         workspace={workspace}
         product={product}
-        editing={editing}
-        onToggle={() => setEditing(!editing)}
+        tracker={tracker.state}
+        onAdjust={() => setDialog('plan')}
+        onTickets={() => setDialog('tickets')}
       />
-      <TicketPublishing key={workspace.project.id} workspace={workspace} tracker={tracker} />
-      {editing ? (
-        <DeliveryPlanEditor
-          product={product}
-          busy={workspace.busy}
-          onSave={async (updated) => {
-            const run = await workspace.call('editIntent', {
-              projectId: workspace.project.id,
-              product: updated,
-            });
-            workspace.setBusy(true);
-            workspace.setActiveRun(run.runId);
-            workspace.setLive('Running a check against the updated plan…');
-          }}
-          onClose={() => setEditing(false)}
-        />
-      ) : progress.length ? (
+      <TicketAlerts state={tracker.state} />
+      {progress.length ? (
         progress.map((item) => (
           <FeatureSection
             key={item.feature.id}
@@ -160,7 +139,7 @@ export function DeliveryPlan({
             focus={focus}
             attention={attention.find((a) => a.featureId === item.feature.id)}
           >
-            {item.feature.requirementIds.map(requirement)}
+            {item.feature.requirementIds.map(row)}
           </FeatureSection>
         ))
       ) : (
@@ -168,94 +147,85 @@ export function DeliveryPlan({
           <p className="row-sub">
             This project predates delivery planning. Its existing requirement order is preserved.
           </p>
-          {product.requirements.map((r) => requirement(r.id))}
+          <ul className="req-rows">{product.requirements.map((r) => row(r.id))}</ul>
         </>
+      )}
+      <PlanDialogs
+        workspace={workspace}
+        product={product}
+        tracker={tracker}
+        dialog={dialog}
+        onClose={() => setDialog(null)}
+      />
+      {opened && (
+        <OpenedRequirement
+          workspace={workspace}
+          view={opened}
+          report={report}
+          check={check}
+          risks={risks}
+          onWatch={onWatch}
+          onClose={() => onOpen(null)}
+        />
       )}
     </section>
   );
 }
 
-/** Explain one feature’s outcome, current position, and dependency links above its requirements. */
-function FeatureSection({
-  item,
-  product,
-  focus,
-  attention,
-  children,
+/** The pop-up for one requirement: its ticket, actions, verification gaps, and evidence. */
+function OpenedRequirement({
+  workspace,
+  view,
+  report,
+  check,
+  risks,
+  onWatch,
+  onClose,
 }: {
-  item: FeatureProgress;
-  product: Product;
-  focus: string | undefined;
-  attention: DeliveryAttention | undefined;
-  children: ReactNode;
+  workspace: Workspace;
+  view: RequirementView;
+  report: Report | undefined;
+  check: Check | null;
+  risks: Risk[];
+  onWatch: (result: CriterionResult) => void;
+  onClose: () => void;
 }): JSX.Element {
-  const { feature, done, total, complete, waitingOn } = item;
   return (
-    <section
-      className="delivery-feature"
-      id={`feature-${feature.id}`}
-      key={feature.id}
-      aria-label={feature.title}
+    <RequirementSheet
+      requirement={view.item}
+      feature={view.feature}
+      report={report}
+      state={view.state}
+      main={view.facts?.main}
+      edges={view.facts?.edges ?? []}
+      triage={check?.result.triage ?? []}
+      attention={view.attention}
+      actionCount={view.work.length}
+      onWatch={onWatch}
+      onOpenEvidence={(index, evidenceIndex) =>
+        void workspace.action(async () =>
+          workspace.setEvidence(
+            await workspace.call('evidence', {
+              projectId: workspace.project.id,
+              runId: report!.id,
+              index,
+              evidenceIndex,
+            }),
+          ),
+        )
+      }
+      onClose={onClose}
     >
-      <details className="feature-details">
-        <summary className="feature-summary">
-          <ChevronRight className="feature-chevron" size={20} aria-hidden="true" />
-          <span className="feature-heading">
-            <h3>
-              <code className="feature-id">{feature.id}</code> {feature.title}
-            </h3>
-            <span className="row-sub">
-              {done} of {total} requirements complete
-            </span>
-          </span>
-          {attention ? (
-            <AttentionBadge item={attention} />
-          ) : (
-            <span
-              className={`chip chip--${complete ? 'verified' : feature.id === focus ? 'pm' : 'neutral'}`}
-            >
-              {complete
-                ? 'Complete'
-                : item.blocked
-                  ? 'Blocked by a decision'
-                  : feature.id === focus
-                    ? 'Current focus'
-                    : waitingOn.length
-                      ? 'Waiting on prerequisites'
-                      : 'Up next'}
-            </span>
-          )}
-        </summary>
-        <div className="feature-content">
-          <p>{feature.outcome}</p>
-          <p className="row-sub">
-            {feature.kind === 'platform' ? 'Shared platform work · ' : ''}
-            {done} of {total} complete. {feature.rationale}
-          </p>
-          {feature.dependsOn.length > 0 && (
-            <p className="row-sub">
-              Depends on:{' '}
-              {feature.dependsOn.map((id) => (
-                <a key={id} href={`#feature-${id}`}>
-                  {product.deliveryPlan!.find((f) => f.id === id)?.title}{' '}
-                </a>
-              ))}
-              {waitingOn.length > 0 && ` · Waiting for ${waitingOn.join(', ')}`}
-            </p>
-          )}
-          {(feature.testPlan || feature.kind === 'platform') && (
-            <div className="req-block">
-              <h4>Test plan</h4>
-              <p>
-                {feature.testPlan ??
-                  'Test plan needed: define a consumer integration check, expected results, and failure or rollback checks before implementation.'}
-              </p>
-            </div>
-          )}
-          {children}
-        </div>
-      </details>
-    </section>
+      {view.ticket}
+      <ActionItems
+        embedded
+        items={view.work}
+        onAnswer={workspace.answerCall}
+        onWatch={onWatch}
+        onDone={workspace.confirm}
+      />
+      <Risks risks={risks.filter((r) => r.requirementId === view.item.id)} />
+    </RequirementSheet>
   );
 }
 
@@ -299,70 +269,48 @@ function planStates(
   return states;
 }
 
-/** Keep a draft requirement and its linked ticket together before any assessment exists. */
-function UncheckedRequirement({
-  id,
-  text,
-  blocked,
-  waiting,
-  attention,
-  children,
-}: {
-  id: string;
-  text: string;
-  blocked: boolean;
-  waiting: boolean;
-  attention: DeliveryAttention | undefined;
-  children: ReactNode;
-}): JSX.Element {
-  return (
-    <details className="req-row" id={`requirement-${id}`}>
-      <summary>
-        <span className="row-title">
-          <code>{id}</code> {text}
-        </span>
-        {attention && <AttentionBadge item={attention} />}
-        <span className="row-sub">
-          {blocked
-            ? 'Blocked: waiting on a decision'
-            : waiting
-              ? 'Waiting on a prerequisite decision'
-              : 'Not checked yet'}
-        </span>
-      </summary>
-      <div className="req-detail">{children}</div>
-    </details>
-  );
-}
-
-/** Keep plan editing optional and available alongside publication controls. */
+/** The plan's title line with its two pop-ups: adjusting the plan and publishing tickets. */
 function PlanHeader({
   workspace,
   product,
-  editing,
-  onToggle,
+  tracker,
+  onAdjust,
+  onTickets,
 }: {
   workspace: Workspace;
   product: Product;
-  editing: boolean;
-  onToggle: () => void;
+  tracker: TicketState | null;
+  onAdjust: () => void;
+  onTickets: () => void;
 }): JSX.Element {
+  const provider = tracker?.settings?.destination.provider;
+  const linked = provider ? (provider === 'linear' ? 'Linear' : 'Jira') : null;
   return (
     <div className="card-label-row">
       <h2 className="card-label">Delivery plan · {product.requirements.length} requirements</h2>
-      {product.deliveryPlan ? (
-        <button className="text-button" disabled={workspace.busy} onClick={onToggle}>
-          {editing ? 'Close editor' : 'Adjust plan'}
+      <div className="button-row">
+        {product.deliveryPlan ? (
+          <button
+            className="text-button"
+            aria-haspopup="dialog"
+            disabled={workspace.busy}
+            onClick={onAdjust}
+          >
+            Adjust plan
+          </button>
+        ) : (
+          <button
+            className="text-button"
+            disabled={workspace.busy}
+            onClick={() => void workspace.editIntent({ context: workspace.project.context })}
+          >
+            Plan delivery
+          </button>
+        )}
+        <button className="text-button" aria-haspopup="dialog" onClick={onTickets}>
+          {linked ? `Tickets · ${linked}` : 'Tickets'}
         </button>
-      ) : (
-        <button
-          className="text-button"
-          disabled={workspace.busy}
-          onClick={() => void workspace.editIntent({ context: workspace.project.context })}
-        >
-          Plan delivery
-        </button>
-      )}
+      </div>
     </div>
   );
 }

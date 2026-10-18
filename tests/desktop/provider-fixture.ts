@@ -22,6 +22,7 @@ async function turn(params: any) {
   runtime.clarification = !!control.clarification;
   runtime.clarificationBlocking = !!control.blocking;
   runtime.pause = !!control.pause;
+  if (control.pauseUnderstand) runtime.holdUnderstand = new Promise(() => {});
   runtime.guideReply = control.guideReply ?? null;
   runtime.understanding = control.understanding ?? null;
   const pending = runtime.run({

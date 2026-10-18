@@ -109,7 +109,7 @@
 }
 
 .card-row,
-.req-row > summary {
+.req-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
@@ -119,7 +119,7 @@
 }
 
 .card-row:first-child,
-.req-row:first-of-type > summary {
+.req-row:first-child {
   border-top: 0;
   padding-top: 0;
 }
@@ -182,19 +182,6 @@
 .chip--neutral {
   color: var(--color-body);
   background: var(--color-paper2);
-}
-
-.req-row > summary {
-  cursor: pointer;
-  list-style: none;
-}
-
-.req-row > summary::-webkit-details-marker {
-  display: none;
-}
-
-.req-row > summary:hover .row-title {
-  color: var(--color-brand-dark);
 }
 
 .req-detail {
@@ -477,4 +464,11 @@
 .chip--pm {
   color: var(--color-brand-dark);
   background: var(--color-tint);
+}
+
+/* The monitored branch is read from the overflow menu once it is configured. */
+.overflow-menu [role='menuitem'] small {
+  display: block;
+  color: var(--color-muted-foreground);
+  font-size: 12px;
 }

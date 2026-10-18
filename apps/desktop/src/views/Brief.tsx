@@ -1,6 +1,7 @@
-import { type JSX, useState } from 'react';
+import { type JSX, type ReactNode, useState } from 'react';
 
 import type { CriterionResult } from '../../../../packages/contracts/src/index';
+import type { TicketState } from '../../../../packages/contracts/src/tickets';
 import { ActionItems } from '../components/ActionItems';
 import { AppCheckResults } from '../components/AppCheckResults';
 import { BrowserEvidence } from '../components/BrowserEvidence';
@@ -11,7 +12,8 @@ import { DoneMeans } from '../components/DoneMeans';
 import { ProjectConnections } from '../components/ProjectConnections';
 import { useProjectGuide } from '../components/ProjectGuide';
 import { ProjectProgress } from '../components/ProjectProgress';
-import { ProjectTabs } from '../components/ProjectTabs';
+import { type ProjectTab, ProjectTabs } from '../components/ProjectTabs';
+import { requirementCounts } from '../components/RequirementProgress';
 import { useCodingDelivery } from '../hooks/useCodingDelivery';
 import { useProjectTab } from '../hooks/useProjectTab';
 import { useTrackerTickets } from '../hooks/useTrackerTickets';
@@ -24,30 +26,88 @@ import { ProjectHistory } from './ProjectHistory';
 import { ProjectRunHistory } from './ProjectRunHistory';
 const api = window.aiden;
 
+/** One tab's content, kept in the page but hidden while another tab is selected. */
+function Panel({
+  id,
+  tab,
+  children,
+}: {
+  id: ProjectTab;
+  tab: ProjectTab;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <section
+      className="project-panel"
+      role="tabpanel"
+      id={`project-panel-${id}`}
+      aria-labelledby={`project-tab-${id}`}
+      hidden={tab !== id}
+    >
+      {children}
+    </section>
+  );
+}
+
+/** Work that stopped early, with the button that recovers from it. */
+function recovery(
+  workspace: Workspace,
+  state: ReturnType<typeof briefData>['state'],
+  onOpen: () => void,
+): { text: string; label: string; run: () => void } | null {
+  const note = state.note;
+  if (!note) return null;
+  return {
+    text: note.text,
+    label: note.recovery === 'look' ? 'Run check again' : 'Try again',
+    run: () => {
+      onOpen();
+      void (note.recovery === 'look'
+        ? workspace.lookNow()
+        : workspace.editIntent({ context: workspace.project.context }));
+    },
+  };
+}
+
+/** Delivery findings and whether every requirement is done, from the current brief data. */
+function overview(
+  workspace: Workspace,
+  data: ReturnType<typeof briefData>,
+  tracker: TicketState | null,
+): { attention: ReturnType<typeof deliveryAttention>; allDone: boolean } {
+  const { product, report, stateMap, check } = data;
+  const counts = requirementCounts(stateMap, product?.requirements.length ?? 0);
+  return {
+    attention: deliveryAttention({
+      product,
+      report,
+      states: stateMap,
+      check,
+      tracker,
+      runs: workspace.runs,
+    }),
+    allDone: !!product && counts.total > 0 && counts.done === counts.total,
+  };
+}
+
 /**
  * The home screen: a brief that reads like a PM's Monday update. Only touch points ask anything of
- * the person; everything else is what Aiden did, found, and decided, with evidence.
+ * the person; everything else is what Aiden did, found, and decided, with evidence one click away
+ * in a requirement's pop-up.
  */
 export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
   const { project, baseline } = workspace;
-  const busy = workPaused(workspace);
+  const busy = workspace.busy || project.lifecycle?.status === 'closed';
   const [watching, setWatching] = useState<CriterionResult | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
   const delivery = useCodingDelivery(workspace);
   const tracker = useTrackerTickets(workspace);
   const coding = delivery.enabled || delivery.jobs.length > 0;
-  const { guide, open } = useProjectGuide();
+  const { guide, open: openChat } = useProjectGuide();
   const { tab, select: selectTab } = useProjectTab(workspace, coding);
-  const { report, product, check, stateMap, actions, unverified, state, status, update } =
-    briefData(workspace);
-  const showPlan = showsDeliveryPlan(Boolean(report), Boolean(check));
-  const attention = deliveryAttention({
-    product,
-    report,
-    states: stateMap,
-    check,
-    tracker: tracker.state,
-    runs: workspace.runs,
-  });
+  const data = briefData(workspace);
+  const { report, product, check, stateMap, actions, unverified, state, status, update } = data;
+  const { attention, allDone } = overview(workspace, data, tracker.state);
   return (
     <div className="brief">
       <BriefHeader
@@ -55,22 +115,17 @@ export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
         delivery={delivery}
         {...status}
         showStatus={tab === 'overview'}
+        allDone={allDone}
         navigation={<ProjectTabs selected={tab} coding={coding} onSelect={selectTab} />}
         attention={
           <DeliveryAttention
             items={attention}
             busy={busy}
             onCheck={() => {
-              open({ type: 'run' });
+              openChat({ type: 'run' });
               void workspace.lookNow();
             }}
-            onReview={(item) =>
-              open({ type: 'finding', requirementId: item.requirementIds[0]!, title: item.title })
-            }
-            onEvidence={() => {
-              selectTab('activity');
-              if (!check && report) workspace.setOpenRun(report.id);
-            }}
+            onOpen={setOpen}
           />
         }
         progress={
@@ -78,43 +133,26 @@ export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
             workspace={workspace}
             product={product}
             report={report}
-            states={stateMap}
             check={check}
+            states={stateMap}
             job={delivery.jobs.find((job) => job.baselineId === baseline?.id)}
           />
         }
-        note={
-          state.note && {
-            text: state.note.text,
-            label: state.note.recovery === 'look' ? 'Run check again' : 'Try again',
-            run: () => {
-              open({ type: 'run' });
-              void (state.note?.recovery === 'look'
-                ? workspace.lookNow()
-                : workspace.editIntent({ context: project.context }));
-            },
-          }
-        }
+        note={recovery(workspace, state, () => openChat({ type: 'run' }))}
       />
-      <section
-        className="project-panel"
-        role="tabpanel"
-        id="project-panel-overview"
-        aria-labelledby="project-tab-overview"
-        hidden={tab !== 'overview'}
-      >
-        <SetupBanner setup={guide.view?.setup} onOpen={open} />
+      <Panel id="overview" tab={tab}>
+        <SetupBanner setup={guide.view?.setup} onOpen={openChat} />
         <ActionItems
           title="Needs you"
           items={actions.filter((a) => !a.requirementId || a.call)}
           onAnswer={workspace.answerCall}
           onWatch={setWatching}
           onDone={workspace.confirm}
+          onOpen={setOpen}
         />
-      </section>
-      <ScopePanel workspace={workspace} hidden={tab !== 'scope'} busy={busy} />
+      </Panel>
       <section hidden={tab !== 'scope' && tab !== 'overview'} aria-label="Delivery plan details">
-        {product && showPlan && (
+        {product && (report || !check) && (
           <DeliveryPlan
             workspace={workspace}
             tracker={tracker}
@@ -125,32 +163,29 @@ export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
             actions={actions.filter((a) => !a.call)}
             risks={unverified}
             onWatch={setWatching}
+            open={open}
+            onOpen={setOpen}
           />
         )}
       </section>
       <div hidden={tab !== 'overview'}>
         <ProjectConnections workspace={workspace} />
       </div>
+      <Panel id="scope" tab={tab}>
+        {baseline ? (
+          <DoneMeans baseline={baseline} context={project.context} busy={busy} />
+        ) : (
+          <p className="brief-card">Aiden has not written the scope yet.</p>
+        )}
+      </Panel>
       {coding && (
-        <section
-          className="project-panel"
-          role="tabpanel"
-          id="project-panel-coding"
-          aria-labelledby="project-tab-coding"
-          hidden={tab !== 'coding'}
-        >
+        <Panel id="coding" tab={tab}>
           {baseline && (
             <CodingDelivery key={project.id} workspace={workspace} delivery={delivery} />
           )}
-        </section>
+        </Panel>
       )}
-      <section
-        className="project-panel"
-        role="tabpanel"
-        id="project-panel-activity"
-        aria-labelledby="project-tab-activity"
-        hidden={tab !== 'activity'}
-      >
+      <Panel id="activity" tab={tab}>
         {check && <AppCheckResults check={check} onWatch={setWatching} />}
         <ProjectRunHistory workspace={workspace} visible={tab === 'activity'} />
         <ProjectHistory
@@ -160,7 +195,7 @@ export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
           update={update}
           onWatch={setWatching}
         />
-      </section>
+      </Panel>
       {watching && check && (
         <BrowserEvidence
           api={api}
@@ -172,42 +207,4 @@ export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
       )}
     </div>
   );
-}
-
-/** Browse the agreed scope and open changes in the project conversation. */
-function ScopePanel({
-  workspace,
-  hidden,
-  busy,
-}: {
-  workspace: Workspace;
-  hidden: boolean;
-  busy: boolean;
-}): JSX.Element {
-  const { baseline, project } = workspace;
-  return (
-    <section
-      className="project-panel"
-      role="tabpanel"
-      id="project-panel-scope"
-      aria-labelledby="project-tab-scope"
-      hidden={hidden}
-    >
-      {baseline ? (
-        <DoneMeans baseline={baseline} context={project.context} busy={busy} />
-      ) : (
-        <p className="brief-card">Aiden has not written the scope yet.</p>
-      )}
-    </section>
-  );
-}
-
-/** Closed projects preserve their scope and evidence until explicitly reopened. */
-function workPaused(workspace: Workspace): boolean {
-  return workspace.busy || workspace.project.lifecycle?.status === 'closed';
-}
-
-/** Standalone app results replace code delivery progress when there is no code report. */
-function showsDeliveryPlan(hasReport: boolean, hasCheck: boolean): boolean {
-  return hasReport || !hasCheck;
 }
