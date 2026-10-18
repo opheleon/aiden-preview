@@ -121,7 +121,7 @@ test('the brief keeps only touch points on screen; the rest lives in one menu', 
   expect(screen.getByRole('menuitem', { name: 'Close project' })).toBeEnabled();
   // The fixture project has no lifecycle record yet, so acceptance waits for one.
   expect(screen.getByRole('menuitem', { name: 'Accept outcome' })).toBeDisabled();
-  expect(screen.getByRole('menuitem', { name: /Change branch/ })).toBeEnabled();
+  expect(screen.queryByRole('menuitem', { name: /Change branch/ })).toBeNull();
   await userEvent.click(screen.getByLabelText('More'));
   await menu('Export Markdown');
   expect(screen.getByLabelText('More').closest('details')).not.toHaveAttribute('open');
@@ -374,7 +374,7 @@ test('project settings hold the folder, the app URL, and context connections', a
   const panel = await screen.findByRole('region', { name: 'Project verification' });
   await userEvent.click(within(panel).getByRole('button', { name: 'Edit verification in chat' }));
   const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
-  expect(await within(chat).findByRole('button', { name: 'Check access & save' })).toBeVisible();
+  expect(await within(chat).findByRole('button', { name: 'Save settings' })).toBeVisible();
   await userEvent.click(within(chat).getByRole('button', { name: 'Back' }));
   expect(panel).toBeVisible();
   await userEvent.type(screen.getByLabelText('Branch notes for frontend'), ' reviewed');

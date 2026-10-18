@@ -70,7 +70,17 @@ export function ProjectSettings({ workspace }: { workspace: Workspace }): JSX.El
   if (!saved) return <p className="fine-print">Hand a project to Aiden first.</p>;
   return (
     <div className="settings-stack">
-      <BranchMonitoring workspace={workspace} />
+      <section className="settings-stack" aria-label="Testing settings">
+        <h2>Testing settings</h2>
+        <BranchMonitoring workspace={workspace} />
+        <section className="card settings-panel" aria-label="Project verification">
+          <h2>App and API access</h2>
+          <p>Check and update this project’s test access in its conversation.</p>
+          <button disabled={busy} onClick={() => open({ type: 'verification' })}>
+            Edit verification in chat
+          </button>
+        </section>
+      </section>
       <RepositorySetup {...workspace} />
       <div className="next-row">
         <span>Saving the folder makes Aiden rewrite the requirements and run a check.</span>
@@ -78,13 +88,6 @@ export function ProjectSettings({ workspace }: { workspace: Workspace }): JSX.El
           Save and run check
         </button>
       </div>
-      <section className="card settings-panel" aria-label="Project verification">
-        <h2>App and API access</h2>
-        <p>Check and update this project’s test access in its conversation.</p>
-        <button disabled={busy} onClick={() => open({ type: 'verification' })}>
-          Edit verification in chat
-        </button>
-      </section>
       <TicketSettings key={`tickets-${project.id}`} workspace={workspace} />
       <BetaSchedule key={`beta-${project.id}`} workspace={workspace} />
       <ContextSources key={`sources-${project.id}`} workspace={workspace} />

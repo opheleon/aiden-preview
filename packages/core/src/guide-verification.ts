@@ -111,11 +111,19 @@ export async function configureGuideVerification(
       ),
     });
   }
-  return {
-    message: save
-      ? 'Access checked and verification setup confirmed.' + storageNote
-      : 'Access checked. You can confirm this setup.',
-  };
+  return { message: setupMessage(update, save, storageNote) };
+}
+
+/** Report a confirmed choice without claiming an access probe for local code or manual checks. */
+function setupMessage(update: VerificationUpdate, save: boolean, storageNote: string): string {
+  const checked = !!(update.url || update.api || update.phone);
+  if (!save)
+    return checked ? 'Access checked. You can confirm this setup.' : 'Ready to confirm setup.';
+  return (
+    (checked
+      ? 'Access checked and verification setup confirmed.'
+      : 'Verification setup confirmed.') + storageNote
+  );
 }
 
 /** Verify login with a real browser and a fresh cookie-only context before accepting setup. */

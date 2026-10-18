@@ -16,6 +16,12 @@ Each requirement is one line with one status; hover the status to see how Aiden 
 
 While Preview is open, Aiden watches the selected remote branch every minute and checks again when pushed code changes. It also checks each morning if no check has run that day. Use Run check now in the project header to start a fresh assessment from current code. Interrupted checks stay in history; this action does not resume their old snapshots.
 
+To change the monitored branch, open **Project settings** from the project menu, then **Testing settings**. Branch monitoring and app/API test access live together there.
+
+The project chat shows **Setup not complete** until its required steps are finished, then **Setup complete** with the checklist under **Setup details**. Use the top-right close button to return to the project without losing your conversation or draft. Refreshing only the overview keeps your requirements confirmed; changes to the agreed scope require review again.
+
+Local-code and manual-only selections confirm directly; local code requires a valid project folder. Adding a web or API target reveals the access check, and removing those targets hides it again.
+
 With automatic tickets enabled, Aiden checks tracker status every minute while the project is idle. A status change prompts a new code assessment, as does the first successful read of an already completed or canceled ticket. Saving scope and finishing an assessment also reconcile tickets. Sync tickets does this on demand.
 
 ## When will it land?

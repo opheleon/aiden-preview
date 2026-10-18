@@ -98,7 +98,16 @@ void test('setup proves every selected target before saving and ties readiness t
     'access checks never write to APIs',
   );
   assert.equal(runtime.calls.length, 0, 'access probes do not spend model quota');
-  await configureGuideVerification(e, f.project.id, { manual: true }, false, f.project);
+  const requestCount = requests.length;
+  assert.equal(
+    (await configureGuideVerification(e, f.project.id, { manual: true }, false, f.project)).message,
+    'Ready to confirm setup.',
+  );
+  assert.equal(
+    requests.length,
+    requestCount,
+    'local repository validation does not probe network access',
+  );
   await assert.rejects(
     configureGuideVerification(e, f.project.id, { manual: true }, true, {
       ...f.project,
@@ -135,12 +144,13 @@ void test('setup proves every selected target before saving and ties readiness t
     !(await guideFacts(e, f.project.id)).facts.readyMethods?.includes('web'),
     'changed settings require fresh evidence',
   );
-  await configureGuideVerification(
+  const manualResult = await configureGuideVerification(
     e,
     f.project.id,
     { url: null, api: null, phone: null, manual: true },
     true,
   );
+  assert.equal(manualResult.message, 'Verification setup confirmed.');
   await saveVerificationSettings(e, f.project.id, update);
   assert.deepEqual(
     (await guideFacts(e, f.project.id)).facts.readyMethods,

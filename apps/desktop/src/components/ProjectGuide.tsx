@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, X } from 'lucide-react';
 import {
   createContext,
   type JSX,
@@ -95,10 +95,13 @@ export function ProjectGuide({
           <button onClick={close} aria-label="Back" className="guide-back">
             <ArrowLeft size={18} /> Back
           </button>
-          <div>
+          <div className="project-guide-title">
             <h2 id="project-guide-title">Chat with Aiden</h2>
             <p>{scopeName(workspace.project.context, workspace.baseline?.product)}</p>
           </div>
+          <button onClick={close} aria-label="Close chat" className="guide-close">
+            <X size={20} aria-hidden="true" />
+          </button>
         </header>
         {saved && (
           <GuideChat

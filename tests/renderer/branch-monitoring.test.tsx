@@ -10,8 +10,13 @@ test('project settings discover remote choices on demand and save a project-spec
   f.reset();
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
-  await userEvent.click(await screen.findByRole('button', { name: 'Change branch' }));
-  const panel = await screen.findByRole('region', { name: 'Branch monitoring' });
+  expect(screen.queryByRole('button', { name: 'Change branch' })).toBeNull();
+  await userEvent.click(screen.getByLabelText('More'));
+  expect(screen.queryByRole('menuitem', { name: /Change branch/ })).toBeNull();
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Project settings' }));
+  const settings = await screen.findByRole('region', { name: 'Testing settings' });
+  const panel = within(settings).getByRole('region', { name: 'Branch monitoring' });
+  expect(within(settings).getByRole('region', { name: 'Project verification' })).toBeVisible();
   expect(f.api.request).not.toHaveBeenCalledWith('remoteBranches', expect.anything());
   await userEvent.click(within(panel).getByRole('button', { name: 'Change branch' }));
   const select = await within(panel).findByRole('combobox');
@@ -25,6 +30,8 @@ test('project settings discover remote choices on demand and save a project-spec
       monitoredBranch: { remote: 'origin', branch: 'release' },
     }),
   );
-  await screen.findByText(/Monitoring origin\/release/);
+  await userEvent.click(await screen.findByLabelText('More'));
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Project settings' }));
+  expect(await screen.findByText('origin/release')).toBeVisible();
   expect(f.api.request).toHaveBeenCalledWith('look', expect.anything());
 });

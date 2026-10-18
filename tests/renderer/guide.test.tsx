@@ -120,7 +120,7 @@ test('choosing to check by hand saves manual verification', async () => {
   await userEvent.click(await screen.findByRole('button', { name: 'Looks right' }));
   const methods = await screen.findByRole('group', { name: 'How should Aiden check the work?' });
   await userEvent.click(within(methods).getByRole('checkbox', { name: /check it myself/ }));
-  await userEvent.click(screen.getByRole('button', { name: 'Check access' }));
+  expect(screen.queryByRole('button', { name: 'Check access' })).toBeNull();
   await userEvent.click(screen.getByRole('button', { name: 'Confirm setup' }));
   await waitFor(() =>
     expect(f.request).toHaveBeenCalledWith(
@@ -133,6 +133,9 @@ test('choosing to check by hand saves manual verification', async () => {
   );
   // Checking by hand needs no automatic first check, so setup is complete.
   expect(await screen.findByText(/Setup complete/)).toBeVisible();
+  expect(screen.getByRole('status', { name: 'Setup status' })).toHaveTextContent(
+    /^Setup complete$/,
+  );
 });
 
 test('a checked project with unfinished setup stays on Overview with a banner to the Guide', async () => {
@@ -250,6 +253,29 @@ test('manual-only setup confirms directly without a meaningless connection check
   expect(screen.queryByRole('button', { name: 'Check access' })).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'Confirm setup' }));
   expect(await screen.findByText(/Setup complete/)).toBeVisible();
+});
+
+test('local code confirms directly and adding or removing a web check updates the access requirement', async () => {
+  await openFreshProject();
+  await userEvent.click(await screen.findByRole('button', { name: 'Looks right' }));
+  const methods = await screen.findByRole('group', { name: 'How should Aiden check the work?' });
+  expect(screen.queryByRole('button', { name: 'Check access' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Confirm setup' })).toBeEnabled();
+  await userEvent.click(within(methods).getByRole('checkbox', { name: 'Web app' }));
+  expect(screen.getByRole('button', { name: 'Check access' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Confirm setup' })).toBeDisabled();
+  await userEvent.click(within(methods).getByRole('checkbox', { name: 'Web app' }));
+  expect(screen.queryByRole('button', { name: 'Check access' })).toBeNull();
+  await userEvent.click(screen.getByRole('button', { name: 'Confirm setup' }));
+  expect(
+    f.request.mock.calls.filter(
+      ([method, params]) => method === 'configureGuideVerification' && !params?.save,
+    ),
+  ).toHaveLength(0);
+  expect(f.request).toHaveBeenCalledWith('askGuide', {
+    projectId: f.project().id,
+    text: 'I confirmed these verification methods: Connect the code.',
+  });
 });
 
 test('private login and key fields go directly to the worker, and editing a secret invalidates the access check', async () => {
@@ -372,9 +398,15 @@ test('progress replaces the current activity without repeating logs or showing i
     f.emit({ type: 'progress', runId: 'preparing', stage: 'understand', message: 'Understand...' }),
   );
   expect(within(progress).queryByText('Understand...')).toBeNull();
-  expect(
-    within(progress).getAllByText('Reading your goal to write the requirements.'),
-  ).toHaveLength(1);
+  expect(within(progress).queryByText('Reading your goal to write the requirements.')).toBeNull();
+  act(() =>
+    f.emit({
+      type: 'progress',
+      runId: 'preparing',
+      message: 'Reading your goal to write the requirements.',
+    }),
+  );
+  expect(within(progress).queryByText('Reading your goal to write the requirements.')).toBeNull();
   act(() =>
     f.emit({
       type: 'progress',
@@ -386,6 +418,25 @@ test('progress replaces the current activity without repeating logs or showing i
   expect(within(progress).queryByText('Reading your goal to write the requirements.')).toBeNull();
   await userEvent.click(within(progress).getByRole('button', { name: 'Stop' }));
   expect(f.request).toHaveBeenCalledWith('cancel', { runId: 'preparing' });
+});
+
+test('finished checks do not complete setup and the close button preserves the draft and project tab', async () => {
+  f.setSetupPending();
+  render(<App />);
+  await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  await userEvent.click(screen.getByRole('tab', { name: 'Scope' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Ask Aiden' }));
+  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  const status = await within(chat).findByRole('status', { name: 'Setup status' });
+  expect(status).toHaveTextContent('Setup not complete');
+  expect(within(chat).queryByText('Check complete')).toBeNull();
+  expect(within(chat).getByText('Step 2 of 4 · Review requirements')).toBeVisible();
+  await userEvent.type(within(chat).getByLabelText('Message the Guide'), 'Keep this question');
+  await userEvent.click(within(chat).getByRole('button', { name: 'Close chat' }));
+  expect(chat).not.toBeVisible();
+  expect(screen.getByRole('tab', { name: 'Scope' })).toHaveAttribute('aria-selected', 'true');
+  await userEvent.click(screen.getByRole('button', { name: 'Ask Aiden' }));
+  expect(within(chat).getByLabelText('Message the Guide')).toHaveValue('Keep this question');
 });
 
 test('a running check streams progress and partial results in chat without losing the draft', async () => {
@@ -415,6 +466,10 @@ test('a running check streams progress and partial results in chat without losin
   ).toHaveTextContent('Checking your app');
   expect(within(chat).queryByRole('button', { name: 'Later' })).toBeNull();
   expect(within(chat).queryByRole('button', { name: 'View progress' })).toBeNull();
+  expect(within(chat).getByRole('button', { name: 'Close chat' })).toBeVisible();
+  expect(within(chat).getByRole('status', { name: 'Setup status' })).toHaveTextContent(
+    'Setup not complete',
+  );
   await userEvent.type(within(chat).getByLabelText('Message the Guide'), 'Keep my question');
   const summary = { total: 1, verified: 1, failed: 0, unverified: 0, line: '1 check passed.' };
   f.setVerification({

@@ -11,16 +11,14 @@ import { timeAgo } from '../renderer/time';
 const api = window.aiden;
 
 /**
- * The overflow menu: exports, settings, the monitored branch, and the project's outcome decision
+ * The overflow menu: exports, settings, and the project's outcome decision
  * stay one click away without taking space on the brief.
  */
 function Overflow({
   workspace,
-  monitoring,
   onOutcome,
 }: {
   workspace: Workspace;
-  monitoring: string;
   onOutcome: (mode: 'accept' | 'close') => void;
 }): JSX.Element {
   const { project, report, action, setNotice, setArea, setSettingsTab } = workspace;
@@ -49,16 +47,6 @@ function Overflow({
         </button>
         <button role="menuitem" disabled={!report} onClick={choose(() => exportAs('json'))}>
           Export JSON
-        </button>
-        <button
-          role="menuitem"
-          onClick={choose(() => {
-            setSettingsTab('project');
-            setArea('settings');
-          })}
-        >
-          Change branch
-          <small>Monitoring {monitoring}</small>
         </button>
         {outcomeReady(workspace) && !closed && (
           <>
@@ -159,16 +147,7 @@ function TitleLines({
       )}
       {inline && (
         <p className="brief-when">
-          {closed ? 'Monitoring paused for' : 'Monitoring'} {monitoring}{' '}
-          <button
-            className="text-button"
-            onClick={() => {
-              workspace.setSettingsTab('project');
-              workspace.setArea('settings');
-            }}
-          >
-            Change branch
-          </button>
+          {closed ? 'Monitoring paused for' : 'Monitoring'} {monitoring}
         </p>
       )}
     </div>
@@ -267,7 +246,7 @@ export function BriefHeader({
           <button onClick={() => open()}>
             <MessageCircle size={15} /> Ask Aiden
           </button>
-          <Overflow workspace={workspace} monitoring={monitoring} onOutcome={setOutcome} />
+          <Overflow workspace={workspace} onOutcome={setOutcome} />
         </div>
       </header>
       <ProjectOutcome key={workspace.project.id} workspace={workspace} quiet={!allDone} />

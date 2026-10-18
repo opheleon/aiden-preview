@@ -1,5 +1,6 @@
 import type { JSX } from 'react';
 
+import type { ActivityEntry } from '../../../../packages/contracts/src/index';
 import type { Workspace } from '../hooks/useWorkspace';
 import { activeTitles, runTitle } from '../renderer/run-labels';
 import { GuideCheckResults } from './GuideCheckResults';
@@ -34,7 +35,7 @@ export function GuideRunStatus({
         const live = workspace.liveByRun[id] || (ids.length === 1 ? workspace.live : '');
         const detail = currentActivity(
           live,
-          workspace.activity.find((entry) => entry.runId === id)?.summary,
+          workspace.activity.find((entry) => entry.runId === id),
         );
         return (
           <div key={id} className="guide-check-progress">
@@ -67,7 +68,10 @@ export function GuideRunStatus({
   );
 }
 
-/** Keep one current update; terse worker placeholders such as "Understand..." add no context. */
-function currentActivity(live: string, latest?: string): string | undefined {
-  return [live, latest].find((line) => line?.trim() && !/^[a-z]+(?:\.{3}|…)$/i.test(line.trim()));
+/** Show concrete work, leaving generic run introductions and terse stage labels to the heading. */
+function currentActivity(live: string, latest?: ActivityEntry): string | undefined {
+  const introduction = latest?.kind === 'look' ? latest.summary : undefined;
+  return [live, latest?.summary].find(
+    (line) => line?.trim() && line !== introduction && !/^[a-z]+(?:\.{3}|…)$/i.test(line.trim()),
+  );
 }

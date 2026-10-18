@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 
 import {
   helpLinks,
@@ -8,7 +9,7 @@ import {
   type SetupState,
   SetupStateSchema,
 } from '../../contracts/src/guide.js';
-import type { Baseline, Project, RunManifest } from '../../contracts/src/index.js';
+import { type Baseline, id, type Project, type RunManifest } from '../../contracts/src/index.js';
 import { readCalls } from './calls.js';
 import type { Engine } from './engine.js';
 import { guideClarifications, guideRequirementsPending } from './guide-scope.js';
@@ -37,6 +38,40 @@ export async function writeSetupState(
   state: SetupState,
 ): Promise<void> {
   await atomic(setupFile(store, projectId), SetupStateSchema.parse(state));
+}
+
+/**
+ * Carry an explicit confirmation across an overview-only refresh. Connecting code can produce
+ * a new baseline without changing the agreed work. Compare the archived confirmed scope rather
+ * than treating a new version ID as a new decision; changed intent, answers, or scope still need review.
+ * This also repairs older projects on read without rewriting their confirmation history.
+ */
+async function confirmedScopeState(
+  store: Store,
+  projectId: string,
+  baseline: Baseline | null,
+): Promise<SetupState> {
+  const state = await readSetupState(store, projectId);
+  if (
+    !baseline ||
+    !state.requirementsConfirmedAt ||
+    !state.baselineId ||
+    state.baselineId === baseline.id
+  )
+    return state;
+  const previous = await optionalJson<Baseline>(
+    path.join(store.project(projectId), 'baselines', `${id.parse(state.baselineId)}.json`),
+  );
+  if (!previous || previous.projectId !== projectId || previous.id !== state.baselineId)
+    return state;
+  const unchanged =
+    previous.contextHash === baseline.contextHash &&
+    previous.decisionsHash === baseline.decisionsHash &&
+    isDeepStrictEqual(
+      { ...previous.product, overview: undefined },
+      { ...baseline.product, overview: undefined },
+    );
+  return unchanged ? { ...state, baselineId: baseline.id } : state;
 }
 
 /** Everything the Guide knows about a project, all read from saved files. */
@@ -77,7 +112,7 @@ export async function guideFacts(engine: Engine, projectId: string): Promise<Gui
   if (!project) throw new Error('This project is not saved yet.');
   const settings = await readAppUrl(engine, projectId);
   const tickets = await readTicketState(engine.store, projectId).catch(() => null);
-  const state = await readSetupState(engine.store, projectId);
+  const state = await confirmedScopeState(engine.store, projectId, baseline);
   const keys = verificationAccessKeys(settings);
   const facts: SetupFacts = {
     baselineId: baseline?.id ?? null,

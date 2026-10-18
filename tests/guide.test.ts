@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 
@@ -7,9 +8,11 @@ import {
   type SetupFacts,
   setupProgress,
 } from '../packages/contracts/src/guide.js';
+import { commitBaseline } from '../packages/core/src/baseline.js';
 import { Engine } from '../packages/core/src/engine.js';
 import { askGuide, openGuide, readThread } from '../packages/core/src/guide.js';
 import { confirmRequirements, skipSetupStep } from '../packages/core/src/guide-actions.js';
+import { readSetupState } from '../packages/core/src/guide-context.js';
 import { prepareAndLook, startLook } from '../packages/core/src/look.js';
 import { atomic, Store } from '../packages/core/src/storage.js';
 import {
@@ -263,4 +266,82 @@ void test('setup cards stay singular across legacy web and API widgets', () => {
     ]),
     [{ type: 'web-check' }, { type: 'link', link: 'help' }, { type: 'link', link: 'slack' }],
   );
+});
+
+void test('an overview-only refresh preserves confirmed setup, including after reopening an older project', async () => {
+  const { e, store, project } = await engineFor(false);
+  try {
+    const started = await e.prepare(project, { autoAccept: true });
+    await e.wait(started.runId);
+    await confirmRequirements(e, project.id);
+    await saveVerificationSettings(e, project.id, { manual: true });
+    const original = (await e.state(project.id)).baseline!;
+    const confirmed = await readSetupState(store, project.id);
+    const refreshed = await commitBaseline(
+      store,
+      project.id,
+      {
+        ...original.product,
+        overview: 'A refreshed overview after connecting the code.',
+      },
+      project.context,
+    );
+    assert.notEqual(refreshed.id, original.id);
+    assert.equal((await openGuide(e, project.id)).setup.complete, true);
+    assert.equal((await openGuide(e, project.id)).setup.next, null);
+    assert.deepEqual(
+      await readSetupState(store, project.id),
+      confirmed,
+      'keep the original confirmation history',
+    );
+  } finally {
+    await e.dispose();
+  }
+});
+
+void test('changed requirements, criteria, intent, answers, or missing confirmation evidence still need review', async () => {
+  const { e, store, project } = await engineFor(false);
+  try {
+    const started = await e.prepare(project, { autoAccept: true });
+    await e.wait(started.runId);
+    await confirmRequirements(e, project.id);
+    await saveVerificationSettings(e, project.id, { manual: true });
+    const original = (await e.state(project.id)).baseline!;
+    const product = original.product;
+    const changes = [
+      {
+        ...product,
+        requirements: product.requirements.map((r, i) =>
+          i ? r : { ...r, text: 'Users can search books.' },
+        ),
+      },
+      {
+        ...product,
+        requirements: product.requirements.map((r, i) =>
+          i
+            ? r
+            : {
+                ...r,
+                edgeCases: [
+                  { id: 'E1', text: 'Empty lists are shown clearly.', origin: 'scope' as const },
+                ],
+              },
+        ),
+      },
+      { ...product, milestones: ['Deliver next week.'] },
+    ];
+    for (const changed of changes) {
+      await commitBaseline(store, project.id, changed, project.context);
+      assert.equal((await openGuide(e, project.id)).setup.next, 'confirm');
+    }
+    await commitBaseline(store, project.id, product, 'A different goal.');
+    assert.equal((await openGuide(e, project.id)).setup.next, 'confirm');
+    await commitBaseline(store, project.id, product, project.context, 'changed-answers');
+    assert.equal((await openGuide(e, project.id)).setup.complete, false);
+    await commitBaseline(store, project.id, product, project.context);
+    await rm(path.join(store.project(project.id), 'baselines', `${original.id}.json`));
+    assert.equal((await openGuide(e, project.id)).setup.next, 'confirm');
+  } finally {
+    await e.dispose();
+  }
 });

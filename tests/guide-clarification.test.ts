@@ -48,6 +48,7 @@ async function question(
 
 void test('clarification reopens old setup, accepts answers in chat, and rewrites before confirmation without a check', async () => {
   const { engine, project, runtime } = await setup();
+  let releaseRewrite = () => {};
   try {
     await confirmRequirements(engine, project.id);
     const original = (await engine.state(project.id)).baseline!.id;
@@ -92,6 +93,9 @@ void test('clarification reopens old setup, accepts answers in chat, and rewrite
         },
       ],
     };
+    runtime.holdUnderstand = new Promise<void>((resolve) => {
+      releaseRewrite = resolve;
+    });
     const finalAnswer = await askGuide(engine, project.id, {
       text: 'Free/busy only with each owner’s permission.',
     });
@@ -101,6 +105,8 @@ void test('clarification reopens old setup, accepts answers in chat, and rewrite
       false,
     );
     await assert.rejects(confirmRequirements(engine, project.id), /updated with your answers/);
+    releaseRewrite();
+    runtime.holdUnderstand = null;
     const rewrite = (await engine.history(project.id))[0]!;
     await engine.wait(rewrite.id);
     assert.ok((await engine.history(project.id)).every((r) => r.kind === 'prepare'));
@@ -115,6 +121,7 @@ void test('clarification reopens old setup, accepts answers in chat, and rewrite
     await confirmRequirements(engine, project.id);
     assert.ok((await readSetupState(engine.store, project.id)).requirementsConfirmedAt);
   } finally {
+    releaseRewrite();
     await engine.dispose();
   }
 });

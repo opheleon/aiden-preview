@@ -41,6 +41,10 @@ test('intent-only setup uses the shared chat, saves web settings, and restores t
     const chat = page.getByRole('dialog', { name: 'Chat with Aiden' });
     await expect(chat).toBeVisible();
     await expect(chat.getByRole('list', { name: 'Setup' })).toBeVisible();
+    await expect(chat.getByRole('status', { name: 'Setup status' })).toHaveText(
+      'Setup not complete',
+    );
+    await expect(chat.getByRole('button', { name: 'Close chat' })).toBeInViewport();
     const thinking = chat.getByRole('status', { name: 'Aiden is thinking' });
     await expect(thinking).toHaveText('Thinking');
     const label = thinking.locator('span');
@@ -101,7 +105,7 @@ test('intent-only setup uses the shared chat, saves web settings, and restores t
     await expect(chat.getByRole('button', { name: 'Confirm setup' })).toBeDisabled();
     await chat.getByLabel('Where does the app run?').fill(url);
     await chat.getByRole('button', { name: 'Check access' }).click();
-    await expect(chat.getByRole('status')).toContainText(/Access checked/i);
+    await expect(chat.getByText(/Access checked\. You can confirm/)).toBeVisible();
     await reply('run-check', 'Synthetic setup saved. Ready for the first check.');
     await chat.getByRole('button', { name: 'Confirm setup', exact: true }).click();
     await chat.getByRole('button', { name: 'Later', exact: true }).click();
@@ -112,7 +116,7 @@ test('intent-only setup uses the shared chat, saves web settings, and restores t
     await chat.getByRole('button', { name: 'Setup details' }).click();
     await chat.getByLabel('Message the Guide').fill('Keep this draft');
     await page.screenshot({ path: info.outputPath('02-setup-complete.png') });
-    await chat.getByRole('button', { name: 'Back', exact: true }).click();
+    await chat.getByRole('button', { name: 'Close chat', exact: true }).click();
     await expect(chat).not.toBeVisible();
     await page.getByRole('button', { name: 'Settings', exact: true }).first().click();
     await page.getByRole('button', { name: 'Edit verification in chat' }).click();
@@ -151,10 +155,16 @@ test('intent-only setup uses the shared chat, saves web settings, and restores t
       .first();
     await result.click();
     await expect(result.locator('..')).toHaveAttribute('open', '');
+    await expect(chat.getByRole('status', { name: 'Setup status' })).toContainText(
+      'Setup complete',
+    );
+    await expect(chat.getByRole('button', { name: 'Close chat', exact: true })).toBeInViewport();
     await page.screenshot({
       path: info.outputPath('03-check-results-in-chat.png'),
       animations: 'disabled',
     });
+    await chat.getByRole('button', { name: 'Close chat', exact: true }).click();
+    await expect(chat).not.toBeVisible();
     expect(desktop.errors).toEqual([]);
   } finally {
     await desktop.close();

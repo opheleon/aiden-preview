@@ -2,6 +2,12 @@
 
 ## 1.2.4
 
+- Show explicit setup status and a close button in project chat. Keep confirmed requirements confirmed when a code connection only refreshes the overview; genuine scope changes still require review.
+
+- Confirm local-code and manual-check setup directly. Show access checks only for app/API/device targets, and update the actions automatically when selections change.
+
+- Keep generic run introductions out of chat progress and move branch controls into Project settings under Testing settings, alongside app and API access.
+
 - Keep chat progress compact with an animated status, adjacent Stop control, and one current activity line instead of repeated logs and internal stage labels.
 
 - Show Aiden's introduction before clarification choices become available, preserving pending selections while a reply is being prepared.

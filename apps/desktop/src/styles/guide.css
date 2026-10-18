@@ -31,6 +31,30 @@
   gap: 20px;
 }
 
+.project-guide-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.guide-close {
+  display: inline-flex;
+  flex: 0 0 36px;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.guide-close:is(:hover, :focus-visible) {
+  background: var(--paper2);
+  color: var(--ink);
+}
+
 .project-guide-header h2 {
   margin: 0;
   font-size: 16px;

@@ -51,7 +51,10 @@ test('setup chat proves real database-backed web login and API-key access before
     await chat.getByLabel('API base URL').fill(`${demo.origin}/api/`);
     await chat.getByLabel('API key', { exact: true }).fill(demoAccount.apiKey);
     await chat.getByRole('button', { name: 'Check access' }).click();
-    await expect(chat.getByRole('status')).toContainText('Access checked', { timeout: 20000 });
+    await expect(chat.getByRole('status').filter({ hasText: 'Access checked' })).toContainText(
+      'Access checked',
+      { timeout: 20000 },
+    );
     await page.screenshot({ path: info.outputPath('private-setup-checked.png') });
     await writeFile(
       f.control,

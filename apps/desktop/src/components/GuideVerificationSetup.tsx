@@ -21,7 +21,7 @@ const methods: { id: VerifyMethod; label: string; detail: string }[] = [
   { id: 'manual', label: "I'll check it myself", detail: 'Use a manual test list' },
 ];
 
-/** Shared setup fields, with the selected surfaces checked together before a single confirmation. */
+/** Shared setup fields; only app targets need a separate access check before confirmation. */
 type SetupProps = {
   workspace: Workspace;
   guide: Guide;
@@ -78,7 +78,7 @@ function useVerificationChoices({ workspace, initialMethod, initialUrl }: SetupP
   return { draft, setDraft, code, setCode, manual, setManual, loaded, error, setError };
 }
 
-/** Stage selections locally; only checked, confirmed configurations reach saved project settings. */
+/** Stage selections locally, validating connected targets before saving the confirmed configuration. */
 function useVerificationSetup(props: SetupProps) {
   const { workspace, guide } = props;
   const { draft, setDraft, code, setCode, manual, setManual, loaded, error, setError } =
@@ -88,7 +88,8 @@ function useVerificationSetup(props: SetupProps) {
   const [note, setNote] = useState('');
   const projectId = workspace.project.id;
   const selected = selection(draft, code, manual);
-  const needsAccess = code || draft.browser || draft.api || draft.phone;
+  const needsAccess = draft.browser || draft.api || draft.phone;
+  const confirmation = needsAccess ? 'I checked access and confirmed' : 'I confirmed';
   const identity = JSON.stringify({
     draft,
     code,
@@ -112,7 +113,7 @@ function useVerificationSetup(props: SetupProps) {
     else patch({ [method === 'web' ? 'browser' : method]: value });
   }
   const canSave = props.singleStep || !needsAccess || checked === identity;
-  /** Probe every selected target, then optionally recheck and commit the complete selection. */
+  /** Validate the local folder and probe app targets, then optionally commit the selection. */
   async function check(save: boolean): Promise<void> {
     if (pending || (save && !canSave)) return;
     setPending(true);
@@ -143,7 +144,8 @@ function useVerificationSetup(props: SetupProps) {
           await workspace.start();
         props.onSaved?.();
         await guide.ask(
-          'I checked access and confirmed these verification methods: ' +
+          confirmation +
+            ' these verification methods: ' +
             methods
               .filter((method) => selected[method.id])
               .map((method) => method.label)
@@ -163,7 +165,7 @@ function useVerificationSetup(props: SetupProps) {
     selected,
     loaded,
     pending,
-    ready: (!needsAccess && manual) || checked === identity,
+    ready: !needsAccess || checked === identity,
     needsAccess,
     note: checked === identity ? note : '',
     error,
@@ -173,7 +175,7 @@ function useVerificationSetup(props: SetupProps) {
   };
 }
 
-/** A plain multi-select checklist; confirmation is available only after every target passes access checks. */
+/** A plain checklist with direct confirmation for local code or manual testing. */
 export function GuideVerificationSetup(props: SetupProps): JSX.Element {
   const setup = useVerificationSetup(props);
   const { workspace, guide } = props;
@@ -234,14 +236,18 @@ export function GuideVerificationSetup(props: SetupProps): JSX.Element {
             </label>
             <p className="guide-card-note">
               Automatic checks use your selected model allowance while Aiden is open. Keep the test
-              app available. Saving checks access only.
+              app available.{' '}
+              {setup.needsAccess
+                ? 'Saving checks access only.'
+                : 'Saving updates your testing settings.'}
             </p>
           </details>
         )}
       </fieldset>
       <p className="guide-card-note">
-        Select all that apply. We’ll check access before saving. Access checks do not confirm that
-        the requirements work.
+        Select all that apply.
+        {setup.needsAccess &&
+          ' We’ll check access before saving. Access checks do not confirm that the requirements work.'}
       </p>
       {setup.note && <p role="status">{setup.note}</p>}
       {setup.error && <p role="alert">{setup.error}</p>}
@@ -342,6 +348,7 @@ function VerificationActions({
     !setup.loaded ||
     setup.pending ||
     guide.thinking ||
+    (setup.selected.code && !workspace.project.repositories.length) ||
     !Object.values(setup.selected).some(Boolean);
   return (
     <div className="guide-card-actions">
@@ -355,12 +362,14 @@ function VerificationActions({
         disabled={unavailable || (!props.singleStep && !setup.ready) || workspace.busy}
         onClick={() => void setup.check(true)}
       >
-        {props.singleStep
-          ? setup.pending
-            ? 'Checking access…'
-            : 'Check access & save'
-          : 'Confirm setup'}
+        {props.singleStep ? saveLabel(setup.needsAccess, setup.pending) : 'Confirm setup'}
       </button>
     </div>
   );
+}
+
+/** Name a settings save by whether it also has an app connection to check. */
+function saveLabel(needsAccess: boolean, pending: boolean): string {
+  if (pending) return needsAccess ? 'Checking access…' : 'Saving…';
+  return needsAccess ? 'Check access & save' : 'Save settings';
 }

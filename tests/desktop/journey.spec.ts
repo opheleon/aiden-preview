@@ -75,6 +75,18 @@ test('one handoff produces a brief with evidence, exports, restart, cancellation
     const exported = await readFile(markdown, 'utf8');
     expect(exported).toContain('FIXTURE REPORT');
     expect(exported).not.toContain('## Estimation');
+    await page.getByLabel('More').click();
+    await expect(page.getByRole('menuitem', { name: /Change branch/ })).toHaveCount(0);
+    await page.screenshot({ path: info.outputPath('project-menu.png') });
+    await page.getByRole('menuitem', { name: 'Project settings' }).click();
+    const testing = page.getByRole('region', { name: 'Testing settings' });
+    await expect(testing.getByRole('region', { name: 'Branch monitoring' })).toBeVisible();
+    await expect(testing.getByRole('region', { name: 'Project verification' })).toBeVisible();
+    await page.screenshot({ path: info.outputPath('testing-settings.png'), fullPage: true });
+    await testing.getByRole('button', { name: 'Edit verification in chat' }).click();
+    const chat = page.getByRole('dialog', { name: 'Chat with Aiden' });
+    await expect(chat.getByRole('button', { name: 'Check access & save' })).toHaveCount(0);
+    await expect(chat.getByRole('button', { name: 'Save settings' })).toBeEnabled();
     expect(desktop.errors).toEqual([]);
     await desktop.close();
     desktop = await fixture.launch(info);

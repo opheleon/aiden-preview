@@ -20,6 +20,7 @@ test('requirements progress stays compact, animated, and cancellable at both win
     await expect(status).toHaveText('Writing requirements');
     await expect.poll(async () => (await fixture.calls()).includes('understand')).toBe(true);
     await expect(chat.getByText('Understand...')).toHaveCount(0);
+    await expect(chat.getByText('Reading your goal to write the requirements.')).toHaveCount(0);
     await expect(status.locator('span')).toHaveCSS('animation-name', 'guide-thinking-shimmer');
     for (const width of [1320, 600]) {
       await page.setViewportSize({ width, height: 868 });

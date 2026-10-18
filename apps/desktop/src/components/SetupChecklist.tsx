@@ -11,7 +11,7 @@ const explanations: Record<SetupStepId, string> = {
   confirm:
     'Review the requirements and resolve any open questions before confirming what Aiden should check.',
   verify:
-    'Choose code, web, API, or manual checks. Aiden verifies access before saving. Use the private setup fields for passwords and API keys.',
+    'Choose code, web, API, or manual checks. Local code and manual checks confirm directly; web and API connections need an access check. Use the private setup fields for passwords and API keys.',
   'first-check':
     'Check your requirements and see progress, results, and evidence here in the chat. You can skip this for now and run a check later.',
   extras: 'Optionally connect a ticket tracker. You can finish setup without it and add it later.',
@@ -52,15 +52,15 @@ export function SetupChecklist({ setup }: { setup: SetupProgress }): JSX.Element
     <section className="setup-checklist" aria-label="Project setup">
       <div className="setup-heading">
         <div>
-          <p className="setup-current">
-            {setup.complete ? (
-              <>
-                <Check size={14} aria-hidden="true" /> Setup complete
-              </>
-            ) : (
-              `Step ${required.findIndex((step) => step.id === setup.next) + 1} of ${required.length} · ${current?.label ?? 'Project setup'}`
-            )}
+          <p className="setup-current" role="status" aria-label="Setup status">
+            {setup.complete && <Check size={14} aria-hidden="true" />}
+            {setup.complete ? 'Setup complete' : 'Setup not complete'}
           </p>
+          {!setup.complete && (
+            <p className="setup-next-action">
+              {`Step ${required.findIndex((step) => step.id === setup.next) + 1} of ${required.length} · ${current?.label ?? 'Project setup'}`}
+            </p>
+          )}
           {current && <p className="setup-next-action">{current.detail}</p>}
         </div>
         {setup.complete && (
