@@ -61,7 +61,7 @@ function BranchPicker({
       <div className="next-row">
         <div>
           {workspace.project.repositories.length > 1 && (
-            <strong>{repo.path.split('/').at(-1)}</strong>
+            <strong>{repo.path.split(/[\\/]/).at(-1)}</strong>
           )}
           <p>
             Monitoring{' '}

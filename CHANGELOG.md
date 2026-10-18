@@ -2,6 +2,8 @@
 
 ## 1.2.4
 
+- Show concise folder and repository names on Windows throughout setup, testing settings, and project summaries.
+
 - Require packaged desktop journeys on hosted Windows, Linux, and macOS runners, with installed Windows and extracted Linux AppImage coverage and screenshots/traces saved for every run.
 
 - Wait for worker cleanup when closing the desktop app so interrupted checks keep their cancellation state across restart.

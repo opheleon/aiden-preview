@@ -186,7 +186,9 @@ function allFacts(
   check: Check | null,
   project: Pick<Project, 'repositories'>,
 ): Facts[] {
-  const repos = new Map(project.repositories.map((r) => [r.id, r.path.split('/').at(-1) ?? r.id]));
+  const repos = new Map(
+    project.repositories.map((r) => [r.id, r.path.split(/[\\/]/).at(-1) ?? r.id]),
+  );
   const criteria = check?.result.criteria ?? [];
   return report.baseline.requirements.map((requirement) => ({
     requirement,

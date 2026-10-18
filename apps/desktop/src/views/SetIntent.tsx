@@ -12,7 +12,7 @@ const api = window.aiden;
  */
 export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element {
   const { project, setProject, busy, scanning, scanProjectFolder, start, action } = workspace;
-  const folder = project.rootPath?.split('/').at(-1) || project.rootPath;
+  const folder = project.rootPath?.split(/[\\/]/).at(-1) || project.rootPath;
   const repos = project.repositories.length;
   const blocker = scanning ? undefined : startHint(!!project.context.trim(), folder, repos);
   const missing = blocker?.blocking ? blocker.why : '';
