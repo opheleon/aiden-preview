@@ -33,6 +33,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec install-electron
+      - name: Check native test provider and its pipes
+        run: node --import tsx scripts/check-desktop-fixtures.ts
       - name: Install Linux display and browser dependencies
         if: runner.os == 'Linux'
         run: |

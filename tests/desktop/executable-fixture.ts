@@ -12,6 +12,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
 class FixtureLauncher {
   [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
   static extern IntPtr CreateJobObject(IntPtr attributes, string name);
@@ -32,6 +33,12 @@ class FixtureLauncher {
     }
     return value.Append('\\', slashes * 2).Append('"').ToString();
   }
+  static async Task ForwardInput(Process child) {
+    try {
+      await Console.OpenStandardInput().CopyToAsync(child.StandardInput.BaseStream);
+      child.StandardInput.Close();
+    } catch (IOException) { }
+  }
   static int Main(string[] args) {
     var config = File.ReadAllLines(Process.GetCurrentProcess().MainModule.FileName + ".args")
       .Select(line => Encoding.UTF8.GetString(Convert.FromBase64String(line))).ToArray();
@@ -44,10 +51,15 @@ class FixtureLauncher {
     Marshal.FreeHGlobal(limits);
     using (var child = Process.Start(new ProcessStartInfo(config[0],
       string.Join(" ", config.Skip(1).Concat(args).Select(Quote))) {
-        UseShellExecute = false, CreateNoWindow = true
+        UseShellExecute = false, CreateNoWindow = true,
+        RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true
       })) {
       if (!AssignProcessToJobObject(job, child.Handle)) { child.Kill(); return 126; }
+      var input = ForwardInput(child);
+      var output = child.StandardOutput.BaseStream.CopyToAsync(Console.OpenStandardOutput());
+      var error = child.StandardError.BaseStream.CopyToAsync(Console.OpenStandardError());
       child.WaitForExit();
+      Task.WaitAll(output, error);
       int code = child.ExitCode;
       CloseHandle(job);
       return code;
