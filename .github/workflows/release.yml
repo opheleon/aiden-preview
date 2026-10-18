@@ -118,7 +118,7 @@ jobs:
             release/mac/*-mac.yml
 
   # Windows has no code-signing certificate yet, so installers are unsigned and SmartScreen
-  # warns on first launch. The packaged journeys use POSIX provider fixtures and run on macOS.
+  # warns on first launch. Quality runs installed-app journeys on all three operating systems.
   build-windows:
     needs: quality
     runs-on: windows-2025

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { expect, test } from '@playwright/test';
 
 import { ReportSchema } from '../../packages/contracts/src/index.js';
+import { copyExecutableFixture } from './executable-fixture.js';
 import { createProject, desktopFixture, lookAgain } from './journey-fixture.js';
 
 const stoppedNote = /latest check didn't finish, so this is from the one before/;
@@ -176,7 +177,7 @@ test('first launch with missing providers explains recovery and reconnects after
 }, info) => {
   info.annotations.push({ type: 'browser engine', description: browserName });
   const fixture = await desktopFixture();
-  const missing = path.join(fixture.root, 'new-codex-installation');
+  const missing = path.join(fixture.root, `new-codex-installation${path.extname(fixture.binary)}`);
   const desktop = await fixture.launch(info, {
     AIDEN_CODEX_BINARY: missing,
     AIDEN_CLAUDE_BINARY: path.join(fixture.root, 'missing-claude'),
@@ -191,7 +192,7 @@ test('first launch with missing providers explains recovery and reconnects after
     await page.getByRole('button', { name: 'Claude', exact: true }).click();
     await expect(page.getByTestId('claude-connection')).toContainText('runtime unavailable');
     await page.getByRole('button', { name: 'Codex', exact: true }).click();
-    await writeFile(missing, await readFile(fixture.binary), { mode: 0o755 });
+    await copyExecutableFixture(fixture.binary, missing);
     await page.getByRole('button', { name: 'Check connection', exact: true }).click();
     await expect(
       page.getByText('Subscription credentials available', { exact: true }),

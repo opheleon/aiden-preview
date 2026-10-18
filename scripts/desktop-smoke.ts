@@ -6,6 +6,7 @@ import { _electron as electron, expect } from '@playwright/test';
 import { ReportSchema } from '../packages/contracts/src/index.js';
 import { Engine } from '../packages/core/src/engine.js';
 import { Store } from '../packages/core/src/storage.js';
+import { executableFixture } from '../tests/desktop/executable-fixture.js';
 import { verifyPackagedRuntimes } from '../tests/desktop/native-runtime.js';
 import { providerLauncher } from '../tests/desktop/provider-launcher.js';
 import { updateFixture } from '../tests/desktop/update-fixture.js';
@@ -26,7 +27,11 @@ await engine.approve(f.project.id, p.runId, f.product);
 const run = await engine.report(f.project.id);
 await engine.wait(run.runId);
 await engine.dispose();
-const claudeFixture = path.join(f.root, 'claude-auth-fixture');
+const claudeScript = path.join(f.root, 'claude-auth-fixture.cjs');
+const claudeFixture = await executableFixture(path.join(f.root, 'claude-auth-fixture'), [
+  process.execPath,
+  claudeScript,
+]);
 const packagedApp = process.env.AIDEN_PACKAGED_APP;
 /** Replace the isolated Claude auth executable with a deterministic signed-in or signed-out response. */
 async function setClaudeFixture(loggedIn: boolean) {
@@ -39,8 +44,8 @@ async function setClaudeFixture(loggedIn: boolean) {
       }
     : { loggedIn: false, authMethod: 'none', apiProvider: 'firstParty' };
   await writeFile(
-    claudeFixture,
-    '#!/usr/bin/env node\nprocess.stdout.write(' +
+    claudeScript,
+    'process.stdout.write(' +
       JSON.stringify(JSON.stringify(status)) +
       ');process.exit(' +
       (loggedIn ? '0' : '1') +
@@ -220,7 +225,7 @@ try {
       .getByRole('button', { name: 'Check for updates', exact: true });
     await checkForUpdates.click();
     await expect(page.getByText('You are on the latest version.')).toBeVisible({ timeout: 20000 });
-    expect(updates.requests.some((url) => url.split('?')[0]?.endsWith('-mac.yml'))).toBe(true);
+    expect(updates.requests.some((url) => url.split('?')[0]?.endsWith('.yml'))).toBe(true);
     updates.setUnavailable(true);
     await checkForUpdates.click();
     await expect(

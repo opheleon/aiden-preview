@@ -26,11 +26,17 @@ The publish job, which runs no project code, writes `SHA256SUMS.txt`, creates a 
 
 Running the workflow manually from the Actions tab is a dry run: unsigned builds uploaded as workflow artifacts, with nothing published.
 
+### Hosted packaged-app tests
+
+Every PR runs the shared `packaged-desktop.yml` workflow on macOS 15 ARM64, Windows Server 2025 x64, and Ubuntu 24.04 x64. Each builds an unsigned distributable with the verification browser, then runs setup, real local database login, API-key access, saved credential reuse, project deletion, restart, update transport, and evidence journeys. Provider output is synthetic and consumes no subscription quota. The Mac package is a ZIP; Windows runs the silently installed NSIS app; Linux runs an extracted AppImage under Xvfb with its Chromium sandbox helper enabled. Linux packaging is a CI compatibility target, not a published release asset.
+
+Download `packaged-evidence-<os>` from the Quality run for screenshots, Playwright traces, and the HTML report, including successful runs. `pnpm test:package` selects the installed or extracted app for the host OS; `AIDEN_PACKAGED_APP` can override its path. These checks do not cover SmartScreen, macOS permission dialogs, or upgrades on a consumer desktop.
+
 ### Windows x64
 
 A parallel job on a GitHub-hosted Windows runner builds an NSIS installer, `Aiden-<version>-x64.exe`, and its update manifest (`latest.yml`, or `beta.yml` for beta tags). The job checks that the bundled Claude executable and native keyring are unpacked from the archive, and launches the bundled verification browser to render a page, take a screenshot, and record video. The publish job refuses to release unless both the macOS and Windows files are present, and the Windows files share the same checksums and provenance attestation.
 
-Windows builds are unsigned because no code-signing certificate is configured, so SmartScreen warns on first launch. Signing carries an ongoing cost (for example, Azure Trusted Signing or an OV certificate). The packaged-app journeys use POSIX provider fixtures and run only on macOS. Until those fixtures are portable, the Windows installer has not been exercised end to end in CI.
+Windows builds are unsigned because no code-signing certificate is configured, so SmartScreen warns on first launch. Signing carries an ongoing cost (for example, Azure Trusted Signing or an OV certificate). Required quality checks install the Windows NSIS package into an isolated directory and run the same desktop journeys as macOS. Native executable fixtures keep provider authentication synthetic without enabling shell execution in the app.
 
 ### Permanent installer link
 

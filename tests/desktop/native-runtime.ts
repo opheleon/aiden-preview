@@ -17,11 +17,18 @@ export async function verifyPackagedRuntimes(app: ElectronApplication) {
     const probe = spawnSync(binary, ['--version'], {
       timeout: 10_000,
       encoding: 'utf8',
-      env: { HOME: app.getPath('userData'), PATH: '/usr/bin:/bin:/usr/sbin:/sbin' },
+      env: {
+        HOME: app.getPath('userData'),
+        USERPROFILE: app.getPath('userData'),
+        PATH: process.env.PATH,
+        SystemRoot: process.env.SystemRoot,
+        TEMP: app.getPath('temp'),
+        TMP: app.getPath('temp'),
+      },
     });
     return {
       keyringLoaded: typeof keyring.Entry === 'function',
-      unpacked: binary.includes('.asar.unpacked/'),
+      unpacked: /\.asar\.unpacked[\\/]/.test(binary),
       status: probe.status,
       error: probe.error?.message,
       version: probe.stdout?.trim(),
