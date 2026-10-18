@@ -31,7 +31,9 @@ export async function launchBrowser(): Promise<Browser> {
     return await chromium.launch({ headless: true });
   } catch {
     throw new Error(
-      'Aiden could not start its test browser. Run "pnpm exec playwright install chromium" and try again.',
+      process.env.AIDEN_PACKAGED === '1'
+        ? 'Aiden could not start its included test browser. Reopen Aiden or reinstall the latest version and try again.'
+        : 'Aiden could not start its test browser. Run "pnpm exec playwright install chromium" and try again.',
     );
   }
 }

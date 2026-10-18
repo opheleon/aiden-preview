@@ -63,6 +63,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec install-electron
       - run: pnpm build
+      - name: Prepare bundled verification browser
+        run: pnpm browser:prepare
 
       - name: Package, sign, and notarize
         if: env.RELEASE == 'true'
@@ -152,6 +154,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec install-electron
       - run: pnpm build
+      - name: Prepare bundled verification browser
+        run: pnpm browser:prepare
 
       - name: Package unsigned
         env:
@@ -164,6 +168,9 @@ jobs:
           test -x release/win/win-unpacked/Aiden.exe
           test -f "$resources/@anthropic-ai/claude-agent-sdk-win32-x64/claude.exe"
           ls "$resources"/@napi-rs/keyring-win32-x64-msvc/*.node
+
+      - name: Test the packaged verification browser
+        run: pnpm browser:check-package release/win/win-unpacked/resources/playwright
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

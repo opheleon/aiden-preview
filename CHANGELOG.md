@@ -2,6 +2,8 @@
 
 ## 1.2.4
 
+- Include the verification browser and video encoder in macOS and Windows packages, so private sign-in and app checks work without a separate browser installation. Test packaged login with an unavailable external browser cache.
+
 - Preserve cancellation status when a device check finishes during a concurrent status read.
 
 - Keep requested web/API setup fields visible after settings load, including in smaller chat windows. Install the login-test browser in desktop CI and explicitly normalize public credential-presence flags used in access fingerprints.

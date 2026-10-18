@@ -23,8 +23,8 @@
     "eval:behavior": "node --import tsx scripts/behavior-eval.ts",
     "test:desktop": "pnpm run build && pnpm test:desktop:journeys && node --import tsx scripts/desktop-smoke.ts",
     "test:package:mac": "AIDEN_PACKAGED_APP=release/mac/mac-arm64/Aiden.app/Contents/MacOS/Aiden pnpm test:desktop:journeys && AIDEN_PACKAGED_APP=release/mac/mac-arm64/Aiden.app/Contents/MacOS/Aiden node --import tsx scripts/desktop-smoke.ts",
-    "package:mac": "pnpm check && pnpm exec electron-builder --mac --arm64",
-    "package:win": "pnpm check && pnpm exec electron-builder --win --x64",
+    "package:mac": "pnpm check && pnpm browser:prepare && pnpm exec electron-builder --mac --arm64",
+    "package:win": "pnpm check && pnpm browser:prepare && pnpm exec electron-builder --win --x64",
     "release:legacy-feed": "node --import tsx scripts/publish-legacy-feed.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -38,7 +38,9 @@
     "test:renderer": "vitest run --coverage",
     "test:desktop:journeys": "playwright test --config playwright.desktop.config.ts",
     "eval:api": "node --import tsx scripts/api-eval.ts",
-    "demo:auth": "node --import tsx scripts/local-auth-demo.ts"
+    "demo:auth": "node --import tsx scripts/local-auth-demo.ts",
+    "browser:prepare": "node --import tsx scripts/prepare-browser.ts",
+    "browser:check-package": "node --import tsx scripts/check-packaged-browser.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.269",
@@ -149,7 +151,17 @@
           ]
         }
       ]
-    }
+    },
+    "extraResources": [
+      {
+        "from": "release/browser-runtime",
+        "to": "playwright",
+        "filter": [
+          "**/*",
+          "!.links/**/*"
+        ]
+      }
+    ]
   },
   "packageManager": "pnpm@11.19.0"
 }

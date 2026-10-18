@@ -80,6 +80,10 @@ app
     worker = new WorkerClient({
       ...process.env,
       AIDEN_HOME: dataRoot,
+      AIDEN_PACKAGED: app.isPackaged ? '1' : '0',
+      ...(app.isPackaged
+        ? { PLAYWRIGHT_BROWSERS_PATH: path.join(process.resourcesPath, 'playwright') }
+        : {}),
     });
     window = new BrowserWindow({
       width: 1320,

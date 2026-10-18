@@ -20,13 +20,15 @@ Project data, reports, and update preferences remain in `~/.aiden`. The renamed 
 
 The build job checks that the tag matches `package.json`, requires the aggregate quality workflow, then packages, signs, and notarizes on a GitHub-hosted macOS runner. It verifies the signature and stapled notarization ticket, then tests that packaged application. Package tests cover a complete synthetic analysis, exports, restart, interruption, explicit resume, missing-provider recovery, native keyring loading, bundled Claude execution, and update-feed failures. No live provider credentials or model requests are needed.
 
+Both platform packages include the pinned Playwright Chromium headless browser and its video encoder, including their license notices. The desktop worker always uses these bundled resources for private sign-in and web/API evidence, without downloading a browser on first use or relying on a developer cache. Packaged desktop journeys deliberately point the external browser cache at a missing directory to verify this isolation.
+
 The publish job, which runs no project code, writes `SHA256SUMS.txt`, creates a build provenance attestation for every file, and publishes the release with notes generated from merged pull requests. It rejects existing releases for the tag, verifies local checksums and uploaded asset completeness, and publishes the exact draft ID it created. electron-updater reads `latest-mac.yml` and the ZIP from the release; the DMG is for new installs.
 
 Running the workflow manually from the Actions tab is a dry run: unsigned builds uploaded as workflow artifacts, with nothing published.
 
 ### Windows x64
 
-A parallel job on a GitHub-hosted Windows runner builds an NSIS installer, `Aiden-<version>-x64.exe`, and its update manifest (`latest.yml`, or `beta.yml` for beta tags). The job checks that the bundled Claude executable and native keyring are unpacked from the archive. The publish job refuses to release unless both the macOS and Windows files are present, and the Windows files share the same checksums and provenance attestation.
+A parallel job on a GitHub-hosted Windows runner builds an NSIS installer, `Aiden-<version>-x64.exe`, and its update manifest (`latest.yml`, or `beta.yml` for beta tags). The job checks that the bundled Claude executable and native keyring are unpacked from the archive, and launches the bundled verification browser to render a page, take a screenshot, and record video. The publish job refuses to release unless both the macOS and Windows files are present, and the Windows files share the same checksums and provenance attestation.
 
 Windows builds are unsigned because no code-signing certificate is configured, so SmartScreen warns on first launch. Signing carries an ongoing cost (for example, Azure Trusted Signing or an OV certificate). The packaged-app journeys use POSIX provider fixtures and run only on macOS. Until those fixtures are portable, the Windows installer has not been exercised end to end in CI.
 
