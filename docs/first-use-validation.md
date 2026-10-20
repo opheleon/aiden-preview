@@ -26,7 +26,7 @@ A native modal dialog contains five steps with a short summary, two key points, 
 
 The three user docs are bundled from their repository Markdown sources and rendered as plain headings and paragraphs. They remain available offline, without executing embedded HTML or navigating away. Documentation cannot confirm completion. Guide navigation does not call provider installation, authentication, tracker publishing, or project mutations.
 
-The content was checked against current settings and workflow code: Model and Project settings, live remote branch selection, optional Linear team/project publishing, Overview/Scope/Activity/Runs, decisions, checks, reconnect/resync, and delivery-attention states. It separates remote code, acceptance behavior, and tracker status. It promises no automatic merge, deployment verification, or ticket closure.
+The content was checked against current settings and workflow code: the start screen's model Connect, Model and Project settings, the setup chat, GitHub code connection with read-only copies, Notion page reading, branch selection, optional Linear team/project publishing, Chat/Overview/Scope/Activity, questions, checks, reconnect/resync, and delivery-attention states. It was last rechecked on 2026-10-19. It separates remote code, acceptance behavior, and tracker status. It promises no automatic merge, deployment verification, or ticket closure.
 
 ## Repeatable acceptance checks
 

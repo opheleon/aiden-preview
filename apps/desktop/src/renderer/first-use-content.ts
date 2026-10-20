@@ -1,10 +1,10 @@
-/** Marketing-led introduction with practical setup details for the shipped Preview app. */
+/** A short introduction with practical setup details for the shipped Preview app. */
 export const firstUseSteps = [
   {
     title: 'Meet Aiden',
     summary: 'Your first autonomous project manager.',
     points: [
-      'You set the intent, make the calls, and accept the outcome.',
+      'You decide what done means, answer the questions only you can, and accept the result.',
       'Aiden keeps track of what done means, where it stands, when it will land, and what’s in the way.',
     ],
     detail:
@@ -14,31 +14,31 @@ export const firstUseSteps = [
     title: 'Bring your own subscription',
     summary: 'Use Aiden with your Claude or ChatGPT account.',
     points: [
-      'Claude: install Claude Code, then select Sign in with Claude and finish in your browser. A paid Claude plan is needed.',
-      'Codex for ChatGPT: install the Codex CLI, then select Sign in with Codex.',
+      'Claude: install Claude Code, choose Claude on the start screen, select Connect, then Sign in with Claude and finish in your browser. A paid Claude plan is needed.',
+      'Codex for ChatGPT: install the Codex CLI, choose Codex on the start screen, select Connect, then Sign in with Codex.',
     ],
     detail:
-      'The start screen shows whether your chosen model is connected, and Connect opens the sign-in steps; Settings → Model has the same controls. Cursor is not supported in this Preview. Choose the model and effort for your project in Model settings. Aiden uses the subscription or API-key billing option you select. Provider limits and charges may apply. There is no separate Aiden sign-in. You can connect Linear or Notion later in Settings → Integrations. It’s optional.',
+      'The start screen shows whether your chosen model is connected, and Connect opens the sign-in steps; Settings → Model has the same controls. Cursor is not supported in this Preview. Choose the model and effort for your project in Model settings. Aiden uses the subscription or API-key billing option you select. Provider limits and charges may apply. There is no separate Aiden sign-in. You can connect Linear or Notion later in Settings → Integrations. It’s optional; connecting Notion lets Aiden read the pages you link, using only Notion’s fetch and search tools.',
   },
   {
     title: 'Set the intent',
-    summary: 'Start from a customer call, a brief, or a sentence.',
+    summary: 'Start from a sentence, a spec, or a Notion page.',
     points: [
-      'Tell Aiden what you’re building, or paste a Notion page link, and select Hand it to Aiden. In the setup chat next, Aiden finds your code on GitHub.',
+      'Tell Aiden what you’re building, or paste a Notion page link, and select Hand it to Aiden. In the setup chat, Aiden connects your code from GitHub.',
       'Aiden writes down what done means in plain language and plans the work in usable steps.',
     ],
     detail:
-      'Choose the branch to follow in Settings → Project → Branch monitoring. It starts with your current branch’s remote upstream or the same-named remote branch. Aiden checks pushed code; local edits stay on your computer. To use Linear, open Publishing settings, choose your connection and team, then Create project and publish tickets. Aiden writes the tickets and keeps them in a separate Linear project for this project.',
+      'Name the repositories in your goal or linked page, such as acme/web and acme/api, and Aiden connects them after you confirm the requirements. Otherwise it asks which GitHub organization and which repositories to use, or takes all of them. Private repositories need the GitHub CLI signed in (gh auth login). Aiden keeps a read-only copy for each project and follows the default branch; change it in Settings → Project → Branch monitoring. To use Linear, open Publishing settings, choose your connection and team, then Create project and publish tickets. Aiden writes the tickets and keeps them in a separate Linear project for this project.',
   },
   {
-    title: 'Make the calls',
-    summary: 'Keep the calls that need judgment.',
+    title: 'Answer questions',
+    summary: 'Aiden asks only what needs a person.',
     points: [
-      'Aiden brings questions to Needs you. Answer the question to keep the affected work moving.',
+      'Aiden asks in the chat during setup, and lists open questions under Needs you on Overview. Answer one to keep the affected work moving.',
       'Change the scope as you learn. Aiden checks again and updates where the project stands.',
     ],
     detail:
-      'Start in Overview for progress, what’s left, and what’s in the way. Scope holds what done means, Activity shows what changed and includes check details under All runs. While Preview is open, Aiden watches the selected remote branch and ticket status every minute and checks each morning. Use Run check now whenever you need a fresh answer. Reconnect an unavailable tracker in Settings → Integrations, then use Sync tickets.',
+      'Ask Aiden anything about the project in the Chat tab, such as where it stands or to re-estimate. Overview shows progress, what’s left, and what’s in the way. Scope holds what done means, Activity shows what changed and includes check details under All runs. While Preview is open, Aiden watches the selected remote branch and ticket status every minute and checks each morning. Use Run check now whenever you need a fresh answer. Reconnect an unavailable tracker in Settings → Integrations, then use Sync tickets.',
   },
   {
     title: 'Accept the outcome',
