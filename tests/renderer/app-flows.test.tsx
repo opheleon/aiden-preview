@@ -93,8 +93,9 @@ test('starting needs a connected model, and Connect opens its sign-in controls',
     expect(start).toBeDisabled();
     expect(start).toHaveAccessibleDescription('Connect Claude first.');
     await userEvent.click(screen.getByRole('button', { name: 'Connect Claude' }));
-    expect(screen.getByText('Model connection and effort').closest('details')).toHaveAttribute(
-      'open',
+    expect(screen.getByRole('button', { name: 'Model and effort' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
     );
     expect(screen.getByRole('button', { name: 'Sign in with Claude' })).toBeVisible();
   } finally {

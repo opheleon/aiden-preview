@@ -1,5 +1,5 @@
-import { ArrowRight, CircleAlert, Info } from 'lucide-react';
-import { type JSX, useRef } from 'react';
+import { ArrowRight, CircleAlert, Info, SlidersHorizontal } from 'lucide-react';
+import { type JSX, useRef, useState } from 'react';
 
 import {
   notionContext,
@@ -19,7 +19,16 @@ const api = window.aiden;
 export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element {
   const { project, setProject, busy, start } = workspace;
   const missing = startHint(workspace);
-  const model = useRef<HTMLDetailsElement>(null);
+  const [showModel, setShowModel] = useState(false);
+  const model = useRef<HTMLDivElement>(null);
+  /** Open the model settings below the box, bring them into view, and focus their first action. */
+  function openModel(): void {
+    setShowModel(true);
+    requestAnimationFrame(() => {
+      model.current?.scrollIntoView?.({ block: 'nearest' });
+      model.current?.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
+    });
+  }
   return (
     <section className="goal-starter set-intent" aria-label="New project">
       <div className="goal-starter-brand">
@@ -41,52 +50,46 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
           onChange={(event) => setProject({ ...project, context: event.target.value })}
         />
         <div className="chat-composer-footer">
-          <ProviderPicker
-            workspace={workspace}
-            onConnect={() => openModelControls(model.current)}
-          />
-          {/* A disabled button gets no hover, so its wrapper says what is still needed. */}
-          <span className="goal-starter-start" title={missing || undefined}>
-            <button
-              className="primary goal-starter-create"
-              disabled={busy || !!missing}
-              aria-describedby={missing ? 'start-hint' : undefined}
-              onClick={() => void start()}
-            >
-              Hand it to Aiden <ArrowRight size={15} />
-            </button>
-            <span id="start-hint" hidden>
-              {missing}
+          <button
+            className="text-button goal-starter-model"
+            aria-expanded={showModel}
+            aria-controls="start-model-settings"
+            onClick={() => (showModel ? setShowModel(false) : openModel())}
+          >
+            <SlidersHorizontal size={14} aria-hidden="true" /> Model and effort
+          </button>
+          <div className="goal-starter-actions">
+            <ProviderPicker workspace={workspace} onConnect={openModel} />
+            {/* A disabled button gets no hover, so its wrapper says what is still needed. */}
+            <span className="goal-starter-start" title={missing || undefined}>
+              <button
+                className="primary goal-starter-create"
+                disabled={busy || !!missing}
+                aria-describedby={missing ? 'start-hint' : undefined}
+                onClick={() => void start()}
+              >
+                Hand it to Aiden <ArrowRight size={15} />
+              </button>
+              <span id="start-hint" hidden>
+                {missing}
+              </span>
             </span>
-          </span>
+          </div>
         </div>
       </div>
       <NotionNotice workspace={workspace} />
-      <details ref={model}>
-        <summary>Model connection and effort</summary>
-        <RuntimeSettings
-          runtime={project.runtime}
-          diagnostics={workspace.diagnostics}
-          api={api}
-          disabled={busy}
-          onRefresh={workspace.refresh}
-          onChange={(runtime) => setProject((current) => ({ ...current, runtime }))}
-        />
-      </details>
-      <div className="goal-starter-next">
-        <span>
-          <b>You</b> set the goal
-        </span>
-        <span>
-          <b>You</b> make the calls
-        </span>
-        <span>
-          <b>You</b> accept the outcome
-        </span>
-        <span>
-          <b>Aiden</b> does the rest
-        </span>
-      </div>
+      {showModel && (
+        <div id="start-model-settings" className="goal-starter-settings" ref={model}>
+          <RuntimeSettings
+            runtime={project.runtime}
+            diagnostics={workspace.diagnostics}
+            api={api}
+            disabled={busy}
+            onRefresh={workspace.refresh}
+            onChange={(runtime) => setProject((current) => ({ ...current, runtime }))}
+          />
+        </div>
+      )}
     </section>
   );
 }
@@ -176,14 +179,6 @@ function ProviderPicker({
       )}
     </>
   );
-}
-
-/** Open the model connection controls, bring them into view, and focus their first action. */
-function openModelControls(details: HTMLDetailsElement | null): void {
-  if (!details) return;
-  details.open = true;
-  details.scrollIntoView?.({ block: 'nearest' });
-  details.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
 }
 
 /**

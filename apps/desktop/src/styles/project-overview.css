@@ -94,14 +94,22 @@
 }
 
 .chat-composer-footer .chat-model-select {
+  appearance: none;
+  field-sizing: content;
   width: auto;
-  min-width: 112px;
-  height: 32px;
+  min-width: 0;
+  height: 30px;
   margin: 0;
-  padding: 5px 30px 5px 10px;
+  padding: 4px 22px 4px 8px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6880' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  background-size: 12px;
   border-color: transparent;
   background-color: transparent;
   font-size: 13px;
+  text-align: center;
+  text-align-last: center;
 }
 
 .start-blocker {
@@ -153,33 +161,23 @@
   background: var(--brand-dark);
 }
 
-/* The tooltip wrapper carries the right alignment the start button used to have. */
-.goal-starter-start {
+/* Provider, its status, and the start button sit together on the right of the footer. */
+.goal-starter-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-left: auto;
 }
 
-.set-intent > details {
-  margin-top: 14px;
-}
-
-.goal-starter-next {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  margin-top: 24px;
+/* Model settings sit inside the box's footer and open in their own panel below it. */
+.goal-starter-model {
+  gap: 6px;
   color: var(--color-muted-foreground);
   font-size: 13px;
 }
 
-.goal-starter-next span {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.goal-starter-next b {
-  color: var(--color-brand);
-  font: 12px var(--font-mono);
+.goal-starter-settings {
+  margin-top: 20px;
 }
 
 .project-health {
