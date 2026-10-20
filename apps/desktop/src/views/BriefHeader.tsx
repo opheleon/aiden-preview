@@ -49,22 +49,23 @@ function Overflow({
           Export JSON
         </button>
         {outcomeReady(workspace) && !closed && (
-          <>
-            <button
-              role="menuitem"
-              disabled={workspace.busy || !workspace.baseline || !lifecycle}
-              onClick={choose(() => onOutcome('accept'))}
-            >
-              {lifecycle?.acceptanceCurrent ? 'Update acceptance' : 'Accept outcome'}
-            </button>
-            <button
-              role="menuitem"
-              disabled={workspace.busy}
-              onClick={choose(() => onOutcome('close'))}
-            >
-              Close project
-            </button>
-          </>
+          <button
+            role="menuitem"
+            disabled={workspace.busy || !workspace.baseline || !lifecycle}
+            onClick={choose(() => onOutcome('accept'))}
+          >
+            {lifecycle?.acceptanceCurrent ? 'Update acceptance' : 'Accept outcome'}
+          </button>
+        )}
+        {/* Any open project can be closed, including one whose setup never finished. */}
+        {!closed && (
+          <button
+            role="menuitem"
+            disabled={workspace.busy}
+            onClick={choose(() => onOutcome('close'))}
+          >
+            Close project
+          </button>
         )}
         <button
           role="menuitem"

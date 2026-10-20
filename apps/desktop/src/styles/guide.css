@@ -28,6 +28,7 @@
 }
 
 .guide-thread {
+  font-size: 16px;
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -64,6 +65,11 @@
   max-width: 85%;
 }
 
+/* Messages and steps read at the thread's size, not the smaller page default. */
+.brief .guide-thread :is(.chat-you, .chat-aiden, .chat-steps, .guide-saved-results) {
+  font-size: inherit;
+}
+
 .guide-thread .guide-reply {
   display: block;
   max-width: 100%;
@@ -75,7 +81,7 @@
 .guide-event {
   margin: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
@@ -87,7 +93,7 @@
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .guide-card .guide-card,
@@ -228,6 +234,7 @@
   background: transparent;
   box-shadow: none;
   font: inherit;
+  font-size: 16px;
   line-height: 1.6;
 }
 
@@ -241,7 +248,7 @@
 
 .guide-composer-footer small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .guide-send {
@@ -271,7 +278,7 @@
   }
 
   .guide-composer-footer small {
-    font-size: 10px;
+    font-size: 11px;
   }
 }
 
@@ -286,7 +293,7 @@
   margin: 0;
   padding: 4px 0;
   color: var(--ink);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
 }
 

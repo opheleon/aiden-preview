@@ -17,14 +17,14 @@
 
 .setup-current {
   margin: 0;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
 }
 
 .setup-next-action {
   margin: 4px 0 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .setup-steps {
@@ -42,18 +42,18 @@
   gap: 6px;
   min-width: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .setup-marker {
   display: flex;
-  flex: 0 0 22px;
+  flex: 0 0 26px;
   align-items: center;
   justify-content: center;
-  height: 22px;
+  height: 26px;
   border: 1px solid var(--border);
   border-radius: 50%;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .setup-item-next {
@@ -84,20 +84,20 @@
 .setup-extras {
   margin: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .setup-explanation {
   max-width: 72ch;
   margin: 4px 0 0;
   color: var(--ink);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.55;
 }
 
 .setup-guide {
   margin-top: 8px;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .setup-guide summary {
