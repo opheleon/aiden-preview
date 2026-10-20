@@ -24,6 +24,28 @@ import {
 import { createModelStage } from './model-stage.js';
 import { atomic, hash, json, optionalJson } from './storage.js';
 import type { WorkflowContext } from './workflow-context.js';
+/**
+ * Let sizing explore the code the latest check froze, so touch points, existing patterns, and test
+ * coverage come from the code rather than the requirements text: the check's snapshots and their
+ * independent copies become the tools' read-only inventory.
+ */
+function exploreFrozenCode(
+  broker: ToolBroker,
+  context: WorkflowContext,
+  projectId: string,
+  report: Report,
+): void {
+  const frozen = path.join(context.store.run(projectId, report.id), 'snapshots');
+  broker.project = {
+    ...broker.project,
+    repositories: broker.project.repositories.map((repo) => ({
+      ...repo,
+      path: path.join(frozen, repo.id),
+    })),
+  };
+  broker.snapshots = report.snapshots;
+}
+
 /** Run independently accepted estimation stages inside an authenticated, cancellation-aware tool boundary. */
 export async function executeEstimate(
   context: WorkflowContext,
@@ -55,6 +77,7 @@ export async function executeEstimate(
       context.integrations.call(connectionId, tool, args, externalSignal),
   );
   broker.signal = signal;
+  if (report) exploreFrozenCode(broker, context, run.projectId, report);
   const tools = await serveTools(broker);
   const modelStage = createModelStage({ context, run, signal, dir, workspace, tools });
   try {
@@ -65,7 +88,7 @@ export async function executeEstimate(
       stage: 'estimate',
       message: 'Classifying reviewed requirements…',
     });
-    const complexity = await originalEstimates(modelStage, baseline);
+    const complexity = await originalEstimates(modelStage, baseline, report?.snapshots ?? []);
     const collected = await collectEstimationHistory(context, run, signal, dir);
     const history = await historicalEstimates(modelStage, collected.rows);
     const remaining = await remainingEstimates(modelStage, baseline, report, context, run, history);

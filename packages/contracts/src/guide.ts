@@ -256,7 +256,7 @@ function stepDetails(
     confirm: done.confirm ? 'You confirmed the requirements.' : 'Check that Aiden understood you.',
     code: facts.repositories
       ? `${facts.repositories} ${facts.repositories === 1 ? 'repository' : 'repositories'} connected.`
-      : 'Connect your code folders so Aiden can estimate the work.',
+      : 'Paste your GitHub repositories so Aiden can estimate the work.',
     verify:
       methods.length && !done.verify
         ? methods.every((m) => m === 'code')

@@ -12,7 +12,6 @@ export type DesktopBridge = {
     method: K,
     params?: WorkerParams<K>,
   ) => Promise<WorkerResult<K>>;
-  chooseProjectFolder: () => Promise<string | null>;
   openExternal: (url: string) => Promise<void>;
   saveExport: (params: {
     projectId: string;

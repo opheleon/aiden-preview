@@ -44,8 +44,7 @@ async function projectRoot(input: string): Promise<string> {
 /** Revalidate saved repositories and uniqueness against the user-selected folders before worker execution. */
 export async function validateProjectRepositories(project: Project): Promise<Project> {
   const rootPath = project.rootPath ? await projectRoot(project.rootPath) : undefined;
-  const additional = await Promise.all((project.additionalRootPaths ?? []).map(projectRoot));
-  const roots = rootPath ? [rootPath, ...additional] : additional;
+  const roots = rootPath ? [rootPath] : [];
   const repositories = [];
   for (const repo of project.repositories) {
     const location = await realpath(repo.path);
@@ -61,7 +60,6 @@ export async function validateProjectRepositories(project: Project): Promise<Pro
   return {
     ...project,
     ...(rootPath ? { rootPath } : {}),
-    ...(additional.length ? { additionalRootPaths: additional } : {}),
     repositories,
   };
 }

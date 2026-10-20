@@ -9,7 +9,7 @@ const explanations: Record<SetupStepId, string> = {
     'Describe what you want to build or change. Aiden asks about missing details here in the chat. Connecting code is optional.',
   confirm:
     'Review the requirements and resolve any open questions before confirming what Aiden should check.',
-  code: 'Add one or more folders with your code so Aiden can size the work and estimate how long it takes. Without code, Aiden suggests delivery slices but gives no estimate.',
+  code: 'Paste the GitHub repositories for the project so Aiden can explore the code, size the work, and estimate how long it takes. Without code, Aiden suggests delivery slices but gives no estimate.',
   verify:
     'Choose code, web, API, or manual checks. Local code and manual checks confirm directly; web and API connections need an access check. Use the private setup fields for passwords and API keys.',
   'first-check':

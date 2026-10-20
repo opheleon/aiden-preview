@@ -137,22 +137,16 @@ export class Engine {
     }
   }
   /**
-   * Save the project's code folders and repositories without rewriting its requirements, after
-   * checking every repository is a committed Git repository inside one of the chosen folders.
+   * Save the project's repositories without rewriting its requirements, after checking each one
+   * is a committed Git repository. Connected code lives in the project's own folder, so no
+   * separate project folder is kept.
    */
-  async updateCode(
-    projectId: string,
-    code: Pick<Project, 'rootPath' | 'additionalRootPaths' | 'repositories'>,
-  ): Promise<Project> {
+  async updateCode(projectId: string, repositories: Project['repositories']): Promise<Project> {
     const release = await this.lock(projectId);
     try {
       const file = path.join(this.store.project(projectId), 'project.json');
-      const saved = ProjectSchema.parse(await json(file));
-      const updated: Project = { ...saved, repositories: code.repositories };
+      const updated: Project = { ...ProjectSchema.parse(await json(file)), repositories };
       delete updated.rootPath;
-      delete updated.additionalRootPaths;
-      if (code.rootPath) updated.rootPath = code.rootPath;
-      if (code.additionalRootPaths?.length) updated.additionalRootPaths = code.additionalRootPaths;
       const next = await validateProjectRepositories(ProjectSchema.parse(updated));
       await atomic(file, next);
       return next;

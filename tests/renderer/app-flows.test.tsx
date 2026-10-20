@@ -386,7 +386,7 @@ test('code evidence, support, and a fresh project stay one click away', async ()
   expect(screen.getByLabelText('What are you building?')).toHaveValue('');
 });
 
-test('project settings hold the folder, the app URL, and context connections', async () => {
+test('project settings hold the GitHub repositories, the app URL, and context connections', async () => {
   await openProject();
   await menu('Project settings');
   const panel = await screen.findByRole('region', { name: 'Project verification' });
@@ -396,9 +396,20 @@ test('project settings hold the folder, the app URL, and context connections', a
   // Chat lives on the project, so editing in chat leaves Settings; the menu returns to it.
   await menu('Project settings');
   expect(await screen.findByRole('region', { name: 'Project verification' })).toBeVisible();
-  await userEvent.type(screen.getByLabelText('Branch notes for frontend'), ' reviewed');
-  await userEvent.click(screen.getByRole('button', { name: 'Rescan folders' }));
-  expect(screen.getByLabelText('Branch notes for frontend')).toHaveValue('main reviewed');
+  // Code is connected by GitHub link; Aiden keeps its own read-only copy.
+  expect(screen.queryByRole('button', { name: /folder/i })).toBeNull();
+  await userEvent.type(
+    screen.getByLabelText('GitHub repository link'),
+    'https://github.com/acme/web/pull/3{Enter}',
+  );
+  expect(screen.getByRole('list', { name: 'GitHub repositories' })).toHaveTextContent('acme/web');
+  await userEvent.click(screen.getByRole('button', { name: /Save repositories/ }));
+  expect(f.request).toHaveBeenCalledWith('connectCode', {
+    projectId: report.projectId,
+    repositories: ['acme/web'],
+  });
+  await userEvent.type(screen.getByLabelText('Branch notes for repo-acme-web'), 'main reviewed');
+  expect(screen.getByLabelText('Branch notes for repo-acme-web')).toHaveValue('main reviewed');
   await userEvent.click(screen.getByRole('button', { name: 'Save and run check' }));
   expect(f.request).toHaveBeenCalledWith('prepare', {
     autoAccept: true,

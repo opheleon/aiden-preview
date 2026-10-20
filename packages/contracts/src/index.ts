@@ -59,8 +59,6 @@ export const ProjectSchema = z
     name: z.string().min(1),
     context: z.string().min(1),
     rootPath: z.string().min(1).optional(),
-    /** More folders the person added after the first; repositories may sit in any of them. */
-    additionalRootPaths: z.array(z.string().min(1)).max(20).optional(),
     discoveryWarnings: z.array(z.string()).optional(),
     repositories: z.array(
       z
@@ -68,6 +66,15 @@ export const ProjectSchema = z
           id,
           path: z.string().min(1),
           notes: z.string(),
+          /** Where Aiden cloned this repository from, for repositories connected by link. */
+          source: z
+            .object({
+              kind: z.literal('github'),
+              name: z.string().regex(/^[\w.-]+\/[\w.-]+$/),
+              url: z.string().url(),
+            })
+            .strict()
+            .optional(),
           monitoredBranch: z
             .object({
               remote: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/),

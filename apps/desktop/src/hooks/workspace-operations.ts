@@ -1,7 +1,6 @@
 import type { Product, RunManifest } from '../../../../packages/contracts/src/index';
 import { scopeName } from '../../../../packages/contracts/src/project-name';
 import type { DesktopBridge } from '../bridge';
-import { projectFolders, withFolder, withoutFolder } from './project-folders';
 import type { WorkspaceState } from './useWorkspaceState';
 
 type Call = DesktopBridge['request'];
@@ -58,38 +57,6 @@ async function load(state: WorkspaceState, call: Call, id: string): Promise<void
     const latest = s.runs.find((r: RunManifest) => r.status === 'completed' && r.kind === 'report');
     if (latest) state.setReport(await call('result', { projectId: id, runId: latest.id }));
     state.setArea('projects');
-  });
-}
-
-/**
- * Find repositories in folders, keeping notes on ones already listed and ignoring a replaced
- * project. `replace` chooses one folder for the whole project, `add` chooses another folder to
- * include, and `rescan` scans every connected folder again.
- */
-async function scanProjectFolder(
-  state: WorkspaceState,
-  call: Call,
-  api: DesktopBridge | undefined,
-  mode: 'replace' | 'add' | 'rescan',
-): Promise<void> {
-  const projectId = state.project.id;
-  await action(state, async () => {
-    state.setScanning(true);
-    try {
-      const folders =
-        mode === 'rescan'
-          ? projectFolders(state.project)
-          : [await api?.chooseProjectFolder()].filter((f): f is string => !!f);
-      for (const [index, folder] of folders.entries()) {
-        const found = await call('discoverRepositories', { rootPath: folder });
-        const how = mode === 'replace' || (mode === 'rescan' && index === 0) ? 'replace' : 'add';
-        state.setProject((current) =>
-          current.id !== projectId ? current : withFolder(current, found, how),
-        );
-      }
-    } finally {
-      state.setScanning(false);
-    }
   });
 }
 
@@ -174,12 +141,6 @@ async function confirm(state: WorkspaceState, call: Call, key: string): Promise<
 export interface WorkspaceOperations {
   action: (fn: () => Promise<void>) => Promise<void>;
   load: (id: string) => Promise<void>;
-  /** Choose one folder (true), or rescan every connected folder (false). */
-  scanProjectFolder: (choose?: boolean) => Promise<void>;
-  /** Choose another folder and add its repositories. */
-  addProjectFolder: () => Promise<void>;
-  /** Remove one connected folder and its repositories. */
-  removeProjectFolder: (folder: string) => void;
   start: () => Promise<void>;
   lookNow: () => Promise<void>;
   answerCall: (callId: string, answer: string) => Promise<void>;
@@ -187,18 +148,10 @@ export interface WorkspaceOperations {
   confirm: (key: string) => Promise<void>;
 }
 /** Bind the current render's state to user actions without performing side effects during render. */
-export function workspaceOperations(
-  state: WorkspaceState,
-  call: Call,
-  api: DesktopBridge | undefined,
-): WorkspaceOperations {
+export function workspaceOperations(state: WorkspaceState, call: Call): WorkspaceOperations {
   return {
     action: (fn) => action(state, fn),
     load: (id) => load(state, call, id),
-    scanProjectFolder: (choose) =>
-      scanProjectFolder(state, call, api, choose ? 'replace' : 'rescan'),
-    addProjectFolder: () => scanProjectFolder(state, call, api, 'add'),
-    removeProjectFolder: (folder) => state.setProject((current) => withoutFolder(current, folder)),
     start: () => start(state, call),
     lookNow: () => lookNow(state, call),
     answerCall: (callId, answer) => answerCall(state, call, callId, answer),

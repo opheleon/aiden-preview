@@ -191,9 +191,11 @@ export async function guideInput(
     project: {
       name: project.name,
       intent: project.context.slice(0, 6000),
-      folder: project.rootPath ?? null,
-      folders: [project.rootPath, ...(project.additionalRootPaths ?? [])].filter(Boolean),
-      repositories: project.repositories.map((r) => ({ id: r.id, notes: r.notes })),
+      repositories: project.repositories.map((r) => ({
+        id: r.id,
+        notes: r.notes,
+        source: r.source?.name ?? null,
+      })),
       runtime: { provider: project.runtime.provider, auth: project.runtime.auth },
     },
     requirements: baseline?.product.requirements.map((r) => ({ id: r.id, text: r.text })) ?? null,

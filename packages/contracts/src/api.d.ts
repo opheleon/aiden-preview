@@ -242,10 +242,8 @@ export type WorkerAPI = {
   integrationRemove: { params: { connectionId: string }; result: { removed: boolean } };
   updateSources: { params: ProjectRef & { sources: ProjectSources }; result: null };
   connectCode: {
-    params: ProjectRef & {
-      code: Pick<Project, 'rootPath' | 'additionalRootPaths' | 'repositories'>;
-    };
-    result: { runId: string | null };
+    params: ProjectRef & { repositories: string[] };
+    result: { runId: string | null; repositories: Project['repositories'] };
   };
   estimate: {
     params: ProjectRef & { reportId?: string; refreshHistory?: boolean };

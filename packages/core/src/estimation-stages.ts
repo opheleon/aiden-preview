@@ -10,6 +10,7 @@ import {
   type Report,
   type RequirementEstimate,
   type RunManifest,
+  type Snapshot,
 } from '../../contracts/src/index.js';
 import { durationSummary, selectComparisons, SIZE_POINTS } from '../../estimation/src/index.js';
 import type { UnclassifiedHistory } from './history-normalization.js';
@@ -20,11 +21,12 @@ import type { WorkflowContext } from './workflow-context.js';
 export async function originalEstimates(
   stage: ModelStage,
   baseline: Baseline,
+  snapshots: Snapshot[] = [],
 ): Promise<Complexity[]> {
   const complexity = await stage(
     'estimate-original',
     ComplexityOutputSchema,
-    { baseline: baseline.product },
+    { baseline: baseline.product, snapshots },
     (value) => {
       const result = ComplexityOutputSchema.parse(value);
       const expected = baseline.product.requirements.map((r) => r.id).sort();

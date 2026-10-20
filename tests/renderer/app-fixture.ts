@@ -399,6 +399,18 @@ export function appFixture() {
             },
           };
           return guideView();
+        case 'connectCode':
+          project = {
+            ...project,
+            repositories: p.repositories.map((name: string) => ({
+              id: `repo-${name.replace(/\W/g, '-')}`,
+              path: `/synthetic/github/${name}`,
+              notes: '',
+              source: { kind: 'github', name, url: `https://github.com/${name}` },
+            })),
+          };
+          setupFacts = { ...setupFacts, repositories: project.repositories.length };
+          return { runId: null, repositories: project.repositories };
         case 'skipSetupStep':
           setupFacts = {
             ...setupFacts,

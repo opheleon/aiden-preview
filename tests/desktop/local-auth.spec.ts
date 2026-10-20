@@ -32,7 +32,7 @@ test('setup chat proves real database-backed web login and API-key access before
     const chat = page.getByRole('tabpanel', { name: 'Chat' });
     await expect(chat).toBeVisible();
     await chat.getByRole('button', { name: 'Looks right' }).click();
-    await chat.getByRole('button', { name: "I don't have the code here" }).click();
+    await chat.getByRole('button', { name: 'No code yet' }).click();
     await chat.getByRole('checkbox', { name: 'Web app', exact: true }).check();
     await expect(chat.getByRole('checkbox', { name: /iPhone/ })).toHaveCount(0);
     await chat.getByLabel('Where does the app run?').fill(`${demo.origin}/app`);

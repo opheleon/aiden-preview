@@ -412,11 +412,20 @@
   line-height: 1.5;
 }
 
-/* Code folders connected to a project, each removable, with Add a folder below. */
-.project-folders {
+/* GitHub repositories connected to a project, each removable, with a link field to add one. */
+.github-repositories {
   display: grid;
   gap: 10px;
-  justify-items: start;
+}
+
+.github-add {
+  display: flex;
+  gap: 8px;
+}
+
+.github-add input {
+  flex: 1;
+  min-width: 0;
 }
 
 .project-folder-list {

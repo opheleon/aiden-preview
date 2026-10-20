@@ -17,7 +17,7 @@ beforeEach(() => {
 /** Open the synthetic project as a fresh one: no confirmed requirements and no finished check. */
 /** Pass the Connect code step without code, as a person without the code on this computer. */
 async function skipCode() {
-  await userEvent.click(await screen.findByRole('button', { name: "I don't have the code here" }));
+  await userEvent.click(await screen.findByRole('button', { name: 'No code yet' }));
 }
 
 async function openFreshProject() {

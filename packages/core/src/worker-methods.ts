@@ -28,6 +28,7 @@ import { readCalls, settleAppUrlCalls } from './calls.js';
 import { cancelCoding, codingJobs, startCodingJob } from './coding-jobs.js';
 import { confirmAction, readConfirmations } from './confirmations.js';
 import { Engine } from './engine.js';
+import { connectGithubCode } from './github-code.js';
 import { guideMethods } from './guide-methods.js';
 import { guardLifecycleMethods, lifecycleMethods } from './lifecycle-methods.js';
 import { linearTeams, publishLinearTickets } from './linear-projects.js';
@@ -187,21 +188,8 @@ function functionMethods(engine: Engine) {
       (p) => saveMonitoredBranch(engine.store, p.projectId, p.repositoryId, p.monitoredBranch),
     ),
     connectCode: operation(
-      project.extend({
-        code: ProjectSchema.pick({
-          rootPath: true,
-          additionalRootPaths: true,
-          repositories: true,
-        }),
-      }),
-      async (p) => {
-        await engine.updateCode(p.projectId, p.code);
-        const { baseline } = await engine.state(p.projectId);
-        // With agreed requirements, read the newly connected code now; sizing follows the check.
-        return baseline && p.code.repositories.length
-          ? startLook(engine, p.projectId, 'you')
-          : { runId: null };
-      },
+      project.extend({ repositories: z.array(z.string().trim().min(1).max(300)).max(20) }),
+      (p) => connectGithubCode(engine, p.projectId, p.repositories),
     ),
     look: operation(
       project.extend({

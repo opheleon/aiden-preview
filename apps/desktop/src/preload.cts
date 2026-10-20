@@ -9,7 +9,6 @@ const bridge: DesktopBridge = {
         message.replace(/^Error invoking remote method 'aiden:request': Error: /, ''),
       );
     }),
-  chooseProjectFolder: () => ipcRenderer.invoke('aiden:chooseProjectFolder'),
   openExternal: (url) => ipcRenderer.invoke('aiden:openExternal', url),
   saveExport: (params) => ipcRenderer.invoke('aiden:export', params),
   openDeviceReport: (runId) => ipcRenderer.invoke('aiden:openDeviceReport', runId),

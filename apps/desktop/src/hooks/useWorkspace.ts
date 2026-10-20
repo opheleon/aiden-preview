@@ -42,7 +42,7 @@ export function useWorkspace(): Workspace {
   useWorkspaceEvents(state, api, call);
   return {
     ...state,
-    ...workspaceOperations(state, call, api),
+    ...workspaceOperations(state, call),
     ...updates,
     call,
     refresh,

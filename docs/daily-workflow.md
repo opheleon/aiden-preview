@@ -20,7 +20,7 @@ To change the monitored branch, open **Project settings** from the project menu,
 
 The project's Chat tab shows **Setup not complete** until its required steps are finished, then **Setup complete** with the checklist under **Setup details**. Switch to any other tab without losing your conversation or draft. Refreshing only the overview keeps your requirements confirmed; changes to the agreed scope require review again.
 
-Local-code and manual-only selections confirm directly; local code requires a valid project folder. Adding a web or API target reveals the access check, and removing those targets hides it again.
+Code and manual-only selections confirm directly; code checks need at least one connected GitHub repository. Adding a web or API target reveals the access check, and removing those targets hides it again.
 
 With automatic tickets enabled, Aiden checks tracker status every minute while the project is idle. A status change prompts a new code assessment, as does the first successful read of an already completed or canceled ticket. Saving scope and finishing an assessment also reconcile tickets. Sync tickets does this on demand.
 

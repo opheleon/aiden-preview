@@ -1,4 +1,5 @@
-import { mkdir, readFile, realpath } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, realpath, symlink } from 'node:fs/promises';
 import path from 'node:path';
 
 import {
@@ -9,7 +10,6 @@ import {
   type TestInfo,
 } from '@playwright/test';
 
-import { discoverRepositories } from '../../packages/tools/src/discovery.js';
 import { fixture, g } from '../helpers.js';
 import { providerLauncher } from './provider-launcher.js';
 
@@ -21,14 +21,17 @@ export async function desktopFixture() {
     await g(f.root, 'clone', '--bare', repo.path, remote);
     await g(repo.path, 'remote', 'add', 'origin', remote);
   }
-  const discovered = await discoverRepositories(f.root);
-  for (const snapshot of f.snapshots) {
-    const old = f.project.repositories.find((r) => r.id === snapshot.repositoryId)!;
-    snapshot.repositoryId = discovered.repositories.find(
-      (r) => path.basename(r.path) === path.basename(old.path),
-    )!.id;
-  }
-  f.project.repositories = discovered.repositories;
+  // Stand in for github.com: acme/frontend and acme/backend clone from these bare remotes.
+  await mkdir(path.join(f.root, '.github-base'));
+  await symlink(path.join(f.root, '.remotes'), path.join(f.root, '.github-base', 'acme'));
+  // Connected repositories are identified by their GitHub link, so the synthetic evidence is too.
+  const githubId = (name: string) =>
+    `repo-${createHash('sha256').update(`https://github.com/acme/${name}`).digest('hex').slice(0, 16)}`;
+  for (const snapshot of f.snapshots) snapshot.repositoryId = githubId(snapshot.repositoryId);
+  f.project.repositories = f.project.repositories.map((repo) => ({
+    ...repo,
+    id: githubId(repo.id),
+  }));
   const { binary, claude, control, calls } = await providerLauncher(f);
   const env = { ...process.env };
   delete env.OPENAI_API_KEY;
@@ -54,6 +57,7 @@ export async function desktopFixture() {
         AIDEN_CLAUDE_BINARY: claude,
         // Probe no default ports, so whatever runs on this machine never joins the journey.
         AIDEN_APP_PORTS: '',
+        AIDEN_GITHUB_CLONE_BASE: path.join(f.root, '.github-base'),
         PATH:
           process.platform === 'darwin'
             ? '/usr/bin:/bin:/usr/sbin:/sbin'
@@ -110,39 +114,44 @@ export async function desktopFixture() {
   };
 }
 
+/** Paste the fixture's two GitHub repositories into a repository list. */
+export async function addFixtureRepositories(scope: Page | ReturnType<Page['getByRole']>) {
+  for (const name of ['acme/frontend', 'acme/backend']) {
+    await scope.getByLabel('GitHub repository link').fill(`https://github.com/${name}`);
+    await scope.getByRole('button', { name: 'Add', exact: true }).click();
+  }
+}
+
 /**
- * Hand a project to Aiden from its goal, confirm the requirements, and connect the fixture code in
- * the setup chat, then wait for its first brief. Blocking questions hold setup in the chat, so a
- * blocked journey connects the code from Project settings instead.
+ * Hand a project to Aiden from its goal, confirm the requirements, and connect the fixture's
+ * GitHub repositories in the setup chat, then wait for its first brief. Blocking questions hold
+ * setup in the chat, so a blocked journey connects the code from Project settings instead.
  */
 export async function createProject(
-  app: ElectronApplication,
+  _app: ElectronApplication,
   page: Page,
-  root: string,
+  _root: string,
   blocked = false,
 ) {
   await page.getByLabel('What are you building?').fill('Users can list and create books.');
   await page.getByRole('button', { name: /Hand it to Aiden/ }).click();
   const chat = page.getByRole('tabpanel', { name: 'Chat' });
   await expect(chat).toBeVisible();
-  await app.evaluate(({ dialog }, folder) => {
-    dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [folder] });
-  }, root);
   if (blocked) {
     await page
       .getByRole('button', { name: /^Actions for / })
       .first()
       .click();
     await page.getByRole('menuitem', { name: 'Project settings' }).click();
-    await page.getByRole('button', { name: 'Add a folder', exact: true }).click();
-    await page.getByText('Repositories included · 2').waitFor();
-    await page.getByRole('button', { name: 'Save and run check', exact: true }).click();
+    await addFixtureRepositories(page);
+    await page.getByRole('button', { name: /Save repositories/ }).click();
+    await page.getByText(/Repositories saved|Saved\./).waitFor();
     await page.locator('.project-row .project-link').first().click();
   } else {
     await chat.getByRole('button', { name: 'Looks right' }).click();
     const code = chat.getByRole('region', { name: 'Connect your code' });
-    await code.getByRole('button', { name: 'Add a folder', exact: true }).click();
-    await code.getByRole('button', { name: 'Use these folders', exact: true }).click();
+    await addFixtureRepositories(code);
+    await code.getByRole('button', { name: 'Use these repositories', exact: true }).click();
   }
   await page.getByRole('tab', { name: 'Overview', exact: true }).click();
   await page.getByRole('progressbar').waitFor();

@@ -123,7 +123,7 @@ function useVerificationSetup(props: SetupProps) {
       if (!Object.values(selected).some(Boolean))
         throw new Error('Choose at least one way to check the work.');
       if (code && !workspace.project.repositories.length)
-        throw new Error('Choose a folder with a Git repository, or uncheck Connect the code.');
+        throw new Error('Connect a GitHub repository first, or uncheck Connect the code.');
       const update = { ...verificationUpdate(draft), manual };
       const result = await workspace.call('configureGuideVerification', {
         projectId,
@@ -296,17 +296,16 @@ function MethodFields({
         <p>
           {workspace.project.repositories.length
             ? `Code checks run on ${workspace.project.repositories.length} connected ${workspace.project.repositories.length === 1 ? 'repository' : 'repositories'}.`
-            : 'Choose the folder containing your code. Aiden will check for Git repositories.'}
+            : 'Connect the GitHub repositories first. Aiden keeps a read-only copy of each.'}
         </p>
         <button
-          disabled={workspace.scanning || workspace.busy}
-          onClick={() => void workspace.addProjectFolder()}
+          disabled={workspace.busy}
+          onClick={() => {
+            workspace.setSettingsTab('project');
+            workspace.setArea('settings');
+          }}
         >
-          {workspace.scanning
-            ? 'Checking the folder…'
-            : workspace.project.repositories.length
-              ? 'Add another folder'
-              : 'Choose the folder'}
+          {workspace.project.repositories.length ? 'Change repositories' : 'Connect repositories'}
         </button>
       </div>
     );

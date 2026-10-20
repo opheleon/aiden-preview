@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 
 import { expect, test } from '@playwright/test';
 
-import { desktopFixture } from './journey-fixture.js';
+import { addFixtureRepositories, desktopFixture } from './journey-fixture.js';
 
 test('intent-only setup opens on the Chat tab, saves web settings, and keeps the draft across pages', async ({
   browserName,
@@ -93,7 +93,7 @@ test('intent-only setup opens on the Chat tab, saves web settings, and keeps the
     // Without a code folder, the next step recommends connecting code; this journey continues without it.
     await expect(chat.getByRole('region', { name: 'Connect your code' })).toBeVisible();
     await page.screenshot({ path: info.outputPath('02-connect-code.png') });
-    await chat.getByRole('button', { name: "I don't have the code here" }).click();
+    await chat.getByRole('button', { name: 'No code yet' }).click();
     await page.screenshot({ path: info.outputPath('02-checklist.png') });
     await chat.getByRole('checkbox', { name: /Web app/ }).click();
     await chat.getByLabel('Where does the app run?').fill(`${url}/unavailable`);
@@ -122,21 +122,13 @@ test('intent-only setup opens on the Chat tab, saves web settings, and keeps the
     await page.getByRole('button', { name: 'A book project', exact: true }).click();
     await expect(chat.getByLabel('Message the Guide')).toHaveValue('Keep this draft');
     expect(await fixture.calls()).not.toContain('assess');
-    await reply('choose-folder', 'Synthetic reply: connect the project folder here.');
+    await reply('connect-code', 'Synthetic reply: paste the GitHub repositories here.');
     await page.getByRole('button', { name: 'A book project', exact: true }).click();
     await chat.getByLabel('Message the Guide').fill('Connect my code');
     await chat.getByRole('button', { name: 'Send', exact: true }).click();
-    await desktop.app.evaluate(({ dialog }, folder) => {
-      dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [folder] });
-    }, fixture.root);
-    await chat.getByRole('button', { name: 'Choose the folder', exact: true }).click();
-    await expect(chat.getByText(/Code checks run on 2 connected repositories/)).toBeVisible();
-    await reply(
-      'confirm-requirements',
-      'Synthetic reply: code connected, review the updated requirements.',
-    );
-    await chat.getByRole('button', { name: 'Check access' }).click();
-    await chat.getByRole('button', { name: 'Confirm setup' }).click();
+    const code = chat.getByRole('region', { name: 'Connect your code' });
+    await addFixtureRepositories(code);
+    await code.getByRole('button', { name: 'Use these repositories', exact: true }).click();
     await expect.poll(async () => (await fixture.calls()).includes('assess')).toBe(true);
     await expect(chat.getByRole('region', { name: 'Code check results' })).toBeVisible();
     await expect(chat).toBeVisible();
