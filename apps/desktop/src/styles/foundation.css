@@ -237,7 +237,7 @@ small {
 }
 
 .sidebar {
-  width: 240px;
+  width: 280px;
   position: fixed;
   top: 44px;
   bottom: 0;
@@ -326,8 +326,15 @@ nav {
   min-width: 0;
   overflow: hidden;
   text-align: left;
+  text-overflow: clip;
   white-space: nowrap;
   mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+
+/* While the "…" shows, the name finishes fading before it reaches the dots. */
+.project-row:hover .project-name,
+.project-row:has([aria-expanded='true'], :focus-visible) .project-name {
+  mask-image: linear-gradient(to right, #000 calc(100% - 60px), transparent calc(100% - 30px));
 }
 
 .project-nav .project-dot {
