@@ -1,4 +1,8 @@
 /* Project chat is the first project tab: the thread scrolls inside the page, composer below. */
+.project-chat-frame {
+  min-width: 0;
+}
+
 .project-chat-panel .guide-tab {
   height: var(--project-chat-height, max(440px, calc(100dvh - 300px)));
 }

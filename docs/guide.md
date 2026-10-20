@@ -14,7 +14,7 @@ The top of the Guide shows the setup steps. Each step's state comes from what th
 2. **Review requirements.** The Guide plays them back, with any assumptions, and says what Aiden will do next. Select **Looks right**, or type a correction such as "REQ-3 should be admin only". Aiden rewrites the requirements and plays back what changed. A later change to the requirements opens this step again.
 3. **Choose checks.** Pick one or more: connect the code (a folder with a Git repository), a web app, an API, or **I'll check it myself**. Use the checkbox list to select any combination and fill in its fields. **Check access** tests the selected web/API addresses and their configured private sign-in or API key. iPhone setup is currently hidden; its implementation is retained. **Confirm setup** becomes available only after all selected targets pass; editing a target requires a new check. A failed check preserves the previous settings. Successful access is separate from passing requirements.
 4. **First check.** Run it now, or select **Later**. Checking by hand needs no automatic first check.
-5. **Extras,** such as linking a ticket tracker. These never block setup.
+5. **Ticket tracker,** such as linking a ticket tracker. These never block setup.
 
 When a step is unfinished on a project that has already been checked, the Overview tab also shows a **Finish setup** banner with **Go to Chat**.
 
@@ -28,7 +28,7 @@ While Aiden prepares a reply, a moving highlight sweeps across **Thinking**. It 
 
 The Guide never asks for passwords, tokens, or API keys. Test logins belong in the private verification settings. Folder choice and iPhone pairing always use their cards, because they need your computer.
 
-The setup checklist highlights the current step, its next action, and a plain explanation of what the step involves. **What each step involves** lists the explanation for every step, and the optional Extras line says what it adds. Reading them never moves the chat or changes your answers. Once setup is complete, open Setup details to revisit the checklist and explanations.
+The top of the chat shows setup on one line: its status, the current step, and its next action. **Show steps** opens every step with a plain explanation of what it involves, including the optional ticket tracker, which Aiden also offers in the chat once the required steps are done. Reading them never moves the chat or changes your answers. Once setup is complete, open Setup details to revisit the checklist and explanations.
 
 Checks stay in the chat. While Aiden works, the conversation shows live updates and results as each app check finishes. Expand a result to read what happened and open its evidence inline, including recordings and screenshots. Code check conclusions, failures, and stopped checks also appear here. When a check finishes, its results are saved into the conversation where it happened, so they stay in scrollback after later checks or scope changes. **View results in chat** on the Overview's Latest check card brings the newest saved results into view.
 

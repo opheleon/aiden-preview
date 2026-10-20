@@ -8,7 +8,9 @@
 
 - Show whether Claude or Codex is connected on the start screen and block Hand it to Aiden until it is, with a Connect button. Add Sign in with Claude, which opens Claude Code's own sign-in and rechecks the connection automatically, plus a Claude Code installation link.
 
-- Show setup step explanations, delivery step outcomes, how Aiden knows each requirement's status, and delivery finding summaries inline instead of behind info icons and hover text.
+- Keep setup to one compact line at the top of the chat, with every step and its explanation under Show steps. The ticket tracker is now the optional last setup step, offered in the chat once the required steps are done.
+
+- Show delivery step outcomes, how Aiden knows each requirement's status, and delivery finding summaries inline instead of behind info icons and hover text.
 
 - Lead chat answers with the direct answer and add numbered next steps naming the exact control when a question asks how to do something.
 

@@ -27,27 +27,24 @@ test('a new project opens on the Guide, plays back the requirements, and sets up
   const dialog = await chatPanel();
   expect(dialog).toBeVisible();
   expect(screen.queryByRole('tab', { name: /Guide/ })).not.toBeInTheDocument();
-  const setup = screen.getByRole('list', { name: 'Setup' });
-  expect(within(setup).getByText('Review requirements')).toBeVisible();
   // The playback starts on its own once the requirements exist.
   expect(await screen.findByText(/Synthetic playback of the requirements/)).toBeVisible();
-  expect(within(dialog).getByText('Step 2 of 4 · Review requirements')).toBeVisible();
+  const checklist = screen.getByRole('region', { name: 'Project setup' });
+  // Setup is one compact line; the steps and their explanations open on demand.
+  expect(within(checklist).getByText(/Step 2 of 4 · Review requirements/)).toBeVisible();
+  expect(within(checklist).queryByRole('list', { name: 'Setup' })).toBeNull();
   await userEvent.type(within(dialog).getByLabelText('Message the Guide'), 'Keep this draft');
   const requestsBeforeHelp = f.request.mock.calls.length;
-  const checklist = screen.getByRole('region', { name: 'Project setup' });
-  // The current step's explanation is in plain view; every other step is one disclosure away.
-  expect(
-    within(checklist).getAllByText(/Review the requirements and resolve any open questions/)[0],
-  ).toBeVisible();
-  expect(within(checklist).getByText(/Optionally connect a ticket tracker/)).toBeVisible();
-  expect(within(checklist).getByText(/Choose code, web, API, or manual checks/)).not.toBeVisible();
-  await userEvent.click(within(checklist).getByText('What each step involves'));
+  await userEvent.click(within(checklist).getByRole('button', { name: 'Show steps' }));
+  const steps = within(checklist).getByRole('list', { name: 'Setup' });
   for (const text of [
     /Describe what you want to build/,
+    /Review the requirements and resolve any open questions/,
     /Choose code, web, API, or manual checks/,
     /Check your requirements and see progress/,
+    /Link Linear so Aiden publishes and syncs tickets/,
   ])
-    expect(within(checklist).getByText(text)).toBeVisible();
+    expect(within(steps).getByText(text)).toBeVisible();
   expect(within(dialog).getByLabelText('Message the Guide')).toHaveValue('Keep this draft');
   expect(f.request.mock.calls.length).toBe(requestsBeforeHelp);
   expect(f.request).toHaveBeenCalledWith('askGuide', { projectId: f.project().id, kickoff: true });

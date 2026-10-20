@@ -1,45 +1,63 @@
+/* Setup is one compact line at the top of the chat; its steps open on demand. */
 .setup-checklist {
   flex-shrink: 0;
-  padding-bottom: 12px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
 }
 
 .setup-heading,
 .setup-current {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  gap: 10px;
 }
 
 .setup-heading {
-  justify-content: space-between;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .setup-current {
+  flex-shrink: 0;
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
 }
 
+.setup-current svg {
+  align-self: center;
+  color: var(--brand);
+}
+
 .setup-next-action {
-  margin: 4px 0 0;
+  flex: 1 1 160px;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
   color: var(--muted);
+  font-size: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.setup-toggle {
+  flex-shrink: 0;
+  margin-left: auto;
   font-size: 14px;
 }
 
 .setup-steps {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
   list-style: none;
-  margin: 12px 0 4px;
+  margin: 12px 0 2px;
   padding: 0;
 }
 
 .setup-item {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 10px;
   min-width: 0;
   color: var(--muted);
   font-size: 14px;
@@ -47,17 +65,32 @@
 
 .setup-marker {
   display: flex;
-  flex: 0 0 26px;
+  flex: 0 0 22px;
   align-items: center;
   justify-content: center;
-  height: 26px;
+  height: 22px;
   border: 1px solid var(--border);
   border-radius: 50%;
   font-size: 12px;
 }
 
-.setup-item-next {
+.setup-item-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.45;
+}
+
+.setup-item-label {
   color: var(--ink);
+}
+
+.setup-optional {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.setup-item-next .setup-item-label {
   font-weight: 600;
 }
 
@@ -74,56 +107,4 @@
 
 .setup-item-skipped .setup-marker {
   border-style: dashed;
-}
-
-.setup-item-label {
-  min-width: 0;
-  line-height: 1.4;
-}
-
-.setup-extras {
-  margin: 0;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.setup-explanation {
-  max-width: 72ch;
-  margin: 4px 0 0;
-  color: var(--ink);
-  font-size: 15px;
-  line-height: 1.55;
-}
-
-.setup-guide {
-  margin-top: 8px;
-  font-size: 14px;
-}
-
-.setup-guide summary {
-  width: fit-content;
-  color: var(--brand);
-  cursor: pointer;
-}
-
-.setup-guide dl {
-  display: grid;
-  gap: 6px;
-  margin: 8px 0 0;
-}
-
-.setup-guide dt {
-  font-weight: 600;
-}
-
-.setup-guide dd {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-@media (width <= 680px) {
-  .setup-steps {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }

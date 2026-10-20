@@ -277,7 +277,7 @@ export function setupProgress(facts: SetupFacts): SetupProgress {
     confirm: 'Review requirements',
     verify: 'Choose checks',
     'first-check': 'First check',
-    extras: 'Extras',
+    extras: 'Ticket tracker',
   };
   const order = SetupStepIdSchema.options;
   const required = order.filter((id) => id !== 'extras');

@@ -40,7 +40,7 @@ test('intent-only setup opens on the Chat tab, saves web settings, and keeps the
     await page.getByRole('button', { name: /Hand it to Aiden/ }).click();
     const chat = page.getByRole('tabpanel', { name: 'Chat' });
     await expect(chat).toBeVisible();
-    await expect(chat.getByRole('list', { name: 'Setup' })).toBeVisible();
+    await expect(chat.getByRole('region', { name: 'Project setup' })).toBeVisible();
     await expect(chat.getByRole('status', { name: 'Setup status' })).toHaveText(
       'Setup not complete',
     );
@@ -67,11 +67,11 @@ test('intent-only setup opens on the Chat tab, saves web settings, and keeps the
     await page.getByRole('button', { name: 'Go to Chat', exact: true }).click();
     await expect(chat.getByRole('button', { name: 'Looks right' })).toBeVisible();
     await expect(chat.getByRole('region', { name: 'Change project scope' })).toHaveCount(0);
-    // Each step's explanation is in plain view, not behind an info icon.
+    // Setup is one compact line; Show steps opens every step and what it involves.
+    await chat.getByRole('button', { name: 'Show steps' }).click();
     await expect(
-      chat.getByText(/Review the requirements and resolve any open questions/).first(),
+      chat.getByText(/Review the requirements and resolve any open questions/),
     ).toBeVisible();
-    await chat.getByText('What each step involves').click();
     await expect(chat.getByText(/Choose code, web, API, or manual checks/)).toBeVisible();
     await page.screenshot({
       path: info.outputPath('setup-step-explanations.png'),
@@ -84,7 +84,7 @@ test('intent-only setup opens on the Chat tab, saves web settings, and keeps the
       path: info.outputPath('setup-step-explanations-narrow.png'),
       animations: 'disabled',
     });
-    await chat.getByText('What each step involves').click();
+    await chat.getByRole('button', { name: 'Hide steps' }).click();
     await expect(chat).toBeVisible();
     await page.setViewportSize({ width: 1320, height: 868 });
     await page.screenshot({ path: info.outputPath('01-setup-chat.png') });
@@ -103,9 +103,9 @@ test('intent-only setup opens on the Chat tab, saves web settings, and keeps the
     await chat.getByRole('button', { name: 'Confirm setup', exact: true }).click();
     await chat.getByRole('button', { name: 'Later', exact: true }).click();
     await expect(chat.getByText(/Setup complete/)).toBeVisible();
-    await chat.getByRole('button', { name: 'Setup details' }).click();
-    await expect(chat.getByText('What each step involves')).toBeVisible();
-    await chat.getByRole('button', { name: 'Setup details' }).click();
+    await chat.getByRole('button', { name: 'Show steps' }).click();
+    await expect(chat.getByRole('list', { name: 'Setup' })).toBeVisible();
+    await chat.getByRole('button', { name: 'Hide steps' }).click();
     await chat.getByLabel('Message the Guide').fill('Keep this draft');
     await page.screenshot({ path: info.outputPath('02-setup-complete.png') });
     await page.getByRole('tab', { name: 'Overview', exact: true }).click();
