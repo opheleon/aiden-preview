@@ -58,12 +58,9 @@
   letter-spacing: -0.04em;
 }
 
-.goal-starter-lead {
-  max-width: 540px;
-  margin: 18px 0 28px;
-  color: var(--color-body);
-  font-size: 16px;
-  line-height: 1.7;
+/* The start screen is the heading and the box; nothing in between. */
+.set-intent .chat-composer {
+  margin-top: 28px;
 }
 
 .chat-composer {
@@ -156,8 +153,13 @@
   background: var(--brand-dark);
 }
 
-.goal-starter-create {
+/* The tooltip wrapper carries the right alignment the start button used to have. */
+.goal-starter-start {
   margin-left: auto;
+}
+
+.set-intent > details {
+  margin-top: 14px;
 }
 
 .goal-starter-next {

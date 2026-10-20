@@ -34,14 +34,12 @@ test('setting the intent is one screen, and Aiden starts with only the intent', 
   expect(screen.getByRole('heading', { name: /What are you building/ })).toBeVisible();
   const start = screen.getByRole('button', { name: /Hand it to Aiden/ });
   expect(start).toBeDisabled();
-  expect(start).toHaveAccessibleDescription('To start, describe what you are building.');
+  // What is missing is the button's tooltip; the start screen has no other hints.
+  expect(start).toHaveAccessibleDescription('Describe what you are building first.');
+  expect(start.parentElement).toHaveAttribute('title', 'Describe what you are building first.');
   await userEvent.type(screen.getByLabelText('What are you building?'), 'List books');
-  // Code folders and checks come later in the setup chat, which says what happens next.
   expect(start).toBeEnabled();
   expect(start).not.toHaveAccessibleDescription();
-  expect(
-    screen.getByText(/asks you to connect your code so it can estimate the work/),
-  ).toBeVisible();
   expect(screen.queryByText('Verification setup: surfaces and connections')).toBeNull();
   for (const name of ['Import a file', 'Add the project folder (optional)'])
     expect(screen.queryByRole('button', { name })).toBeNull();
@@ -88,10 +86,12 @@ test('starting needs a connected model, and Connect opens its sign-in controls',
     await userEvent.type(screen.getByLabelText('What are you building?'), 'List books');
     expect(await screen.findByLabelText('Codex connection')).toHaveTextContent('Connected');
     await userEvent.selectOptions(screen.getByLabelText('Model provider'), 'claude');
-    expect(screen.getByLabelText('Claude connection')).toHaveTextContent('Not connected');
+    expect(screen.getByRole('button', { name: 'Connect Claude' })).toHaveTextContent(
+      'Not connected',
+    );
     const start = screen.getByRole('button', { name: /Hand it to Aiden/ });
     expect(start).toBeDisabled();
-    expect(start).toHaveAccessibleDescription('Connect Claude before handing this to Aiden.');
+    expect(start).toHaveAccessibleDescription('Connect Claude first.');
     await userEvent.click(screen.getByRole('button', { name: 'Connect Claude' }));
     expect(screen.getByText('Model connection and effort').closest('details')).toHaveAttribute(
       'open',

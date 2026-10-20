@@ -18,8 +18,7 @@ const api = window.aiden;
  */
 export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element {
   const { project, setProject, busy, start } = workspace;
-  const blocker = startHint(workspace);
-  const missing = blocker?.blocking ? blocker.why : '';
+  const missing = startHint(workspace);
   const model = useRef<HTMLDetailsElement>(null);
   return (
     <section className="goal-starter set-intent" aria-label="New project">
@@ -31,12 +30,6 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
       <h1>
         What are you <span className="serif">building?</span>
       </h1>
-      <p className="goal-starter-lead">
-        Paste or type anything that says what you want, or paste a link to a Notion page and Aiden
-        reads it. Aiden plans usable features in delivery order, assesses the code and tracks
-        delivery, and surfaces what needs you. Include your target date and constraints if you have
-        them.
-      </p>
       <div className="chat-composer">
         <textarea
           className="chat-composer-textarea"
@@ -48,19 +41,27 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
           onChange={(event) => setProject({ ...project, context: event.target.value })}
         />
         <div className="chat-composer-footer">
-          <ProviderPicker workspace={workspace} />
-          <button
-            className="primary goal-starter-create"
-            disabled={busy || !!blocker.blocking}
-            aria-describedby={missing ? 'start-hint' : undefined}
-            onClick={() => void start()}
-          >
-            Hand it to Aiden <ArrowRight size={15} />
-          </button>
+          <ProviderPicker
+            workspace={workspace}
+            onConnect={() => openModelControls(model.current)}
+          />
+          {/* A disabled button gets no hover, so its wrapper says what is still needed. */}
+          <span className="goal-starter-start" title={missing || undefined}>
+            <button
+              className="primary goal-starter-create"
+              disabled={busy || !!missing}
+              aria-describedby={missing ? 'start-hint' : undefined}
+              onClick={() => void start()}
+            >
+              Hand it to Aiden <ArrowRight size={15} />
+            </button>
+            <span id="start-hint" hidden>
+              {missing}
+            </span>
+          </span>
         </div>
       </div>
       <NotionNotice workspace={workspace} />
-      <StartBlocker blocker={blocker} onConnect={() => openModelControls(model.current)} />
       <details ref={model}>
         <summary>Model connection and effort</summary>
         <RuntimeSettings
@@ -125,8 +126,17 @@ function NotionNotice({ workspace }: { workspace: Workspace }): JSX.Element | nu
   );
 }
 
-/** The provider choice with whether it is connected, read from the loaded diagnostics. */
-function ProviderPicker({ workspace }: { workspace: Workspace }): JSX.Element {
+/**
+ * The provider choice with whether it is connected, read from the loaded diagnostics. When it is
+ * not connected, the status itself opens the sign-in steps.
+ */
+function ProviderPicker({
+  workspace,
+  onConnect,
+}: {
+  workspace: Workspace;
+  onConnect: () => void;
+}): JSX.Element {
   const { project, setProject } = workspace;
   const name = providerName(project.runtime.provider);
   const connected = runtimeReady(workspace.diagnostics, project.runtime);
@@ -147,13 +157,23 @@ function ProviderPicker({ workspace }: { workspace: Workspace }): JSX.Element {
         <option value="codex">Codex</option>
         <option value="claude">Claude</option>
       </select>
-      <span
-        className={`connection provider-ready ${connected ? 'ready' : ''}`}
-        aria-label={`${name} connection`}
-      >
-        <span />
-        {label}
-      </span>
+      {connected === false ? (
+        <button
+          className="text-button provider-connect"
+          aria-label={`Connect ${name}`}
+          onClick={onConnect}
+        >
+          Not connected · Connect
+        </button>
+      ) : (
+        <span
+          className={`connection provider-ready ${connected ? 'ready' : ''}`}
+          aria-label={`${name} connection`}
+        >
+          <span />
+          {label}
+        </span>
+      )}
     </>
   );
 }
@@ -166,67 +186,16 @@ function openModelControls(details: HTMLDetailsElement | null): void {
   details.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
 }
 
-/** Something the person should know before starting: a blocker, or a note that does not block. */
-interface StartBlockerInfo {
-  why: string;
-  fix: string;
-  /** The selected provider needs connecting; offers to open the model connection controls. */
-  connect?: string;
-  blocking: boolean;
-}
-
 /**
- * Say what is still needed before Aiden can start, or what happens after. The goal and a connected
- * model are required; everything else, including the code folders, comes in the setup chat.
- * Example: an empty box blocks; Claude not signed in blocks and offers to connect it.
+ * What still stops the start, as one short sentence for the button's tooltip, or empty when
+ * Aiden can start. The goal and a connected model are required; everything else comes later in
+ * the setup chat.
+ * Example: an empty box gives "Describe what you are building first."
  */
-function startHint(workspace: Workspace): StartBlockerInfo {
+function startHint(workspace: Workspace): string {
   const { project } = workspace;
-  const connected = runtimeReady(workspace.diagnostics, project.runtime);
-  const name = providerName(project.runtime.provider);
-  if (!project.context.trim())
-    return {
-      why: 'To start, describe what you are building.',
-      fix: 'Type or paste your goal in the box above, or paste a Notion page link.',
-      blocking: true,
-    };
-  if (connected === false)
-    return {
-      why: `Connect ${name} before handing this to Aiden.`,
-      fix: `Aiden works through your own ${name} account. Install it if needed and sign in; your subscription or API-key billing applies.`,
-      connect: name,
-      blocking: true,
-    };
-  return {
-    why: 'What happens next: Aiden plays back the requirements for you to confirm, asks you to connect your code so it can estimate the work, then asks how to check it.',
-    fix: 'Each step is in the setup chat, where you can ask what it means. Nothing else is needed here.',
-    blocking: false,
-  };
-}
-
-/**
- * Explain prominently why the start button is disabled and how to fix it, or what happens next.
- * Example: an empty intent shows the reason and the fix; a signed-out model offers to connect it.
- */
-function StartBlocker({
-  blocker,
-  onConnect,
-}: {
-  blocker: StartBlockerInfo;
-  onConnect: () => void;
-}): JSX.Element {
-  return (
-    <div className={blocker.blocking ? 'start-blocker' : 'start-blocker start-note'}>
-      {blocker.blocking ? <CircleAlert size={16} /> : <Info size={16} />}
-      <div>
-        <p id={blocker.blocking ? 'start-hint' : undefined}>{blocker.why}</p>
-        <p className="start-blocker-fix">{blocker.fix}</p>
-      </div>
-      {blocker.connect && (
-        <button className="start-blocker-action" onClick={onConnect}>
-          Connect {blocker.connect}
-        </button>
-      )}
-    </div>
-  );
+  if (!project.context.trim()) return 'Describe what you are building first.';
+  if (runtimeReady(workspace.diagnostics, project.runtime) === false)
+    return `Connect ${providerName(project.runtime.provider)} first.`;
+  return '';
 }

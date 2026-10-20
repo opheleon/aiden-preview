@@ -8,6 +8,8 @@
 
 - Show whether Claude or Codex is connected on the start screen and block Hand it to Aiden until it is, with a Connect button. Add Sign in with Claude, which opens Claude Code's own sign-in and rechecks the connection automatically, plus a Claude Code installation link.
 
+- Keep the start screen to the heading and the box: what is still missing shows as a tooltip on Hand it to Aiden, and a model that is not connected offers Connect beside the provider.
+
 - Connect code by pasting GitHub repository links. Aiden makes a fresh read-only clone of each in the project's own folder (pushing disabled, hooks never run), using your Git or GitHub CLI sign-in for private repositories. Local project folders are no longer supported.
 
 - Sizing now explores the code: estimates read the latest code check's snapshots with file listing, search, and reads, so touch points, existing patterns, and test coverage come from the code.

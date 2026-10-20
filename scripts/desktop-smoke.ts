@@ -102,7 +102,6 @@ try {
   for (const name of ['Import a file', 'Add the project folder (optional)'])
     if (await page.getByRole('button', { name }).count())
       throw new Error(`${name} should not be on the start screen.`);
-  await expect(page.getByText(/asks you to connect your code/)).toBeVisible();
   await page.screenshot({ path: 'test-results/desktop-smoke/intent-fixture.png', fullPage: true });
   // Provider sign-in lives in settings; the unsaved project keeps its intent meanwhile.
   await page.getByRole('button', { name: 'Settings', exact: true }).first().click();
