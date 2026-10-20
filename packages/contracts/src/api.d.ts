@@ -14,6 +14,7 @@ import type {
   EstimateOverrides,
   EstimationSnapshot,
   Evidence,
+  IntegrationPreset,
   McpAuth,
   McpConnection,
   McpTool,
@@ -211,7 +212,7 @@ export type WorkerAPI = {
   login: { params: { provider: 'codex' | 'claude' }; result: { authUrl?: string } };
   updateRuntime: { params: ProjectRef & { runtime: RuntimeConfig }; result: null };
   integrations: { params: Record<string, never>; result: McpConnection[] };
-  integrationPreset: { params: { provider: 'linear' | 'jira' }; result: McpConnection };
+  integrationPreset: { params: { provider: IntegrationPreset }; result: McpConnection };
   integrationAdd: {
     params: {
       name: string;

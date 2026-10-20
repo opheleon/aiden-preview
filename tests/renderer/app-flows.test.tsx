@@ -453,6 +453,7 @@ test('model, integration, privacy, and update settings use the selected saved pr
   expect(screen.queryByRole('button', { name: 'Add server' })).toBeNull();
   expect(screen.queryByLabelText('Server URL')).toBeNull();
   expect(screen.getByText(/Jira and custom MCP are experimental/)).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Connect Notion' })).toBeVisible();
   await userEvent.click(screen.getByRole('button', { name: 'Connect Linear' }));
   await userEvent.click(screen.getByRole('button', { name: 'Connect / test' }));
   await userEvent.click(screen.getByRole('button', { name: 'Review tools' }));

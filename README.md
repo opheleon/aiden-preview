@@ -42,7 +42,7 @@ Check, download, and restart from the update control at the bottom of the sideba
 1. Choose Claude or Codex on the start screen. It shows whether the model is connected; **Connect** opens the sign-in steps (also in **Settings → Model**). Claude needs Claude Code and a paid Claude plan; Codex needs its CLI installed separately, since the Codex desktop app alone is not enough. Cursor is not supported.
 2. Describe what you're building. Adding the code folder is optional.
 3. Choose **Hand it to Aiden**. The project opens on its **Chat** tab, where Aiden plays back the requirements and asks how to check the work.
-4. Review **Overview**, answer questions in **Needs you**, and refine **Scope** as you learn. Connect Linear when you want shared tickets.
+4. Review **Overview**, answer questions in **Needs you**, and refine **Scope** as you learn. Connect Linear when you want shared tickets, and Notion when you want Aiden to read specs and notes as project context.
 
 Your subscription limits or API charges apply; Aiden includes no model credits. Open **Help / Getting started** in the app or read the [getting-started guide](docs/getting-started.md) for more.
 

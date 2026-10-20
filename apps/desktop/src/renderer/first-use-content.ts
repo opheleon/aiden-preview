@@ -18,7 +18,7 @@ export const firstUseSteps = [
       'Codex for ChatGPT: install the Codex CLI, then select Sign in with Codex.',
     ],
     detail:
-      'The start screen shows whether your chosen model is connected, and Connect opens the sign-in steps; Settings → Model has the same controls. Cursor is not supported in this Preview. Choose the model and effort for your project in Model settings. Aiden uses the subscription or API-key billing option you select. Provider limits and charges may apply. There is no separate Aiden sign-in. You can connect Linear later in Settings → Integrations. It’s optional.',
+      'The start screen shows whether your chosen model is connected, and Connect opens the sign-in steps; Settings → Model has the same controls. Cursor is not supported in this Preview. Choose the model and effort for your project in Model settings. Aiden uses the subscription or API-key billing option you select. Provider limits and charges may apply. There is no separate Aiden sign-in. You can connect Linear or Notion later in Settings → Integrations. It’s optional.',
   },
   {
     title: 'Set the intent',

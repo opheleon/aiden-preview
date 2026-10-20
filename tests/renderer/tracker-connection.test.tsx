@@ -44,7 +44,7 @@ test('publishing offers the write connection with readiness and reconnects its e
   expect(f.workspace.setIntegrations).toHaveBeenCalled();
 });
 
-test('new publishing hides experimental connections while an existing selection stays available', () => {
+test('new publishing hides experimental and Notion connections while an existing selection stays available', () => {
   const f = fixture();
   const custom = {
     ...writer,
@@ -59,11 +59,13 @@ test('new publishing hides experimental connections while an existing selection 
     name: 'Jira',
     url: 'https://mcp.atlassian.com/v2/mcp?tools=all',
   };
-  f.workspace.integrations.push(custom, jira);
+  const notion = { ...custom, id: 'notion', name: 'Notion', url: 'https://mcp.notion.com/mcp' };
+  f.workspace.integrations.push(custom, jira, notion);
   const { rerender } = render(
     <TrackerConnection workspace={f.workspace} destination={destination} onChange={vi.fn()} />,
   );
   expect(screen.queryByRole('option', { name: /Experimental/ })).toBeNull();
+  expect(screen.queryByRole('option', { name: /Notion/ })).toBeNull();
   rerender(
     <TrackerConnection
       workspace={f.workspace}
