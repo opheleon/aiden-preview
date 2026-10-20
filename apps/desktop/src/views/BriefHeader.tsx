@@ -68,7 +68,7 @@ function TitleLines({
   const inline = closed || !workspace.project.repositories.some((repo) => repo.monitoredBranch);
   return (
     <div>
-      <h1>{scopeName(workspace.project.context, workspace.baseline?.product)}</h1>
+      <h1>{scopeName(workspace.project.context, workspace.baseline?.product, true)}</h1>
       {when && (
         <p className="brief-when" title={inline ? undefined : `Monitoring ${monitoring}`}>
           {when}
