@@ -42,7 +42,7 @@ Check, download, and restart from the update control at the bottom of the sideba
 1. Open **Settings → Model**, choose Claude or Codex, and follow the installation and sign-in steps. Codex needs its CLI installed separately; the Codex desktop app alone is not enough.
 2. Create a project, describe what you're building, and select its code folder.
 3. Choose **Hand it to Aiden**. It writes the requirements, plans delivery, and runs the first check.
-4. Review **Overview**, answer questions in **Needs you**, and refine **Scope** as you learn. Connect Linear when you want shared tickets.
+4. Review **Overview**, answer questions in **Needs you**, and refine **Scope** as you learn. Connect Linear when you want shared tickets, and Notion when you want Aiden to read specs and notes as project context.
 
 Your subscription limits or API charges apply; Aiden includes no model credits. Open **Help / Getting started** in the app or read the [getting-started guide](docs/getting-started.md) for more.
 

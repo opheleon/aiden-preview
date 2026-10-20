@@ -16,6 +16,7 @@ export * from './ids.js';
 export * from './integrations.js';
 export * from './project-lifecycle.js';
 export * from './runtime.js';
+export type { IntegrationPreset } from './tracker-connections.js';
 export * from './verification.js';
 
 export const id = z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/);

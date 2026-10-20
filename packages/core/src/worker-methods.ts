@@ -268,8 +268,9 @@ function runtimeMethods(engine: Engine, runtimes: RuntimeControls) {
 function integrationMethods(engine: Engine) {
   return {
     integrations: operation(z.object({}).strict(), () => engine.integrations.list()),
-    integrationPreset: operation(z.object({ provider: z.enum(['linear', 'jira']) }).strict(), (p) =>
-      engine.integrations.preset(p.provider),
+    integrationPreset: operation(
+      z.object({ provider: z.enum(['linear', 'jira', 'notion']) }).strict(),
+      (p) => engine.integrations.preset(p.provider),
     ),
     integrationAdd: operation(
       z

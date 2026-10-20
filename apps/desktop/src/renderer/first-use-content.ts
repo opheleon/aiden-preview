@@ -18,7 +18,7 @@ export const firstUseSteps = [
       'Follow the setup steps to install the provider and sign in with your existing account.',
     ],
     detail:
-      'Choose the model and effort for your project in Model settings. Aiden uses the subscription or API-key billing option you select. Provider limits and charges may apply. There is no separate Aiden sign-in. You can connect Linear later in Settings → Integrations. It’s optional.',
+      'Choose the model and effort for your project in Model settings. Aiden uses the subscription or API-key billing option you select. Provider limits and charges may apply. There is no separate Aiden sign-in. You can connect Linear or Notion later in Settings → Integrations. It’s optional.',
   },
   {
     title: 'Set the intent',

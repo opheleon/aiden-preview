@@ -3,6 +3,7 @@ import { type JSX, useState } from 'react';
 import type { TicketDestination } from '../../../../packages/contracts/src/tickets';
 import {
   experimentalIntegration,
+  notionContext,
   readOnlyLinear,
   trackerLabel,
 } from '../../../../packages/contracts/src/tracker-connections';
@@ -24,7 +25,10 @@ export function TrackerConnection({
   const candidates = workspace.integrations.filter(
     (c) =>
       c.id === destination.connectionId ||
-      (destination.provider === 'linear' && !experimentalIntegration(c) && !readOnlyLinear(c)),
+      (destination.provider === 'linear' &&
+        !experimentalIntegration(c) &&
+        !readOnlyLinear(c) &&
+        !notionContext(c)),
   );
   const ready = selected && ['connected', 'needs_review'].includes(selected.status);
   const waiting = selected?.status === 'authorization_required';

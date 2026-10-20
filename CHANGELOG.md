@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Connect Notion in Settings → Integrations as read-only project context. After you approve its read tools and choose it in a project's Context connections, Aiden can read specs and notes from Notion. Notion is never offered as a ticket destination.
+
 ## 1.2.4
 
 - Show concise folder and repository names on Windows throughout setup, testing settings, and project summaries.

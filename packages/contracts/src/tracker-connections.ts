@@ -1,6 +1,17 @@
 import type { McpConnection } from './integrations.js';
 
-/** Supported presets remain distinct from legacy read-only endpoints and custom accounts. */
+/** One-click hosted connections. Notion is read-only project context and never a ticket tracker. */
+export type IntegrationPreset = 'linear' | 'jira' | 'notion';
+
+/** Hosted Notion MCP endpoint, used only through read tools the user approves. */
+export const NOTION_MCP_URL = 'https://mcp.notion.com/mcp';
+
+/** Resolve a preset endpoint; presets remain distinct from legacy read-only endpoints and custom accounts. */
+export function presetUrl(provider: IntegrationPreset): string {
+  if (provider === 'notion') return NOTION_MCP_URL;
+  return trackerUrl(provider);
+}
+/** Ticket tracker endpoints that Aiden can publish to. */
 export function trackerUrl(provider: 'linear' | 'jira'): string {
   return provider === 'linear'
     ? 'https://mcp.linear.app/mcp'
@@ -10,21 +21,26 @@ export function trackerUrl(provider: 'linear' | 'jira'): string {
 export function readOnlyLinear(connection: McpConnection): boolean {
   return connection.url.replace(/\/$/, '') === 'https://mcp.linear.app/mcp/readonly';
 }
-/** Linear connections remain available for setup; other saved servers are experimental. */
+/** Recognize a Notion context connection so it is never offered as a ticket destination. */
+export function notionContext(connection: McpConnection): boolean {
+  return connection.url.replace(/\/$/, '') === NOTION_MCP_URL;
+}
+/** Linear and Notion connections remain available for setup; other saved servers are experimental. */
 export function experimentalIntegration(connection: McpConnection): boolean {
   return (
     connection.provider !== 'linear' &&
     connection.url.replace(/\/$/, '') !== trackerUrl('linear') &&
-    !readOnlyLinear(connection)
+    !readOnlyLinear(connection) &&
+    !notionContext(connection)
   );
 }
 /** Prefer a ready preset; otherwise reuse the most recently saved matching OAuth connection. */
-export function trackerConnection(
+export function presetConnection(
   connections: McpConnection[],
-  provider: 'linear' | 'jira',
+  provider: IntegrationPreset,
 ): McpConnection | undefined {
   return connections
-    .filter((c) => c.auth === 'oauth' && c.url.replace(/\/$/, '') === trackerUrl(provider))
+    .filter((c) => c.auth === 'oauth' && c.url.replace(/\/$/, '') === presetUrl(provider))
     .sort(
       (a, b) =>
         Number(b.status === 'connected') - Number(a.status === 'connected') ||
