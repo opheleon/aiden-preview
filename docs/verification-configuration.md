@@ -22,7 +22,7 @@ Expand **Automatic checks** in the connection editor to change the schedule. **A
 
 The existing **Post-merge beta verification** schedule remains separate and is available in **Settings → Project**. It checks deployed browser/API targets after a tracked merge, with deployment revision confirmation. It does not schedule iPhone tests. If both mechanisms are enabled, a project assessment and a later confirmed deployment can each trigger verification.
 
-A stopped or unavailable surface never counts as verified. Code findings remain available. Browser/API results and evidence are in **Activity**, with detailed run records under **All runs**. The retained phone implementation also keeps its evidence reports. Each phone report identifies its code assessment, requirements, and repository commits, but the tester's build label does not attest that those commits are installed.
+A stopped or unavailable surface never counts as verified. Code findings remain available. Browser/API results and evidence are in **Activity** and saved in the project's Chat tab where each check finished, with detailed run records under **All runs**. The retained phone implementation also keeps its evidence reports. Each phone report identifies its code assessment, requirements, and repository commits, but the tester's build label does not attest that those commits are installed.
 
 ## Configuration and credentials
 

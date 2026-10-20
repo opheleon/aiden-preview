@@ -28,7 +28,14 @@ const answerTimeoutMs = 100_000;
 const maxLogLines = 200;
 const maxEarlier = 12;
 
-const AnswerSchema = z.object({ answer: z.string().trim().min(1).max(1500) }).strict();
+const AnswerSchema = z
+  .object({
+    answer: z.string().trim().min(1).max(1500),
+    nextSteps: z.array(z.string().trim().min(1).max(200)).max(5),
+  })
+  .strict();
+/** One model answer: the direct reply plus any ordered steps it recommends. */
+type Answer = z.infer<typeof AnswerSchema>;
 
 /** Serialize chat writes per run within this worker. */
 const queues = new Map<string, Promise<unknown>>();
@@ -69,14 +76,21 @@ async function append(
   return chat;
 }
 
-/** Build a message with Aiden's text normalized: no em dashes, bounded length. */
-function message(from: ChatMessage['from'], text: string, source?: ChatMessage['source']) {
+/** Build a message with Aiden's text and steps normalized: no em dashes, bounded length. */
+function message(
+  from: ChatMessage['from'],
+  text: string,
+  source?: ChatMessage['source'],
+  nextSteps: string[] = [],
+) {
   const clean = plainText(text).trim();
+  const steps = nextSteps.map((step) => plainText(step).trim()).filter(Boolean);
   return {
     at: new Date().toISOString(),
     from,
     text: clean.length > 2000 ? `${clean.slice(0, 1997)}...` : clean,
     ...(source ? { source } : {}),
+    ...(steps.length ? { nextSteps: steps } : {}),
   };
 }
 
@@ -140,7 +154,7 @@ async function modelAnswer(
   run: RunManifest,
   question: string,
   earlier: ChatMessage[],
-): Promise<string> {
+): Promise<Answer> {
   const log = await runLog(context.store, run);
   const input = {
     question,
@@ -171,7 +185,7 @@ async function modelAnswer(
       progress: () => {},
     });
     const parsed = AnswerSchema.safeParse(result.value);
-    if (parsed.success) return parsed.data.answer;
+    if (parsed.success) return parsed.data;
   } catch (error) {
     if (!(error instanceof ArtifactFormatError)) throw error;
   } finally {
@@ -205,7 +219,7 @@ export function askWhy(
     const answer = await modelAnswer(context, run, text, earlier);
     return append(context.store, projectId, runId, [
       message('you', text),
-      message('aiden', answer, 'model'),
+      message('aiden', answer.answer, 'model', answer.nextSteps),
     ]);
   });
 }

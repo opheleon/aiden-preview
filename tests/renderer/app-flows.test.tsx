@@ -5,6 +5,7 @@ import { beforeEach, expect, test, vi } from 'vitest';
 import type { ActivityEntry } from '../../packages/contracts/src/index';
 import { appFixture, openCall } from './app-fixture';
 import { report } from './fixtures';
+import { chatPanel, selectTab } from './project-tabs';
 const f = appFixture();
 const { default: App } = await import('../../apps/desktop/src/App');
 beforeEach(() => f.reset());
@@ -12,6 +13,7 @@ beforeEach(() => f.reset());
 async function openProject() {
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  await selectTab('Overview');
   await screen.findByRole('region', { name: 'Project connections' });
 }
 
@@ -58,8 +60,49 @@ test('setting the intent is one screen, and Aiden starts with only the intent', 
       }),
     }),
   );
+  // The new project opens on its Chat tab; the Overview says what Aiden is doing.
+  expect(await chatPanel()).toBeVisible();
+  await selectTab('Overview');
   expect(await screen.findByText('Aiden is writing the requirements.')).toBeVisible();
   expect(screen.queryByRole('button', { name: /Approve/ })).toBeNull();
+});
+
+test('starting needs a connected model, and Connect opens its sign-in controls', async () => {
+  const original = f.request.getMockImplementation()!;
+  f.request.mockImplementation((method: string, p?: unknown) =>
+    method === 'diagnostics'
+      ? Promise.resolve([
+          { provider: 'codex', installed: true, ready: true, subscription: true, apiKey: false },
+          {
+            provider: 'claude',
+            installed: true,
+            ready: false,
+            subscription: false,
+            subscriptionState: 'sign_in_required',
+            apiKey: false,
+            message: 'Synthetic Claude sign-in needed.',
+          },
+        ])
+      : original(method, p),
+  );
+  try {
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Create project' }));
+    await userEvent.type(screen.getByLabelText('What are you building?'), 'List books');
+    expect(await screen.findByLabelText('Codex connection')).toHaveTextContent('Connected');
+    await userEvent.selectOptions(screen.getByLabelText('Model provider'), 'claude');
+    expect(screen.getByLabelText('Claude connection')).toHaveTextContent('Not connected');
+    const start = screen.getByRole('button', { name: /Hand it to Aiden/ });
+    expect(start).toBeDisabled();
+    expect(start).toHaveAccessibleDescription('Connect Claude before handing this to Aiden.');
+    await userEvent.click(screen.getByRole('button', { name: 'Connect Claude' }));
+    expect(screen.getByText('Model connection and effort').closest('details')).toHaveAttribute(
+      'open',
+    );
+    expect(screen.getByRole('button', { name: 'Sign in with Claude' })).toBeVisible();
+  } finally {
+    f.request.mockImplementation(original);
+  }
 });
 
 test.each(['/no-git', String.raw`C:\projects\no-git`])(
@@ -91,6 +134,7 @@ test('a project whose first rewrite is running shows it, and a stopped one says 
   f.reset(false);
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  await selectTab('Overview');
   expect(await screen.findByText('Aiden is writing the requirements.')).toBeVisible();
   // Nothing has been checked yet, so there is no outcome to accept.
   expect(screen.queryByRole('region', { name: 'Project outcome' })).toBeNull();
@@ -138,9 +182,10 @@ test('the brief keeps only touch points on screen; the rest lives in one menu', 
     projectId: report.projectId,
     verifySurfaces: true,
   });
-  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  const chat = await chatPanel();
   expect(within(chat).getByRole('region', { name: 'Checks in this chat' })).toBeVisible();
-  expect(screen.getByRole('button', { name: 'Run check now' })).toBeDisabled();
+  // Run check now switched to the Chat tab, where the check's progress shows.
+  expect(screen.getByRole('tab', { name: 'Chat' })).toHaveAttribute('aria-selected', 'true');
   act(() =>
     f.emit({ type: 'progress', projectId: report.projectId, runId: 'look-run', message: 'Sync…' }),
   );
@@ -150,7 +195,6 @@ test('the brief keeps only touch points on screen; the rest lives in one menu', 
   );
   await userEvent.click(within(chat).getByRole('button', { name: 'Stop' }));
   expect(f.request).toHaveBeenCalledWith('cancel', { runId: 'look-run' });
-  await userEvent.click(within(chat).getByRole('button', { name: 'Back' }));
   await menu('Project settings');
   expect(await screen.findByRole('region', { name: 'Project verification' })).toBeVisible();
 });
@@ -316,25 +360,24 @@ test('Why? opens the run conversation: the logged reason first, then questions a
   ).toHaveLength(1);
 });
 
-test('requirement changes open contextual chat and Back restores Scope and the draft', async () => {
+test('requirement changes open contextual chat on the Chat tab and keep the draft', async () => {
   await openProject();
   await userEvent.click(screen.getByRole('tab', { name: 'Scope' }));
   const change = screen.getByRole('button', { name: 'Change REQ-1' });
   await userEvent.click(change);
-  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  const chat = await chatPanel();
   expect(within(chat).getByRole('region', { name: 'Selected requirement' })).toHaveTextContent(
     'Users can list books.',
   );
   expect(f.request).not.toHaveBeenCalledWith('askGuide', expect.anything());
+  expect(screen.getByRole('tab', { name: 'Chat' })).toHaveAttribute('aria-selected', 'true');
   await userEvent.type(
     within(chat).getByRole('textbox', { name: 'Message the Guide' }),
     'Sort books by title',
   );
-  await userEvent.click(within(chat).getByRole('button', { name: 'Back' }));
-  expect(screen.getByRole('tab', { name: 'Scope' })).toHaveAttribute('aria-selected', 'true');
-  expect(change).toHaveFocus();
-  await userEvent.click(change);
-  expect(within(chat).getByRole('textbox')).toHaveValue('Sort books by title');
+  await selectTab('Scope');
+  await userEvent.click(screen.getByRole('button', { name: 'Change REQ-1' }));
+  expect(within(await chatPanel()).getByRole('textbox')).toHaveValue('Sort books by title');
   await userEvent.click(within(chat).getByRole('button', { name: 'Send' }));
   await waitFor(() =>
     expect(f.request).toHaveBeenCalledWith(
@@ -346,7 +389,7 @@ test('requirement changes open contextual chat and Back restores Scope and the d
     ),
   );
   expect(f.request).not.toHaveBeenCalledWith('editIntent', expect.anything());
-  await userEvent.click(within(chat).getByRole('button', { name: 'Back' }));
+  await selectTab('Scope');
   await userEvent.click(screen.getByRole('button', { name: 'Edit goal' }));
   expect(within(chat).getByRole('region', { name: 'Change project scope' })).toHaveTextContent(
     'Project goal',
@@ -376,10 +419,11 @@ test('project settings hold the folder, the app URL, and context connections', a
   await menu('Project settings');
   const panel = await screen.findByRole('region', { name: 'Project verification' });
   await userEvent.click(within(panel).getByRole('button', { name: 'Edit verification in chat' }));
-  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  const chat = await chatPanel();
   expect(await within(chat).findByRole('button', { name: 'Save settings' })).toBeVisible();
-  await userEvent.click(within(chat).getByRole('button', { name: 'Back' }));
-  expect(panel).toBeVisible();
+  // Chat lives on the project, so editing in chat leaves Settings; the menu returns to it.
+  await menu('Project settings');
+  expect(await screen.findByRole('region', { name: 'Project verification' })).toBeVisible();
   await userEvent.type(screen.getByLabelText('Branch notes for frontend'), ' reviewed');
   await userEvent.click(screen.getByRole('button', { name: 'Rescan folder' }));
   expect(screen.getByLabelText('Branch notes for frontend')).toHaveValue('main reviewed');
@@ -493,6 +537,7 @@ test('a first look that failed says why and offers Look again instead of three m
   });
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  await selectTab('Overview');
   expect(await screen.findByText("The first check didn't finish.")).toBeVisible();
   expect(screen.getByText(/could not choose which code to look at/)).toBeVisible();
   expect(screen.queryByText('No look finished yet.')).toBeNull();
@@ -510,7 +555,7 @@ test('a first look that failed says why and offers Look again instead of three m
     }),
   );
   expect(
-    await within(screen.getByRole('dialog', { name: 'Chat with Aiden' })).findByRole('alert'),
+    await within(screen.getByRole('tabpanel', { name: 'Chat' })).findByRole('alert'),
   ).toHaveTextContent('browser check could not start');
 });
 

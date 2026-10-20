@@ -8,6 +8,7 @@ import {
   type GuideAction,
   GuideActionSchema,
   type GuideMessage,
+  GuideNextStepsSchema,
   type GuideThread,
   GuideThreadSchema,
   type GuideView,
@@ -17,7 +18,7 @@ import {
   SetupStepIdSchema,
   VerifyMethodSchema,
 } from '../../contracts/src/guide.js';
-import { outputSchemaFor, type RunManifest } from '../../contracts/src/index.js';
+import { outputSchemaFor } from '../../contracts/src/index.js';
 import { ArtifactFormatError } from '../../runtimes/src/index.js';
 import { noTools, serveTools } from '../../tools/src/mcp.js';
 import { plainText } from '../../verification/src/index.js';
@@ -30,6 +31,7 @@ import {
   readSetupState,
   writeSetupState,
 } from './guide-context.js';
+import { checkAnnouncement } from './guide-results.js';
 import {
   answerGuideClarification,
   guideClarifications,
@@ -37,7 +39,6 @@ import {
 } from './guide-scope.js';
 import { workflowRoot } from './model-stage.js';
 import { atomic, optionalJson, type Store } from './storage.js';
-import { readVerification } from './verification-workflow.js';
 
 /** Longest one Guide turn takes, inside the worker's two-minute request limit. */
 const turnTimeoutMs = 100_000;
@@ -55,6 +56,7 @@ const promptMessages = 30;
 const ReplySchema = z
   .object({
     reply: z.string().trim().min(1).max(3000),
+    nextSteps: GuideNextStepsSchema,
     widgets: z
       .array(
         z
@@ -138,18 +140,21 @@ async function writeThread(store: Store, projectId: string, thread: GuideThread)
   await atomic(threadFile(store, projectId), GuideThreadSchema.parse({ ...thread, messages }));
 }
 
-/** Build a message with normalized text: no em dashes, bounded length. */
+/** Build a message with normalized text and steps: no em dashes, bounded length. */
 export function guideMessage(
   from: GuideMessage['from'],
   text: string,
   widgets: GuideWidget[] = [],
+  nextSteps: string[] = [],
 ): GuideMessage {
   const clean = plainText(text).trim() || '(empty)';
+  const steps = nextSteps.map((step) => plainText(step).trim()).filter(Boolean);
   return {
     at: new Date().toISOString(),
     from,
     text: clean.length > 4000 ? `${clean.slice(0, 3997)}...` : clean,
     ...(widgets.length ? { widgets } : {}),
+    ...(steps.length ? { nextSteps: steps } : {}),
   };
 }
 
@@ -360,7 +365,7 @@ export function askGuide(engine: Engine, projectId: string, turn: GuideTurn): Pr
       ...saved,
       messages: [
         ...saved.messages,
-        guideMessage('aiden', reply.reply, visibleWidgets),
+        guideMessage('aiden', reply.reply, visibleWidgets, reply.nextSteps),
         ...events.map((event) => guideMessage('event', event)),
       ],
     };
@@ -369,25 +374,10 @@ export function askGuide(engine: Engine, projectId: string, turn: GuideTurn): Pr
   });
 }
 
-/** Describe a finished check in one line, with its result when the report is readable. */
-async function checkSummary(engine: Engine, run: RunManifest): Promise<string> {
-  if (run.kind === 'verify') {
-    const check = await readVerification(engine, run.projectId, run.id).catch(() => null);
-    if (check && !check.result.summary.total)
-      return 'No requirements were checked. Resolve the questions in this chat before trying again.';
-    return check
-      ? `App check finished. ${check.result.summary.line}`
-      : 'App check finished. Open the run to see its results.';
-  }
-  const report = await engine.getReport(run.projectId, run.id).catch(() => null);
-  if (!report) return 'Code check finished.';
-  const met = report.assessments.filter((a) => a.status === 'implemented').length;
-  return `Code check finished: ${met} of ${report.assessments.length} requirements met.`;
-}
-
 /**
- * Open the Guide: announce the newest finished check once, so the thread always reflects work that
- * finished while nobody was looking, then return the thread and checklist.
+ * Open the Guide: announce the newest finished check once, with a saved copy of its results, so
+ * the thread always reflects work that finished while nobody was looking and keeps it in
+ * scrollback; then return the thread and checklist.
  */
 export function openGuide(engine: Engine, projectId: string): Promise<GuideView> {
   return exclusive(projectId, async () => {
@@ -398,11 +388,16 @@ export function openGuide(engine: Engine, projectId: string): Promise<GuideView>
     const state = await readSetupState(engine.store, projectId);
     if (newest && newest.id !== state.announcedRunId) {
       const thread = await readThread(engine.store, projectId);
-      if (thread.messages.length)
+      if (thread.messages.length) {
+        const { text, result } = await checkAnnouncement(engine, newest);
         await writeThread(engine.store, projectId, {
           ...thread,
-          messages: [...thread.messages, guideMessage('event', await checkSummary(engine, newest))],
+          messages: [
+            ...thread.messages,
+            { ...guideMessage('event', text), ...(result ? { result } : {}) },
+          ],
         });
+      }
       await writeSetupState(engine.store, projectId, { ...state, announcedRunId: newest.id });
     }
     return guideView(engine, projectId);

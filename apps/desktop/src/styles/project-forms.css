@@ -401,3 +401,13 @@
   border-top: 1px solid var(--border);
   background: color-mix(in srgb, var(--paper2) 25%, var(--card));
 }
+
+/* Numbered sign-in steps for a provider that signs in outside Aiden. */
+.connect-steps {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.5;
+}

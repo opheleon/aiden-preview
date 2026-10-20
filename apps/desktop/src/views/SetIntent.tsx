@@ -1,9 +1,10 @@
 import { ArrowRight, CircleAlert, FileText, FolderKanban, Info } from 'lucide-react';
-import type { JSX } from 'react';
+import { type JSX, useRef } from 'react';
 
 import brandMark from '../assets/brand-mark.svg';
 import RuntimeSettings from '../components/RuntimeSettings';
 import type { Workspace } from '../hooks/useWorkspace';
+import { providerName, runtimeReady } from '../renderer/runtime-readiness';
 const api = window.aiden;
 
 /**
@@ -12,10 +13,9 @@ const api = window.aiden;
  */
 export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element {
   const { project, setProject, busy, scanning, scanProjectFolder, start, action } = workspace;
-  const folder = project.rootPath?.split(/[\\/]/).at(-1) || project.rootPath;
-  const repos = project.repositories.length;
-  const blocker = scanning ? undefined : startHint(!!project.context.trim(), folder, repos);
+  const { folder, repos, blocker } = startState(workspace);
   const missing = blocker?.blocking ? blocker.why : '';
+  const model = useRef<HTMLDetailsElement>(null);
   return (
     <section className="goal-starter set-intent" aria-label="New project">
       <div className="goal-starter-brand">
@@ -69,26 +69,10 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
                 ? `${folder} · ${repos} ${repos === 1 ? 'repository' : 'repositories'}`
                 : 'Add the project folder (optional)'}
           </button>
-          <select
-            className="chat-model-select"
-            aria-label="Model provider"
-            value={project.runtime.provider}
-            onChange={(event) =>
-              setProject({
-                ...project,
-                runtime: {
-                  provider: event.target.value as 'claude' | 'codex',
-                  auth: 'subscription',
-                },
-              })
-            }
-          >
-            <option value="codex">Codex</option>
-            <option value="claude">Claude</option>
-          </select>
+          <ProviderPicker workspace={workspace} />
           <button
             className="primary goal-starter-create"
-            disabled={busy || scanning || !project.context.trim()}
+            disabled={busy || scanning || !!blocker?.blocking}
             aria-describedby={missing ? 'start-hint' : undefined}
             onClick={() => void start()}
           >
@@ -101,9 +85,10 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
         blocker={blocker}
         folder={folder}
         onChooseFolder={() => void scanProjectFolder(true)}
+        onConnect={() => openModelControls(model.current)}
       />
-      <details>
-        <summary>Model and effort</summary>
+      <details ref={model}>
+        <summary>Model connection and effort</summary>
         <RuntimeSettings
           runtime={project.runtime}
           diagnostics={workspace.diagnostics}
@@ -136,29 +121,101 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
   );
 }
 
+/** The provider choice with whether it is connected, read from the loaded diagnostics. */
+function ProviderPicker({ workspace }: { workspace: Workspace }): JSX.Element {
+  const { project, setProject } = workspace;
+  const name = providerName(project.runtime.provider);
+  const connected = runtimeReady(workspace.diagnostics, project.runtime);
+  const label = connected ? 'Connected' : connected === false ? 'Not connected' : 'Checking…';
+  return (
+    <>
+      <select
+        className="chat-model-select"
+        aria-label="Model provider"
+        value={project.runtime.provider}
+        onChange={(event) =>
+          setProject({
+            ...project,
+            runtime: { provider: event.target.value as 'claude' | 'codex', auth: 'subscription' },
+          })
+        }
+      >
+        <option value="codex">Codex</option>
+        <option value="claude">Claude</option>
+      </select>
+      <span
+        className={`connection provider-ready ${connected ? 'ready' : ''}`}
+        aria-label={`${name} connection`}
+      >
+        <span />
+        {label}
+      </span>
+    </>
+  );
+}
+
+/** Open the model connection controls, bring them into view, and focus their first action. */
+function openModelControls(details: HTMLDetailsElement | null): void {
+  if (!details) return;
+  details.open = true;
+  details.scrollIntoView?.({ block: 'nearest' });
+  details.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
+}
+
+/** The chosen folder, its repository count, and what still blocks or informs the start. */
+function startState(workspace: Workspace): {
+  folder: string | undefined;
+  repos: number;
+  blocker: StartBlockerInfo | undefined;
+} {
+  const { project, scanning } = workspace;
+  const folder = project.rootPath?.split(/[\\/]/).at(-1) || project.rootPath;
+  const repos = project.repositories.length;
+  const connected = runtimeReady(workspace.diagnostics, project.runtime);
+  const disconnected = connected === false ? providerName(project.runtime.provider) : undefined;
+  return {
+    folder,
+    repos,
+    blocker: scanning
+      ? undefined
+      : startHint(!!project.context.trim(), folder, repos, disconnected),
+  };
+}
+
 /** Something the person should know before starting: a blocker, or a note that does not block. */
 interface StartBlockerInfo {
   why: string;
   fix: string;
   chooseFolder: boolean;
+  /** The selected provider needs connecting; offers to open the model connection controls. */
+  connect?: string;
   blocking: boolean;
 }
 
 /**
- * Say what is still needed before Aiden can start. Only the intent is required; a folder without a
- * Git repository is a note, because code can be connected later in the Guide.
- * Example: an empty box blocks; a folder with no repository explains and offers another folder.
+ * Say what is still needed before Aiden can start. The intent and a connected model are required;
+ * a folder without a Git repository is a note, because code can be connected later in the Guide.
+ * Example: an empty box blocks; Claude not signed in blocks and offers to connect it.
  */
 function startHint(
   hasIntent: boolean,
   folder: string | undefined,
   repos: number,
+  disconnected?: string,
 ): StartBlockerInfo | undefined {
   if (!hasIntent)
     return {
       why: 'To start, describe what you are building.',
       fix: 'Type or paste your goal in the box above, or use Import a file. The project folder is optional.',
       chooseFolder: false,
+      blocking: true,
+    };
+  if (disconnected)
+    return {
+      why: `Connect ${disconnected} before handing this to Aiden.`,
+      fix: `Aiden works through your own ${disconnected} account. Install it if needed and sign in; your subscription or API-key billing applies.`,
+      chooseFolder: false,
+      connect: disconnected,
       blocking: true,
     };
   if (folder && !repos)
@@ -187,11 +244,13 @@ function StartBlocker({
   blocker,
   folder,
   onChooseFolder,
+  onConnect,
 }: {
   scanning: boolean;
   blocker: StartBlockerInfo | undefined;
   folder: string | undefined;
   onChooseFolder: () => void;
+  onConnect: () => void;
 }): JSX.Element | null {
   if (scanning)
     return (
@@ -211,6 +270,11 @@ function StartBlocker({
       {blocker.chooseFolder && (
         <button className="start-blocker-action" onClick={onChooseFolder}>
           {folder ? 'Choose a different folder' : 'Browse for a folder'}
+        </button>
+      )}
+      {blocker.connect && (
+        <button className="start-blocker-action" onClick={onConnect}>
+          Connect {blocker.connect}
         </button>
       )}
     </div>

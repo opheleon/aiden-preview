@@ -6,7 +6,7 @@ You set the intent, make the calls, and accept the outcome. Aiden Preview is you
 
 ## Bring your own subscription
 
-Open Settings → Model and choose Codex for ChatGPT, or Claude. Follow the setup steps to install the provider and sign in with your existing account. Choose the model and effort for your project. Keep your selected subscription or API-key billing mode; provider limits and charges may apply. There is no separate Aiden sign-in.
+Choose Claude or Codex for ChatGPT on the start screen; it shows whether that model is connected, and **Connect** opens the sign-in steps. For Claude, install Claude Code, select **Sign in with Claude**, finish in the browser window it opens, and Aiden detects the connection; a paid Claude plan is needed. For Codex, install the Codex CLI and select **Sign in with Codex**. The same controls are in Settings → Model. Cursor is not supported in this Preview. Choose the model and effort for your project. Keep your selected subscription or API-key billing mode; provider limits and charges may apply. There is no separate Aiden sign-in.
 
 Linear is optional. Connect it in Settings → Integrations whenever you want Aiden to publish your project’s tickets there. One connection can serve several projects. Jira and custom MCP are experimental and hidden for new setup while live end-to-end testing is incomplete. Existing connections remain available under Experimental connections.
 
@@ -14,7 +14,7 @@ Linear is optional. Connect it in Settings → Integrations whenever you want Ai
 
 Start from a customer call, a brief, or a sentence. Select the plus button beside Projects, tell Aiden what you’re building, and select Hand it to Aiden. Adding the project folder is optional; you can connect your code later.
 
-The project opens a setup chat with Aiden above the project. The Guide plays back the requirements Aiden understood, takes your corrections, and asks how to check the work: connect the code, a web app, an API, an iPhone app, or checking it yourself. See [Project Guide](guide.md).
+The project opens on its Chat tab, with the setup checklist at the top. The Guide plays back the requirements Aiden understood, takes your corrections, and asks how to check the work: connect the code, a web app, an API, an iPhone app, or checking it yourself. See [Project Guide](guide.md).
 
 Aiden writes down what done means in plain language, checks the work, and plans usable steps toward the outcome. The project takes its name from what you’re building. Each step should produce something you can test; a foundation step needs a plan for checking it before other work builds on it.
 

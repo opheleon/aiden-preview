@@ -263,3 +263,8 @@
 .brief .done-means > :not(summary) {
   margin-top: 16px;
 }
+
+/* A feature's outcome stays readable without opening the row. */
+.feature-heading .feature-outcome {
+  flex-basis: 100%;
+}

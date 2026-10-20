@@ -12,6 +12,8 @@ export class FixtureRuntime implements AgentRuntime {
   inputs: unknown[] = [];
   /** Replaces the ask-why answer; null returns output that fails the schema. */
   whyAnswer: string | null = 'FIXTURE answer from the run record, not live model output.';
+  /** Synthetic next steps returned with the ask-why answer. */
+  whySteps: string[] = [];
   invalid = false;
   /** Replaces the Guide reply; synthetic, not live model output. */
   guideReply: Record<string, unknown> | null = null;
@@ -151,15 +153,21 @@ export class FixtureRuntime implements AgentRuntime {
           },
         ];
       } else if (stage === 'guide')
-        value = this.guideReply ?? {
-          reply: 'FIXTURE Guide reply, not live model output.',
-          widgets: [],
-          actions: [],
+        value = {
+          nextSteps: [],
+          ...(this.guideReply ?? {
+            reply: 'FIXTURE Guide reply, not live model output.',
+            widgets: [],
+            actions: [],
+          }),
         };
       else if (stage === 'guide-summary')
         value = { summary: 'FIXTURE summary of the earlier conversation, not live model output.' };
       else if (stage === 'ask-why')
-        value = this.whyAnswer === null ? { answer: '' } : { answer: this.whyAnswer };
+        value =
+          this.whyAnswer === null
+            ? { answer: '', nextSteps: [] }
+            : { answer: this.whyAnswer, nextSteps: this.whySteps };
       else if (stage === 'triage')
         value = {
           items: data.items.map((item: any) => ({

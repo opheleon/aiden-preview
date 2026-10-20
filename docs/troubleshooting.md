@@ -16,7 +16,7 @@ For a deliberate developer reset, quit Aiden, back up the current data folder, a
 
 ## Aiden cannot start a check
 
-Open Settings → Model and check the selected runtime, provider sign-in, model, and effort. Complete provider installation or authentication there. Keep the billing mode you chose; do not substitute an API key for subscription access merely to make a check run. Aiden has no separate account login to repair.
+Open Settings → Model and check the selected runtime, provider sign-in, model, and effort. Complete provider installation or authentication there. For Claude, **Sign in with Claude** opens Claude Code's own sign-in in Terminal; finish it in the browser and Aiden rechecks the connection. Outside macOS, run `claude auth login --claudeai` in a terminal, then select Check connection. Keep the billing mode you chose; do not substitute an API key for subscription access merely to make a check run. Aiden has no separate account login to repair.
 
 ## Linear needs attention
 

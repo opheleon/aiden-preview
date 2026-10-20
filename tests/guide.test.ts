@@ -5,6 +5,7 @@ import test from 'node:test';
 
 import {
   distinctGuideWidgets,
+  GuideThreadSchema,
   type SetupFacts,
   setupProgress,
 } from '../packages/contracts/src/guide.js';
@@ -248,8 +249,42 @@ void test('opening the Guide announces a check that finished meanwhile, once', a
     const first = await openGuide(e, project.id);
     const announced = first.thread.messages.filter((m) => /^Code check finished/.test(m.text));
     assert.equal(announced.length, 1);
+    // The announcement saves each requirement's outcome so it stays in the thread's scrollback.
+    const saved = announced[0]!.result;
+    assert.equal(saved?.kind, 'code');
+    assert.ok(saved?.items.length);
+    for (const item of saved.items) {
+      assert.match(item.requirementId, /^REQ-/);
+      assert.ok(['passed', 'failed', 'unverified'].includes(item.status));
+    }
     const again = await openGuide(e, project.id);
     assert.equal(again.thread.messages.length, first.thread.messages.length);
+  } finally {
+    await e.dispose();
+  }
+});
+
+void test('Guide answers keep ordered next steps without em dashes, and older threads still parse', async () => {
+  const { runtime, e, project } = await engineFor(true);
+  try {
+    const started = await prepareAndLook(e, project, 'intent');
+    await e.wait(started.runId);
+    runtime.guideReply = {
+      reply: 'You can change the branch in Project settings.',
+      nextSteps: ['Open the project menu \u2014 then Project settings.', 'Pick the branch.'],
+      widgets: [],
+      actions: [],
+    };
+    const view = await askGuide(e, project.id, { text: 'How do I change the branch?' });
+    const answer = view.thread.messages.at(-1)!;
+    assert.equal(answer.from, 'aiden');
+    assert.equal(answer.nextSteps?.length, 2);
+    assert.doesNotMatch(answer.nextSteps.join(' '), /\u2014/);
+    assert.ok(
+      GuideThreadSchema.safeParse({
+        messages: [{ at: answer.at, from: 'event', text: 'Old line' }],
+      }).success,
+    );
   } finally {
     await e.dispose();
   }

@@ -53,6 +53,8 @@ export const ChatMessageSchema = z
     from: z.enum(['you', 'aiden']),
     text: z.string().trim().min(1).max(2000),
     source: z.enum(['log', 'model']).optional(),
+    /** Ordered follow-up steps the answer recommends, when the question asked how to do something. */
+    nextSteps: z.array(z.string().trim().min(1).max(200)).max(5).optional(),
   })
   .strict();
 /** Parsed chat message. */

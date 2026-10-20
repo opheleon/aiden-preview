@@ -46,8 +46,8 @@ export function Watch({
 }
 
 /**
- * One requirement on the brief: its text and one chip. The chip's tooltip says how Aiden knows,
- * and the row opens the requirement's full story in a pop-up.
+ * One requirement on the brief: its text, one chip, and a line saying how Aiden knows. The row
+ * opens the requirement's full story in a pop-up.
  */
 export function RequirementRow({
   id,
@@ -71,11 +71,19 @@ export function RequirementRow({
   const how = `${state.how}${actionCount > 0 ? ` · ${plural(actionCount, 'action')} remaining` : ''}`;
   return (
     <li className="req-row" id={`requirement-${id}`}>
-      <button type="button" className="req-open" aria-haspopup="dialog" onClick={() => onOpen(id)}>
-        <span className="row-title">
-          <code>{id}</code> {text}
-        </span>
-      </button>
+      <span className="req-main">
+        <button
+          type="button"
+          className="req-open"
+          aria-haspopup="dialog"
+          onClick={() => onOpen(id)}
+        >
+          <span className="row-title">
+            <code>{id}</code> {text}
+          </span>
+        </button>
+        <span className="row-sub row-how">{how}</span>
+      </span>
       <span className="row-side">
         <Watch result={main} label={id} onWatch={onWatch} />
         {attention && <AttentionBadge item={attention} />}

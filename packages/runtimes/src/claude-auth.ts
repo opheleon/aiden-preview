@@ -11,7 +11,7 @@ import { cleanEnvironment } from './environment.js';
 const exec = promisify(execFile);
 const require = createRequire(import.meta.url);
 export const claudeSignIn =
-  'Sign in to Claude Code with your Claude subscription, then select Check connection. Run: claude auth login --claudeai';
+  'Sign in to Claude Code with your paid Claude plan: in Settings → Model, select Sign in with Claude, finish in your browser, then select Check connection.';
 
 /** Carry an actionable connection state without including provider diagnostics or credentials. */
 export class ClaudeConnectionError extends Error {

@@ -5,7 +5,6 @@ import type { Product } from '../../../../packages/contracts/src/index';
 import type { DeliveryAttention } from '../renderer/delivery-attention';
 import type { FeatureProgress } from '../renderer/delivery-progress';
 import { AttentionBadge } from './DeliveryAttention';
-import { InfoTip, insideInfoTip } from './InfoTip';
 
 /** The one word that says where a feature stands, with the same tone as a requirement chip. */
 function FeatureChip({
@@ -33,8 +32,8 @@ function FeatureChip({
 }
 
 /**
- * One feature of the delivery plan: a collapsible row with its title and one chip. The outcome,
- * rationale, and test plan sit behind an (i) button; opening the row lists its requirements and
+ * One feature of the delivery plan: a collapsible row with its title, outcome, and one chip.
+ * Opening the row shows why the feature exists, how it will be tested, its requirements, and
  * what it depends on.
  */
 export function FeatureSection({
@@ -59,32 +58,13 @@ export function FeatureSection({
       aria-label={feature.title}
     >
       <details className="feature-details">
-        <summary
-          className="feature-summary"
-          title={`${done} of ${total} requirements complete`}
-          onClick={(event) => {
-            if (insideInfoTip(event.target)) event.preventDefault();
-          }}
-        >
+        <summary className="feature-summary" title={`${done} of ${total} requirements complete`}>
           <ChevronRight className="feature-chevron" size={20} aria-hidden="true" />
           <span className="feature-heading">
             <h3>
               <code className="feature-id">{feature.id}</code> {feature.title}
             </h3>
-            <InfoTip label={`About ${feature.id}`}>
-              <span>{feature.outcome}</span>
-              <span className="row-sub">
-                {feature.kind === 'platform' ? 'Shared platform work · ' : ''}
-                {feature.rationale}
-              </span>
-              {(feature.testPlan || feature.kind === 'platform') && (
-                <span className="row-sub">
-                  Test plan:{' '}
-                  {feature.testPlan ??
-                    'needed. Define a consumer integration check, expected results, and failure or rollback checks before implementation.'}
-                </span>
-              )}
-            </InfoTip>
+            <span className="row-sub feature-outcome">{feature.outcome}</span>
           </span>
           {attention ? (
             <AttentionBadge item={attention} />
@@ -93,6 +73,17 @@ export function FeatureSection({
           )}
         </summary>
         <div className="feature-content">
+          <p className="row-sub">
+            {feature.kind === 'platform' ? 'Shared platform work · ' : ''}
+            {feature.rationale}
+          </p>
+          {(feature.testPlan || feature.kind === 'platform') && (
+            <p className="row-sub">
+              Test plan:{' '}
+              {feature.testPlan ??
+                'needed. Define a consumer integration check, expected results, and failure or rollback checks before implementation.'}
+            </p>
+          )}
           {feature.dependsOn.length > 0 && (
             <p className="row-sub">
               Depends on:{' '}

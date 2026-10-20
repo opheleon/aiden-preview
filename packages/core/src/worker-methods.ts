@@ -46,7 +46,10 @@ import { syncTickets } from './ticket-sync.js';
 import { readAppUrl, saveVerificationSettings } from './verification-settings.js';
 import { readVerification } from './verification-workflow.js';
 /** Provider controls separate authentication/model discovery from run execution. */
-export type RuntimeControls = Pick<Runtimes, 'diagnostics' | 'models' | 'setKey' | 'loginCodex'>;
+export type RuntimeControls = Pick<
+  Runtimes,
+  'diagnostics' | 'models' | 'setKey' | 'loginCodex' | 'loginClaude'
+>;
 /** Validate unknown worker inputs before dispatching a typed operation. */
 function operation<T>(
   schema: z.ZodType<T>,
@@ -255,8 +258,8 @@ function runtimeMethods(engine: Engine, runtimes: RuntimeControls) {
         return { saved: 'memory-only' };
       },
     ),
-    login: operation(z.object({ provider: z.literal('codex') }).strict(), () =>
-      runtimes.loginCodex(),
+    login: operation(z.object({ provider: z.enum(['codex', 'claude']) }).strict(), (p) =>
+      p.provider === 'claude' ? runtimes.loginClaude() : runtimes.loginCodex(),
     ),
     updateRuntime: operation(project.extend({ runtime: RuntimeSchema }), (p) =>
       engine.updateRuntime(p.projectId, p.runtime),

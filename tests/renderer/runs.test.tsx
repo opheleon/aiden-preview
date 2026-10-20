@@ -6,6 +6,7 @@ import { runTitle } from '../../apps/desktop/src/renderer/run-labels';
 import type { ActivityEntry } from '../../packages/contracts/src/index';
 import { appFixture, openCall } from './app-fixture';
 import { report } from './fixtures';
+import { chatPanel, selectTab } from './project-tabs';
 const f = appFixture();
 const { default: App } = await import('../../apps/desktop/src/App');
 beforeEach(() => f.reset());
@@ -76,15 +77,15 @@ test('the brief links to the run in progress', async () => {
   f.startRun({ id: 'live-run', kind: 'report' }, [entry('Read frontend/app.txt from line 1')]);
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
-  const show = await screen.findByRole('button', { name: 'Show progress' });
-  await userEvent.click(show);
-  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  // Chat already shows the live check, so it offers no Show progress of its own.
+  expect(screen.queryByRole('button', { name: 'Show progress' })).toBeNull();
+  await selectTab('Overview');
+  expect(await screen.findByRole('region', { name: 'Status' })).toBeVisible();
+  await userEvent.click(await screen.findByRole('button', { name: 'Show progress' }));
+  const chat = await chatPanel();
   expect(within(chat).getByRole('region', { name: 'Checks in this chat' })).toHaveTextContent(
     'Read frontend/app.txt from line 1',
   );
-  await userEvent.click(within(chat).getByRole('button', { name: 'Back' }));
-  expect(await screen.findByRole('region', { name: 'Status' })).toBeVisible();
-  expect(show).toHaveFocus();
 });
 
 test('blocked runs explain the missing information and accept an answer in place', async () => {

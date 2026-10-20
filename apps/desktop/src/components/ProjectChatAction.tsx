@@ -18,10 +18,9 @@ export function ProjectChatAction({
   guide: Guide;
   onDone: () => void;
 }): JSX.Element | null {
-  const { open, close } = useProjectGuide();
+  const { open } = useProjectGuide();
   /** Keep advanced controls reachable until each has an equivalent conversational setup path. */
   function advanced(): void {
-    close();
     workspace.setSettingsTab('project');
     workspace.setArea('settings');
   }
@@ -56,7 +55,7 @@ export function ProjectChatAction({
         </p>
       </section>
     );
-  if (entry.type === 'run') return null;
+  if (entry.type === 'run' || entry.type === 'result') return null;
   if (entry.type === 'requirement' || entry.type === 'finding') {
     const requirement = workspace.baseline?.product.requirements.find(
       (item) => item.id === entry.requirementId,

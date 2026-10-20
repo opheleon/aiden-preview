@@ -126,9 +126,9 @@ export async function createProject(
     .click();
   await page.getByRole('button', { name: /· 2 repositories/ }).waitFor();
   await page.getByRole('button', { name: /Hand it to Aiden/ }).click();
-  // Setup opens above the project; Back returns to the Overview.
-  await expect(page.getByRole('dialog', { name: 'Chat with Aiden' })).toBeVisible();
-  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  // The project opens on its Chat tab; the journey continues from the Overview.
+  await expect(page.getByRole('tabpanel', { name: 'Chat' })).toBeVisible();
+  await page.getByRole('tab', { name: 'Overview', exact: true }).click();
   await page.getByRole('progressbar').waitFor();
   if (blocked) {
     await expect(page.getByText(/Delivery paused: resolve blocking decisions/)).toBeVisible();
@@ -140,10 +140,8 @@ export async function createProject(
 export async function lookAgain(page: Page) {
   await page.getByRole('tab', { name: 'Overview', exact: true }).click();
   await page.getByRole('button', { name: 'Run check now', exact: true }).click();
-  await page
-    .getByRole('dialog', { name: 'Chat with Aiden' })
-    .getByRole('button', { name: 'Back', exact: true })
-    .click();
+  await expect(page.getByRole('tabpanel', { name: 'Chat' })).toBeVisible();
+  await page.getByRole('tab', { name: 'Overview', exact: true }).click();
 }
 
 /** Wait for automatically chained sizing before a journey requests another operation. */

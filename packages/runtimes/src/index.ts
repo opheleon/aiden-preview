@@ -10,6 +10,7 @@ import { z } from 'zod/v3';
 import type { RuntimeDiagnostic, RuntimeModel } from '../../contracts/src/api.js';
 import type { RuntimeConfig } from '../../contracts/src/index.js';
 import { claudeDiagnostics, claudeModels, runClaude } from './claude.js';
+import { openClaudeSignIn } from './claude-login.js';
 import { loadCodexModels, runCodex } from './codex.js';
 import { accountSchema, loginSchema } from './codex-schemas.js';
 import { cleanEnvironment } from './environment.js';
@@ -140,6 +141,11 @@ export class Runtimes implements AgentRuntime {
       c.close();
       throw error;
     }
+  }
+  /** Open Claude Code's own subscription sign-in for the person; never change billing mode. */
+  async loginClaude(): Promise<Record<string, never>> {
+    await openClaudeSignIn();
+    return {};
   }
   /** Load the selected account’s models with bounded pagination and no user prompt. */
   async models(config: RuntimeConfig): Promise<RuntimeModel[]> {

@@ -208,7 +208,7 @@ export type WorkerAPI = {
   diagnostics: { params: Record<string, never>; result: RuntimeDiagnostic[] };
   models: { params: { runtime: RuntimeConfig }; result: RuntimeModel[] };
   setKey: { params: { provider: 'codex' | 'claude'; key: string }; result: { saved: string } };
-  login: { params: { provider: 'codex' }; result: { authUrl?: string } };
+  login: { params: { provider: 'codex' | 'claude' }; result: { authUrl?: string } };
   updateRuntime: { params: ProjectRef & { runtime: RuntimeConfig }; result: null };
   integrations: { params: Record<string, never>; result: McpConnection[] };
   integrationPreset: { params: { provider: 'linear' | 'jira' }; result: McpConnection };

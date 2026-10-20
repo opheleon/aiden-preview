@@ -1,7 +1,7 @@
 import { type JSX, useRef } from 'react';
 
-/** Project sections keep the overview separate from scope, history, and coding controls. */
-export type ProjectTab = 'overview' | 'scope' | 'activity' | 'coding';
+/** Project sections: the conversation first, then the overview, scope, history, and coding. */
+export type ProjectTab = 'chat' | 'overview' | 'scope' | 'activity' | 'coding';
 
 /** Accessible project navigation with arrow-key, Home, and End selection. */
 export function ProjectTabs({
@@ -15,6 +15,7 @@ export function ProjectTabs({
 }): JSX.Element {
   const buttons = useRef<Partial<Record<ProjectTab, HTMLButtonElement | null>>>({});
   const tabs: { id: ProjectTab; label: string }[] = [
+    { id: 'chat', label: 'Chat' },
     { id: 'overview', label: 'Overview' },
     { id: 'scope', label: 'Scope' },
     { id: 'activity', label: 'Activity' },

@@ -5,8 +5,7 @@
 }
 
 .setup-heading,
-.setup-current,
-.setup-extras {
+.setup-current {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -82,54 +81,45 @@
   line-height: 1.4;
 }
 
-.setup-info {
-  display: inline-flex;
-  flex: 0 0 28px;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  min-height: 28px;
-  padding: 4px;
-  color: var(--muted);
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-}
-
-.setup-info:is(:hover, :focus-visible) {
-  color: var(--brand);
-  background: var(--paper2);
-}
-
 .setup-extras {
+  margin: 0;
   color: var(--muted);
-  font-size: 11px;
-}
-
-.setup-info-anchor {
-  display: inline-flex;
-  flex: 0 0 28px;
-}
-
-.setup-tooltip {
-  position: fixed;
-  z-index: 10;
-  width: min(288px, calc(100vw - 32px));
-  padding-top: 7px;
-  color: var(--ink);
   font-size: 12px;
-  font-weight: 400;
-  line-height: 1.6;
-  text-align: left;
 }
 
-.setup-tooltip-content {
-  display: block;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--paper);
-  box-shadow: 0 4px 16px #00000014;
+.setup-explanation {
+  max-width: 72ch;
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.setup-guide {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.setup-guide summary {
+  width: fit-content;
+  color: var(--brand);
+  cursor: pointer;
+}
+
+.setup-guide dl {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+.setup-guide dt {
+  font-weight: 600;
+}
+
+.setup-guide dd {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 @media (width <= 680px) {

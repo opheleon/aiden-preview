@@ -5,6 +5,7 @@ import { beforeEach, expect, test } from 'vitest';
 import type { GuideView } from '../../packages/contracts/src/guide';
 import { appFixture, openCall } from './app-fixture';
 import { report } from './fixtures';
+import { chatPanel, selectTab } from './project-tabs';
 const f = appFixture();
 const request = f.request.getMockImplementation()!;
 const { default: App } = await import('../../apps/desktop/src/App');
@@ -23,7 +24,7 @@ async function openFreshProject() {
 
 test('a new project opens on the Guide, plays back the requirements, and sets up a web check', async () => {
   await openFreshProject();
-  const dialog = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  const dialog = await chatPanel();
   expect(dialog).toBeVisible();
   expect(screen.queryByRole('tab', { name: /Guide/ })).not.toBeInTheDocument();
   const setup = screen.getByRole('list', { name: 'Setup' });
@@ -33,31 +34,24 @@ test('a new project opens on the Guide, plays back the requirements, and sets up
   expect(within(dialog).getByText('Step 2 of 4 · Review requirements')).toBeVisible();
   await userEvent.type(within(dialog).getByLabelText('Message the Guide'), 'Keep this draft');
   const requestsBeforeHelp = f.request.mock.calls.length;
-  for (const label of [
-    'Define goal',
-    'Review requirements',
-    'Choose checks',
-    'First check',
-    'Extras',
-  ]) {
-    const icon = within(dialog).getByRole('button', { name: `About ${label}` });
-    await userEvent.hover(icon);
-    expect(within(dialog).getByRole('tooltip', { name: `About ${label}` })).toBeVisible();
-    await userEvent.unhover(icon);
-    expect(within(dialog).queryByRole('tooltip')).toBeNull();
-    expect(within(dialog).getByLabelText('Message the Guide')).toHaveValue('Keep this draft');
-  }
-  expect(f.request.mock.calls.length).toBe(requestsBeforeHelp);
-  act(() => within(dialog).getByRole('button', { name: 'About Extras' }).focus());
-  expect(within(dialog).getByRole('tooltip', { name: 'About Extras' })).toBeVisible();
-  await userEvent.keyboard('{Escape}');
-  expect(dialog).toBeVisible();
-  expect(within(dialog).queryByRole('tooltip')).toBeNull();
-  expect(within(dialog).getByRole('button', { name: 'About Extras' })).toHaveFocus();
-  expect(f.request).toHaveBeenCalledWith('askGuide', { projectId: f.project().id, kickoff: true });
+  const checklist = screen.getByRole('region', { name: 'Project setup' });
+  // The current step's explanation is in plain view; every other step is one disclosure away.
   expect(
-    within(screen.getByRole('dialog', { name: 'Chat with Aiden' })).getByText('REQ-1'),
+    within(checklist).getAllByText(/Review the requirements and resolve any open questions/)[0],
   ).toBeVisible();
+  expect(within(checklist).getByText(/Optionally connect a ticket tracker/)).toBeVisible();
+  expect(within(checklist).getByText(/Choose code, web, API, or manual checks/)).not.toBeVisible();
+  await userEvent.click(within(checklist).getByText('What each step involves'));
+  for (const text of [
+    /Describe what you want to build/,
+    /Choose code, web, API, or manual checks/,
+    /Check your requirements and see progress/,
+  ])
+    expect(within(checklist).getByText(text)).toBeVisible();
+  expect(within(dialog).getByLabelText('Message the Guide')).toHaveValue('Keep this draft');
+  expect(f.request.mock.calls.length).toBe(requestsBeforeHelp);
+  expect(f.request).toHaveBeenCalledWith('askGuide', { projectId: f.project().id, kickoff: true });
+  expect(within(screen.getByRole('tabpanel', { name: 'Chat' })).getByText('REQ-1')).toBeVisible();
   await userEvent.click(screen.getByRole('button', { name: 'Looks right' }));
   expect(f.request).toHaveBeenCalledWith('confirmRequirements', { projectId: f.project().id });
   expect(await screen.findByText(/how should Aiden check the work/)).toBeVisible();
@@ -69,8 +63,6 @@ test('a new project opens on the Guide, plays back the requirements, and sets up
   );
   await userEvent.click(within(methods).getByRole('checkbox', { name: /Web app/ }));
   await userEvent.type(screen.getByLabelText('Where does the app run?'), 'http://localhost:3000');
-  await userEvent.hover(within(dialog).getByRole('button', { name: 'About Choose checks' }));
-  await userEvent.unhover(within(dialog).getByRole('button', { name: 'About Choose checks' }));
   expect(screen.getByLabelText('Where does the app run?')).toHaveValue('http://localhost:3000');
   expect(screen.getByRole('button', { name: 'Confirm setup' })).toBeDisabled();
   await userEvent.click(screen.getByRole('button', { name: 'Check access' }));
@@ -138,33 +130,38 @@ test('choosing to check by hand saves manual verification', async () => {
   );
 });
 
-test('a checked project with unfinished setup stays on Overview with a banner to the Guide', async () => {
+test('a checked project with unfinished setup opens on Chat, and Overview points back to it', async () => {
   f.setSetupPending();
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  expect(await chatPanel()).toBeVisible();
+  // Opening a checked project shows its chat without spending a playback turn.
+  expect(
+    f.request.mock.calls.filter(([method, params]) => method === 'askGuide' && params?.kickoff),
+  ).toHaveLength(0);
+  await selectTab('Overview');
   expect(await screen.findByText('Finish setup:')).toBeVisible();
-  expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
-  await userEvent.click(screen.getByRole('button', { name: 'Open the Guide' }));
-  expect(screen.getByRole('dialog', { name: 'Chat with Aiden' })).toBeVisible();
+  await userEvent.click(screen.getByRole('button', { name: 'Go to Chat' }));
+  expect(screen.getByRole('tabpanel', { name: 'Chat' })).toBeVisible();
 });
 
-test('Back preserves the project tab and draft, and chat also opens over Settings', async () => {
+test('the Chat tab keeps its draft across tabs, and Settings returns to it', async () => {
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
-  await userEvent.click(screen.getByRole('tab', { name: 'Scope' }));
-  const trigger = screen.getByRole('button', { name: 'Ask Aiden' });
-  await userEvent.click(trigger);
+  await selectTab('Scope');
+  await selectTab('Chat');
   await screen.findByText(/Synthetic playback/);
   await userEvent.type(screen.getByLabelText('Message the Guide'), 'Keep this draft');
-  await userEvent.click(screen.getByRole('button', { name: 'Back' }));
-  expect(screen.queryByRole('dialog', { name: 'Chat with Aiden' })).not.toBeInTheDocument();
-  expect(trigger).toHaveFocus();
+  await selectTab('Scope');
+  expect(screen.queryByRole('tabpanel', { name: 'Chat' })).not.toBeInTheDocument();
   expect(screen.getByRole('tab', { name: 'Scope' })).toHaveAttribute('aria-selected', 'true');
-  await userEvent.click(screen.getAllByRole('button', { name: 'Settings' })[0]!);
-  await userEvent.click(screen.getByRole('button', { name: 'Ask Aiden about this project' }));
+  await selectTab('Chat');
   expect(screen.getByLabelText('Message the Guide')).toHaveValue('Keep this draft');
-  await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+  await userEvent.click(screen.getAllByRole('button', { name: 'Settings' })[0]!);
   expect(screen.getByRole('heading', { name: /Application settings/ })).toBeVisible();
+  await userEvent.click(screen.getByRole('button', { name: 'Ask Aiden about this project' }));
+  expect(await chatPanel()).toBeVisible();
+  expect(screen.getByLabelText('Message the Guide')).toHaveValue('Keep this draft');
   expect(
     f.request.mock.calls.filter(([method, params]) => method === 'askGuide' && params?.kickoff),
   ).toHaveLength(1);
@@ -347,7 +344,7 @@ test('clarification choices wait for the introduction and retain selections thro
       : result;
   });
   await openFreshProject();
-  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  const chat = await chatPanel();
   expect(await within(chat).findByRole('status', { name: 'Aiden is thinking' })).toBeVisible();
   expect(within(chat).queryByRole('group', { name: 'Answer choices' })).toBeNull();
   await act(async () => {
@@ -392,7 +389,7 @@ test('progress replaces the current activity without repeating logs or showing i
   ]);
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
-  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  const chat = await chatPanel();
   const progress = within(chat).getByRole('region', { name: 'Checks in this chat' });
   act(() =>
     f.emit({ type: 'progress', runId: 'preparing', stage: 'understand', message: 'Understand...' }),
@@ -420,22 +417,22 @@ test('progress replaces the current activity without repeating logs or showing i
   expect(f.request).toHaveBeenCalledWith('cancel', { runId: 'preparing' });
 });
 
-test('finished checks do not complete setup and the close button preserves the draft and project tab', async () => {
+test('finished checks do not complete setup and switching tabs preserves the draft', async () => {
   f.setSetupPending();
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
   await userEvent.click(screen.getByRole('tab', { name: 'Scope' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Ask Aiden' }));
-  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  await selectTab('Chat');
+  const chat = await chatPanel();
   const status = await within(chat).findByRole('status', { name: 'Setup status' });
   expect(status).toHaveTextContent('Setup not complete');
   expect(within(chat).queryByText('Check complete')).toBeNull();
   expect(within(chat).getByText('Step 2 of 4 · Review requirements')).toBeVisible();
   await userEvent.type(within(chat).getByLabelText('Message the Guide'), 'Keep this question');
-  await userEvent.click(within(chat).getByRole('button', { name: 'Close chat' }));
+  await selectTab('Scope');
   expect(chat).not.toBeVisible();
   expect(screen.getByRole('tab', { name: 'Scope' })).toHaveAttribute('aria-selected', 'true');
-  await userEvent.click(screen.getByRole('button', { name: 'Ask Aiden' }));
+  await selectTab('Chat');
   expect(within(chat).getByLabelText('Message the Guide')).toHaveValue('Keep this question');
 });
 
@@ -460,13 +457,13 @@ test('a running check streams progress and partial results in chat without losin
   });
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
-  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  const chat = await chatPanel();
   expect(
     await within(chat).findByRole('status', { name: 'Project work in progress' }),
   ).toHaveTextContent('Checking your app');
   expect(within(chat).queryByRole('button', { name: 'Later' })).toBeNull();
   expect(within(chat).queryByRole('button', { name: 'View progress' })).toBeNull();
-  expect(within(chat).getByRole('button', { name: 'Close chat' })).toBeVisible();
+  expect(within(chat).queryByRole('button', { name: 'Close chat' })).toBeNull();
   expect(within(chat).getByRole('status', { name: 'Setup status' })).toHaveTextContent(
     'Setup not complete',
   );
@@ -516,7 +513,7 @@ test('a running check streams progress and partial results in chat without losin
   expect(chat).toBeVisible();
   expect(within(chat).getByLabelText('Message the Guide')).toHaveValue('Keep my question');
   expect(f.api.openVerificationReport).not.toHaveBeenCalled();
-  await userEvent.click(within(chat).getByRole('button', { name: 'Back' }));
+  await selectTab('Overview');
   await userEvent.click(await screen.findByRole('button', { name: 'Show progress' }));
   questions = [openCall()];
   await f.request('cancel', { runId: 'live-check' });
@@ -544,8 +541,8 @@ test('saved web and API cards render one setup form and a completed project can 
   });
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Ask Aiden' }));
-  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  await selectTab('Chat');
+  const chat = await chatPanel();
   expect(
     within(chat).getAllByRole('group', { name: 'How should Aiden check the work?' }),
   ).toHaveLength(1);
@@ -576,7 +573,7 @@ test('unanswered questions replace stale setup cards and return to requirement r
     return result;
   });
   await openFreshProject();
-  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  const chat = await chatPanel();
   const first = await within(chat).findByRole('region', { name: 'Clarify your goal' });
   expect(within(first).getByText('Can two books share a title?')).toBeVisible();
   expect(within(chat).queryByRole('button', { name: 'Looks right' })).toBeNull();
@@ -605,8 +602,8 @@ test('unanswered questions replace stale setup cards and return to requirement r
     projectId: f.project().id,
     clarification: { callId: 'call-1', answer: 'Block duplicates' },
   });
-  await userEvent.click(within(chat).getByRole('button', { name: 'Back' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Ask Aiden' }));
+  await selectTab('Overview');
+  await selectTab('Chat');
   expect(within(chat).getByText('Who can edit a book?')).toBeVisible();
   expect(within(chat).getByRole('button', { name: 'Submit' })).toBeDisabled();
   expect(within(chat).getByText('Choose all that apply.')).toBeVisible();
@@ -634,4 +631,44 @@ test('unanswered questions replace stale setup cards and return to requirement r
   await userEvent.click(within(chat).getByRole('button', { name: 'Update requirements' }));
   expect(await within(chat).findByRole('button', { name: 'Looks right' })).toBeVisible();
   expect(f.request.mock.calls.some(([method]) => method === 'look')).toBe(false);
+});
+
+test('finished checks stay in the thread, and Latest check links back to them', async () => {
+  f.guideMessages().push(
+    {
+      at: '2026-10-16T09:00:00.000Z',
+      from: 'event',
+      text: 'Code check finished: 0 of 1 requirements met.',
+      result: {
+        kind: 'code',
+        runId: 'older-run',
+        items: [{ requirementId: 'REQ-1', label: 'Users can list books.', status: 'failed' }],
+      },
+    },
+    {
+      at: '2026-10-17T10:00:00.000Z',
+      from: 'aiden',
+      text: 'You can change the branch in Project settings.',
+      nextSteps: ['Open the project menu and select Project settings.', 'Pick the branch.'],
+    },
+  );
+  render(<App />);
+  await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  const chat = await chatPanel();
+  // An older check keeps its saved outcome even though newer results replaced the live ones.
+  expect(within(chat).getByText('Code check finished: 0 of 1 requirements met.')).toBeVisible();
+  await userEvent.click(within(chat).getByText('Code check results'));
+  expect(within(chat).getByRole('list', { name: 'Saved check results' })).toHaveTextContent(
+    'Needs work · REQ-1 Users can list books.',
+  );
+  const steps = within(chat).getByRole('list', { name: 'Next steps' });
+  expect(
+    within(steps)
+      .getAllByRole('listitem')
+      .map((item) => item.textContent),
+  ).toEqual(['Open the project menu and select Project settings.', 'Pick the branch.']);
+  await selectTab('Overview');
+  await userEvent.click(screen.getByRole('button', { name: 'View results in chat' }));
+  expect(screen.getByRole('tab', { name: 'Chat' })).toHaveAttribute('aria-selected', 'true');
+  expect(document.getElementById('guide-result-older-run')).toHaveFocus();
 });

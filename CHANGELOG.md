@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Make Chat the first project tab and the one each project opens on, replacing the chat overlay. Sidebar and Settings entries return to it, and drafts survive tab and page changes.
+
+- Save each finished check's results into the chat where it happened, so they stay in scrollback after later checks or scope changes. Add View results in chat to the Latest check card.
+
+- Show whether Claude or Codex is connected on the start screen and block Hand it to Aiden until it is, with a Connect button. Add Sign in with Claude, which opens Claude Code's own sign-in and rechecks the connection automatically, plus a Claude Code installation link.
+
+- Show setup step explanations, delivery step outcomes, how Aiden knows each requirement's status, and delivery finding summaries inline instead of behind info icons and hover text.
+
+- Lead chat answers with the direct answer and add numbered next steps naming the exact control when a question asks how to do something.
+
 ## 1.2.4
 
 - Show concise folder and repository names on Windows throughout setup, testing settings, and project summaries.

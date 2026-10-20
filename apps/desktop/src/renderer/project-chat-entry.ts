@@ -5,7 +5,9 @@ export type ProjectChatEntry =
   | { type: 'connections' | 'run' | 'goal' | 'scope' }
   | { type: 'verification'; method?: VerifyMethod }
   | { type: 'requirement'; requirementId: string }
-  | { type: 'finding'; requirementId: string; title: string };
+  | { type: 'finding'; requirementId: string; title: string }
+  /** Bring a finished check's saved results into view in the thread. */
+  | { type: 'result'; runId: string };
 
 /** Attach only the selected public project context to a person's explicit message. */
 export function contextualGuideMessage(entry: ProjectChatEntry | null, text: string): string {

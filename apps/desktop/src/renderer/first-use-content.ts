@@ -14,17 +14,17 @@ export const firstUseSteps = [
     title: 'Bring your own subscription',
     summary: 'Use Aiden with your Claude or ChatGPT account.',
     points: [
-      'Open Settings → Model and choose Codex for ChatGPT, or Claude.',
-      'Follow the setup steps to install the provider and sign in with your existing account.',
+      'Claude: install Claude Code, then select Sign in with Claude and finish in your browser. A paid Claude plan is needed.',
+      'Codex for ChatGPT: install the Codex CLI, then select Sign in with Codex.',
     ],
     detail:
-      'Choose the model and effort for your project in Model settings. Aiden uses the subscription or API-key billing option you select. Provider limits and charges may apply. There is no separate Aiden sign-in. You can connect Linear later in Settings → Integrations. It’s optional.',
+      'The start screen shows whether your chosen model is connected, and Connect opens the sign-in steps; Settings → Model has the same controls. Cursor is not supported in this Preview. Choose the model and effort for your project in Model settings. Aiden uses the subscription or API-key billing option you select. Provider limits and charges may apply. There is no separate Aiden sign-in. You can connect Linear later in Settings → Integrations. It’s optional.',
   },
   {
     title: 'Set the intent',
     summary: 'Start from a customer call, a brief, or a sentence.',
     points: [
-      'Tell Aiden what you’re building, choose the project folder, and select Hand it to Aiden.',
+      'Tell Aiden what you’re building, optionally add the project folder, and select Hand it to Aiden.',
       'Aiden writes down what done means in plain language and plans the work in usable steps.',
     ],
     detail:

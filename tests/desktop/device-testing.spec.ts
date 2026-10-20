@@ -22,7 +22,7 @@ test('project connections check access before saving and keep API keys private a
       .getByRole('region', { name: 'Project connections' })
       .getByRole('button', { name: 'Manage' })
       .click();
-    const chat = page.getByRole('dialog', { name: 'Chat with Aiden' });
+    const chat = page.getByRole('tabpanel', { name: 'Chat' });
     await page.setViewportSize({ width: 600, height: 700 });
     await chat.getByRole('button', { name: 'API access' }).click();
     await expect(chat.getByLabel('API base URL')).toBeFocused();
@@ -49,11 +49,12 @@ test('project connections check access before saving and keep API keys private a
     await chat.getByLabel('API key', { exact: true }).fill(demoAccount.apiKey);
     await chat.getByRole('button', { name: 'Check access & save' }).click();
     await expect(chat.getByRole('region', { name: 'Edit project verification' })).toHaveCount(0);
-    await chat.getByRole('button', { name: 'Back' }).click();
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click();
     await expect(page.getByText('API · Connected', { exact: true })).toBeVisible();
     await page.screenshot({ path: info.outputPath('clean-project-overview.png'), fullPage: true });
     await page.reload();
     await page.getByRole('button', { name: 'A book project', exact: true }).click();
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click();
     await page.getByRole('button', { name: 'Edit API' }).click();
     await expect(chat.getByLabel('API key', { exact: true })).toHaveValue('');
     await expect(chat.getByLabel('API key', { exact: true })).toHaveAttribute(
@@ -64,8 +65,6 @@ test('project connections check access before saving and keep API keys private a
     await chat.getByText('Automatic checks', { exact: true }).click();
     await expect(chat.getByLabel('When to verify')).toHaveValue('after_assessment');
     await page.screenshot({ path: info.outputPath('connection-edit-in-chat.png'), fullPage: true });
-    await chat.getByRole('button', { name: 'Back' }).click();
-    await expect(page.getByRole('button', { name: 'Edit API' })).toBeFocused();
     await page.getByRole('tab', { name: 'Scope', exact: true }).click();
     await page.getByRole('button', { name: 'Change REQ-1', exact: true }).click();
     await expect(chat.getByRole('region', { name: 'Selected requirement' })).toContainText('REQ-1');
@@ -75,12 +74,11 @@ test('project connections check access before saving and keep API keys private a
       path: info.outputPath('requirement-change-in-chat.png'),
       fullPage: true,
     });
-    await page.keyboard.press('Escape');
+    await page.getByRole('tab', { name: 'Scope', exact: true }).click();
     await expect(page.getByRole('tab', { name: 'Scope', exact: true })).toHaveAttribute(
       'aria-selected',
       'true',
     );
-    await expect(page.getByRole('button', { name: 'Change REQ-1', exact: true })).toBeFocused();
     await page.getByRole('button', { name: 'Change REQ-1', exact: true }).click();
     await expect(chat.getByLabel('Message the Guide')).toHaveValue(
       'Keep this proposed change as a draft',

@@ -2,7 +2,6 @@ import { Check } from 'lucide-react';
 import { type JSX, useState } from 'react';
 
 import type { SetupProgress, SetupStepId } from '../../../../packages/contracts/src/guide';
-import { SetupStepTooltip } from './SetupStepTooltip';
 
 /** Plain explanations of each setup step, available immediately without a model request. */
 const explanations: Record<SetupStepId, string> = {
@@ -17,7 +16,7 @@ const explanations: Record<SetupStepId, string> = {
   extras: 'Optionally connect a ticket tracker. You can finish setup without it and add it later.',
 };
 
-/** One checklist item with a status marker and an independently accessible explanation button. */
+/** One checklist item with a status marker; its explanation is shown in the step guide below. */
 function SetupStep({
   step,
   number,
@@ -36,12 +35,14 @@ function SetupStep({
         {step.status === 'done' ? <Check size={13} /> : number}
       </span>
       <span className="setup-item-label">{step.label}</span>
-      <SetupStepTooltip label={step.label} text={explanations[step.id]} />
     </li>
   );
 }
 
-/** Keep the current step obvious and let people inspect any step without changing setup or their draft. */
+/**
+ * Keep the current step obvious with its explanation in plain view, and let people read what every
+ * step involves without changing setup or their draft.
+ */
 export function SetupChecklist({ setup }: { setup: SetupProgress }): JSX.Element {
   const [expanded, setExpanded] = useState(false);
   const required = setup.steps.filter((step) => step.id !== 'extras');
@@ -62,6 +63,7 @@ export function SetupChecklist({ setup }: { setup: SetupProgress }): JSX.Element
             </p>
           )}
           {current && <p className="setup-next-action">{current.detail}</p>}
+          {current && <p className="setup-explanation">{explanations[current.id]}</p>}
         </div>
         {setup.complete && (
           <button
@@ -81,15 +83,21 @@ export function SetupChecklist({ setup }: { setup: SetupProgress }): JSX.Element
             ))}
           </ol>
           {extras && (
-            <div className="setup-extras">
-              <span>
-                {extras.status === 'done'
-                  ? 'Ticket tracker connected'
-                  : 'Optional: connect a ticket tracker'}
-              </span>
-              <SetupStepTooltip label="Extras" text={explanations.extras} />
-            </div>
+            <p className="setup-extras">
+              {extras.status === 'done' ? 'Ticket tracker connected.' : explanations.extras}
+            </p>
           )}
+          <details className="setup-guide">
+            <summary>What each step involves</summary>
+            <dl>
+              {required.map((step) => (
+                <div key={step.id}>
+                  <dt>{step.label}</dt>
+                  <dd>{explanations[step.id]}</dd>
+                </div>
+              ))}
+            </dl>
+          </details>
         </>
       )}
     </section>

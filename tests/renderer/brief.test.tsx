@@ -15,6 +15,7 @@ import type {
 } from '../../packages/contracts/src/index';
 import { appFixture, openCall } from './app-fixture';
 import { report } from './fixtures';
+import { chatPanel, selectTab } from './project-tabs';
 const f = appFixture();
 const { default: App } = await import('../../apps/desktop/src/App');
 let blobs = 0;
@@ -163,6 +164,7 @@ function withEdgeCases() {
 async function openProject() {
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  await selectTab('Overview');
   await userEvent.click(screen.getByRole('tab', { name: 'Scope' }));
   return screen.findByRole('region', { name: 'Requirements' });
 }
@@ -180,6 +182,7 @@ test('app-only Overview keeps verification progress and explains unavailable eff
   saveCheck();
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  await selectTab('Overview');
   const progress = await screen.findByRole('progressbar');
   expect(progress).toBeVisible();
   expect(progress).toHaveAttribute('value', '1');
@@ -228,6 +231,7 @@ test('Overview exposes the current effort and time estimate without opening deta
   });
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  await selectTab('Overview');
   expect(await screen.findByText(/8 estimated complexity points/)).toBeVisible();
   expect(screen.getByText(/4 working days remaining/)).toBeVisible();
   expect(screen.getByRole('region', { name: 'Requirements' })).toBeVisible();
@@ -558,6 +562,7 @@ test('web-only projects show their completed check and open criterion evidence w
   saveCheck();
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  await selectTab('Overview');
   expect(await screen.findByText('App check finished.')).toBeVisible();
   expect(screen.queryByText('No check finished yet.')).toBeNull();
   await userEvent.click(screen.getByRole('tab', { name: 'Activity' }));
@@ -568,8 +573,8 @@ test('web-only projects show their completed check and open criterion evidence w
   expect(await screen.findByRole('dialog', { name: 'Browser check' })).toBeVisible();
   expect(screen.getByText('Synthetic backend-only explanation')).toBeVisible();
   await userEvent.click(screen.getByRole('button', { name: 'Close browser check' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Ask Aiden' }));
-  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  await selectTab('Chat');
+  const chat = await chatPanel();
   expect(within(chat).queryByRole('button', { name: 'View results' })).toBeNull();
   const chatResults = within(chat).getByRole('region', { name: 'App check results' });
   await userEvent.click(within(chatResults).getByText(/Users can create books/));
@@ -588,9 +593,10 @@ test('web-only results from superseded requirements do not appear as current evi
   saveCheck('old-baseline');
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  await selectTab('Overview');
   expect(await screen.findByText('No check finished yet.')).toBeVisible();
   expect(screen.queryByRole('region', { name: 'App check results' })).toBeNull();
-  await userEvent.click(screen.getByRole('button', { name: 'Ask Aiden' }));
-  const chat = await screen.findByRole('dialog', { name: 'Chat with Aiden' });
+  await selectTab('Chat');
+  const chat = await chatPanel();
   expect(within(chat).queryByRole('region', { name: 'App check results' })).toBeNull();
 });

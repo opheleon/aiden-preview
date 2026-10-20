@@ -1,81 +1,16 @@
-/* Project chat overlays any surface without losing the user's place. */
-.project-guide-dialog {
-  width: min(900px, calc(100vw - 48px));
-  height: min(900px, calc(100dvh - 64px));
-  max-width: none;
-  max-height: none;
-  margin: auto;
-  padding: 24px 32px;
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  background: var(--paper);
-  color: var(--ink);
-  box-shadow: 0 24px 100px #14131a26;
+/* Project chat is the first project tab: the thread scrolls inside the page, composer below. */
+.project-chat-panel .guide-tab {
+  height: var(--project-chat-height, max(440px, calc(100dvh - 300px)));
 }
 
-.project-guide-dialog[open] {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+/* Long setup explanations scroll on their own so the composer always stays in view. */
+.project-chat-panel .setup-checklist {
+  max-height: 45%;
+  overflow: auto;
+  scrollbar-width: thin;
 }
 
-.project-guide-dialog::backdrop {
-  background: #14131a38;
-  backdrop-filter: blur(3px);
-}
-
-.project-guide-header {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 20px;
-}
-
-.project-guide-title {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.guide-close {
-  display: inline-flex;
-  flex: 0 0 36px;
-  align-items: center;
-  justify-content: center;
-  min-height: 36px;
-  padding: 8px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--muted);
-}
-
-.guide-close:is(:hover, :focus-visible) {
-  background: var(--paper2);
-  color: var(--ink);
-}
-
-.project-guide-header h2 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.project-guide-header p {
-  margin: 3px 0 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.guide-back {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 8px;
-}
-
-.project-guide-dialog :is(button, summary):focus-visible {
+.project-chat-panel :is(button, summary):focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 3px;
 }
@@ -331,13 +266,6 @@
 }
 
 @media (width <= 720px) {
-  .project-guide-dialog {
-    width: calc(100vw - 16px);
-    height: calc(100dvh - 16px);
-    padding: 16px;
-    border-radius: 16px;
-  }
-
   .guide-tab {
     width: 100%;
   }
@@ -457,4 +385,32 @@
   .guide-clarification {
     animation: none;
   }
+}
+
+/* A finished check where it happened in the conversation. */
+.guide-result {
+  display: grid;
+  gap: 8px;
+}
+
+.guide-result:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.guide-result > details > summary {
+  width: fit-content;
+  color: var(--brand);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.guide-saved-results {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
 }

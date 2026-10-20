@@ -142,7 +142,7 @@ export async function claudeDiagnostics(
     state = e instanceof ClaudeConnectionError ? e.state : 'check_failed';
     installed = state !== 'unavailable';
   }
-  const message = state === 'sign_in_required' ? claudeSignIn.split(' Run:')[0] : messages[state];
+  const message = messages[state];
   return {
     provider: 'claude',
     installed,

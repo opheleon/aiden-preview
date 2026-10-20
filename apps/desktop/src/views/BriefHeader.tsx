@@ -1,4 +1,4 @@
-import { MessageCircle, MoreHorizontal, Square } from 'lucide-react';
+import { MoreHorizontal, Square } from 'lucide-react';
 import { type JSX, type ReactNode, useRef, useState } from 'react';
 
 import type { LookReason, RunManifest } from '../../../../packages/contracts/src/index';
@@ -83,13 +83,13 @@ function Overflow({
 /** What Aiden is doing right now, with a way to stop it. */
 function LiveLine({ workspace }: { workspace: Workspace }): JSX.Element | null {
   const { busy, live, activeRun, action, call } = workspace;
-  const { open } = useProjectGuide();
+  const { open, tab } = useProjectGuide();
   if (!busy) return null;
   return (
     <p className="live-line" aria-live="polite">
       <span className="spinner" aria-hidden="true" />
       {live || 'Aiden is working.'}
-      {activeRun && (
+      {activeRun && tab !== 'chat' && (
         <button className="text-button" onClick={() => open({ type: 'run' })}>
           Show progress
         </button>
@@ -171,11 +171,20 @@ function StatusCard({
   note: { text: string; label: string; run: () => void } | null;
 }): JSX.Element {
   const closed = workspace.project.lifecycle?.status === 'closed';
-  const { open } = useProjectGuide();
+  const { open, guide } = useProjectGuide();
+  const savedResult = guide.view?.thread.messages.filter((m) => m.result).at(-1)?.result;
   return (
     <section className="brief-card" aria-label="Status">
       <div className="card-label-row">
         <h2 className="card-label">Latest check</h2>
+        {savedResult && (
+          <button
+            className="text-button"
+            onClick={() => open({ type: 'result', runId: savedResult.runId })}
+          >
+            View results in chat
+          </button>
+        )}
         <button
           disabled={workspace.busy || closed}
           onClick={() => {
@@ -236,16 +245,12 @@ export function BriefHeader({
   note: { text: string; label: string; run: () => void } | null;
 }): JSX.Element {
   const [outcome, setOutcome] = useState<'accept' | 'close'>();
-  const { open } = useProjectGuide();
   const monitoring = monitoringLabel(workspace.project.repositories);
   return (
     <>
       <header className="brief-top">
         <TitleLines workspace={workspace} monitoring={monitoring} />
         <div className="button-row">
-          <button onClick={() => open()}>
-            <MessageCircle size={15} /> Ask Aiden
-          </button>
           <Overflow workspace={workspace} onOutcome={setOutcome} />
         </div>
       </header>

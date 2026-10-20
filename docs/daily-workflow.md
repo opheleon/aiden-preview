@@ -10,7 +10,7 @@ Scope holds what you’re building and how you’ll know it works. Refine it as 
 
 Overview shows progress, remaining effort, agreed timing, the delivery plan, and what needs your attention. Expand a delivery step for checks, linked tickets, and next actions. Scope holds the agreed requirements and plan; Change opens a requirement in chat. Activity shows what changed and why, with the details of each check under All runs.
 
-Each requirement is one line with one status; hover the status to see how Aiden knows, and open the line for its checks, evidence, linked ticket, and next actions. A delivery step's outcome and rationale sit behind its (i) button.
+Each requirement is one line with one status and a short line saying how Aiden knows; open it for its checks, evidence, linked ticket, and next actions. A delivery step shows its outcome under its title; open the step for its rationale and test plan.
 
 ![A requirement opened from the overview, showing its status, ticket, and code evidence with synthetic fixture data](screenshots/requirement-fixture.png)
 
@@ -18,7 +18,7 @@ While Preview is open, Aiden watches the selected remote branch every minute and
 
 To change the monitored branch, open **Project settings** from the project menu, then **Testing settings**. Branch monitoring and app/API test access live together there.
 
-The project chat shows **Setup not complete** until its required steps are finished, then **Setup complete** with the checklist under **Setup details**. Use the top-right close button to return to the project without losing your conversation or draft. Refreshing only the overview keeps your requirements confirmed; changes to the agreed scope require review again.
+The project's Chat tab shows **Setup not complete** until its required steps are finished, then **Setup complete** with the checklist under **Setup details**. Switch to any other tab without losing your conversation or draft. Refreshing only the overview keeps your requirements confirmed; changes to the agreed scope require review again.
 
 Local-code and manual-only selections confirm directly; local code requires a valid project folder. Adding a web or API target reveals the access check, and removing those targets hides it again.
 

@@ -95,6 +95,37 @@ export const GuideActionSchema = z.discriminatedUnion('type', [
 export type GuideAction = z.infer<typeof GuideActionSchema>;
 
 /**
+ * Up to five short, ordered steps that follow an answer, each naming the control to use.
+ * Example: ["Open Settings, then Model.", "Select Sign in with Claude."].
+ */
+export const GuideNextStepsSchema = z.array(z.string().trim().min(1).max(200)).max(5);
+
+/**
+ * A finished check saved into the conversation, so its outcome stays in the thread after later
+ * checks or scope changes replace the live results. One item per requirement or criterion.
+ * Example: { kind: 'app', runId: 'r1', items: [{ requirementId: 'REQ-1', label: 'Books list', status: 'passed' }] }.
+ */
+export const GuideCheckResultSchema = z
+  .object({
+    kind: z.enum(['app', 'code']),
+    runId: z.string().min(1).max(200),
+    items: z
+      .array(
+        z
+          .object({
+            requirementId: z.string().min(1).max(100),
+            label: z.string().trim().min(1).max(400),
+            status: z.enum(['passed', 'failed', 'unverified']),
+          })
+          .strict(),
+      )
+      .max(50),
+  })
+  .strict();
+/** One saved check result. */
+export type GuideCheckResult = z.infer<typeof GuideCheckResultSchema>;
+
+/**
  * One line in a project's Guide conversation. `event` lines are facts the app wrote, such as a
  * saved URL or a finished check, so the Guide always knows what changed outside the chat.
  */
@@ -104,6 +135,8 @@ export const GuideMessageSchema = z
     from: z.enum(['you', 'aiden', 'event']),
     text: z.string().trim().min(1).max(4000),
     widgets: z.array(GuideWidgetSchema).max(4).optional(),
+    nextSteps: GuideNextStepsSchema.optional(),
+    result: GuideCheckResultSchema.optional(),
   })
   .strict();
 /** One Guide message. */

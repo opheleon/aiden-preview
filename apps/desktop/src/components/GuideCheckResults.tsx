@@ -2,6 +2,7 @@ import { type JSX, useState } from 'react';
 
 import type {
   CriterionResult,
+  Report,
   VerificationAttempt,
   VerificationResult,
 } from '../../../../packages/contracts/src/index';
@@ -89,76 +90,108 @@ function CheckResult({
   );
 }
 
-/** Show current-scope app results as they arrive and code conclusions without leaving the chat. */
-export function GuideCheckResults({
-  workspace,
-  activeIds,
+/** Plain labels for code assessment statuses. */
+const codeLabels = {
+  implemented: 'Implemented',
+  partial: 'Partly implemented',
+  missing: 'Not implemented',
+  unknown: 'Could not determine',
+};
+
+/** One app check's results with expandable evidence, as it arrives or once it has finished. */
+export function AppResults({
+  result,
+  projectId,
 }: {
-  workspace: Workspace;
-  activeIds: string[];
+  result: VerificationResult;
+  projectId: string;
 }): JSX.Element {
+  return (
+    <section aria-label="App check results" className="guide-check-results">
+      <p>{checkSummary(result)}</p>
+      {result.criteria.map((criterion) => (
+        <CheckResult
+          key={`${result.runId}:${criterion.method}:${criterion.requirementId}:${criterion.edgeCaseId ?? ''}`}
+          criterion={criterion}
+          projectId={projectId}
+          runId={result.runId}
+        />
+      ))}
+    </section>
+  );
+}
+
+/** One code check's conclusions, each requirement expandable to its explanation. */
+export function CodeResults({ report }: { report: Report }): JSX.Element {
+  return (
+    <section aria-label="Code check results" className="guide-check-results">
+      <p>{report.summary}</p>
+      {report.assessments.map((assessment) => (
+        <details key={`${report.id}:${assessment.requirementId}`} className="guide-check-result">
+          <summary>
+            <b>{codeLabels[assessment.status]}</b> ·{' '}
+            {report.baseline.requirements.find((r) => r.id === assessment.requirementId)?.text ??
+              assessment.requirementId}
+          </summary>
+          <p>{assessment.explanation}</p>
+          {assessment.remainingWork.length > 0 && (
+            <ul>
+              {assessment.remainingWork.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          )}
+          {assessment.unknowns.map((item) => (
+            <p key={item}>{item}</p>
+          ))}
+        </details>
+      ))}
+    </section>
+  );
+}
+
+/** The current-scope app results, unless another app check is running. */
+function liveApp(workspace: Workspace, activeIds: string[]): VerificationResult | undefined {
   const result = workspace.verification?.result;
-  const current =
-    result?.baselineId === workspace.baseline?.id && result?.projectId === workspace.project.id;
+  if (result?.baselineId !== workspace.baseline?.id) return undefined;
+  if (result?.projectId !== workspace.project.id) return undefined;
   const checkingApp = workspace.runs.some(
     (run) => activeIds.includes(run.id) && run.kind === 'verify',
   );
-  const showApp = result && current && (!checkingApp || activeIds.includes(result.runId));
+  return !checkingApp || activeIds.includes(result.runId) ? result : undefined;
+}
+
+/** The current-scope code conclusions, unless another code check is running. */
+function liveCode(workspace: Workspace, activeIds: string[]): Report | undefined {
   const report = workspace.report;
-  const showCode =
-    report &&
-    report.baselineId === workspace.baseline?.id &&
-    report.projectId === workspace.project.id &&
-    !workspace.runs.some((run) => activeIds.includes(run.id) && run.kind === 'report');
-  const labels = {
-    implemented: 'Implemented',
-    partial: 'Partly implemented',
-    missing: 'Not implemented',
-    unknown: 'Could not determine',
-  };
+  if (report?.baselineId !== workspace.baseline?.id) return undefined;
+  if (report?.projectId !== workspace.project.id) return undefined;
+  const checkingCode = workspace.runs.some(
+    (run) => activeIds.includes(run.id) && run.kind === 'report',
+  );
+  return checkingCode ? undefined : report;
+}
+
+/**
+ * Show current-scope app results as they arrive and code conclusions without leaving the chat.
+ * Results already saved in the thread are shown there instead, so nothing appears twice.
+ */
+export function GuideCheckResults({
+  workspace,
+  activeIds,
+  saved,
+}: {
+  workspace: Workspace;
+  activeIds: string[];
+  /** Run IDs whose results the thread already holds. */
+  saved: ReadonlySet<string>;
+}): JSX.Element {
+  const app = liveApp(workspace, activeIds);
+  const code = liveCode(workspace, activeIds);
   return (
     <>
-      {showApp && (
-        <section aria-label="App check results" className="guide-check-results">
-          <p>{checkSummary(result)}</p>
-          {result.criteria.map((criterion) => (
-            <CheckResult
-              key={`${result.runId}:${criterion.method}:${criterion.requirementId}:${criterion.edgeCaseId ?? ''}`}
-              criterion={criterion}
-              projectId={workspace.project.id}
-              runId={result.runId}
-            />
-          ))}
-        </section>
-      )}
-      {showCode && (
-        <section aria-label="Code check results" className="guide-check-results">
-          <p>{report.summary}</p>
-          {report.assessments.map((assessment) => (
-            <details
-              key={`${report.id}:${assessment.requirementId}`}
-              className="guide-check-result"
-            >
-              <summary>
-                <b>{labels[assessment.status]}</b> ·{' '}
-                {report.baseline.requirements.find((r) => r.id === assessment.requirementId)
-                  ?.text ?? assessment.requirementId}
-              </summary>
-              <p>{assessment.explanation}</p>
-              {assessment.remainingWork.length > 0 && (
-                <ul>
-                  {assessment.remainingWork.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              )}
-              {assessment.unknowns.map((item) => (
-                <p key={item}>{item}</p>
-              ))}
-            </details>
-          ))}
-        </section>
-      )}
+      {app && !saved.has(app.runId) && <AppResults result={app} projectId={workspace.project.id} />}
+      {code && !saved.has(code.id) && <CodeResults report={code} />}
     </>
   );
 }

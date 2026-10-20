@@ -41,14 +41,17 @@ export function DeliveryAttention({
       <ul className="attention-rows">
         {items.map((item) => (
           <li className="attention-row" key={item.featureId}>
-            <button
-              type="button"
-              className="attention-open"
-              aria-haspopup="dialog"
-              onClick={() => onOpen(item.requirementIds[0]!)}
-            >
-              {item.title}
-            </button>
+            <span className="attention-main">
+              <button
+                type="button"
+                className="attention-open"
+                aria-haspopup="dialog"
+                onClick={() => onOpen(item.requirementIds[0]!)}
+              >
+                {item.title}
+              </button>
+              <span className="row-sub attention-summary">{item.summary}</span>
+            </span>
             <AttentionBadge item={item} />
           </li>
         ))}
@@ -57,7 +60,7 @@ export function DeliveryAttention({
   );
 }
 
-/** The same finding label on the attention row, the feature, and the requirement; hover for the summary. */
+/** The same finding label on the attention row, the feature, and the requirement. */
 export function AttentionBadge({ item }: { item: Attention }): JSX.Element {
   return (
     <span className={`attention-badge attention-badge--${item.kind}`} title={item.summary}>

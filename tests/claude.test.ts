@@ -279,7 +279,7 @@ void test('explicit API-key runs use the SDK without a subscription and reject s
 void test('expired authentication, usage limits, billing and network errors have distinct recovery guidance', async () => {
   const { r, home } = await request();
   for (const [error, expected] of [
-    ['authentication_failed', /claude auth login --claudeai/],
+    ['authentication_failed', /Sign in with Claude/],
     ['rate_limit', /usage limit/],
     ['billing_error', /billing error/],
     ['server_error', /connection and provider/],

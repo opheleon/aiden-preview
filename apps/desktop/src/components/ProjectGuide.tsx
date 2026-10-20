@@ -1,30 +1,32 @@
-import { ArrowLeft, X } from 'lucide-react';
-import {
-  createContext,
-  type JSX,
-  type ReactNode,
-  useContext,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import { createContext, type JSX, type ReactNode, useContext, useState } from 'react';
 
-import { scopeName } from '../../../../packages/contracts/src/project-name';
 import { type Guide, useGuide } from '../hooks/useGuide';
 import type { Workspace } from '../hooks/useWorkspace';
 import type { ProjectChatEntry } from '../renderer/project-chat-entry';
-import { GuideChat } from '../views/GuideChat';
+import type { ProjectTab } from './ProjectTabs';
 
 /** Shared entry point to the selected project's conversation, available from any app surface. */
 type ProjectGuideState = {
   guide: Guide;
+  /** Show the project's Chat tab, optionally with a requested action or context attached. */
   open: (entry?: ProjectChatEntry) => void;
-  close: () => void;
+  /** The action or context attached to the next message, if any. */
+  entry: ProjectChatEntry | null;
+  clearEntry: () => void;
+  /** The selected project tab; every project opens on Chat. */
+  tab: ProjectTab;
+  /** The person chose the Chat tab, rather than seeing it as the default on opening a project. */
+  chatChosen: boolean;
+  selectTab: (next: ProjectTab) => void;
+  onHelp: () => void;
+  /** The unsent message, kept per project while the person visits other pages. */
+  draft: string;
+  setDraft: (text: string) => void;
   revision: number;
 };
 const ProjectGuideContext = createContext<ProjectGuideState | null>(null);
 
-/** Access the project conversation without changing the current page or project tab. */
+/** Access the project conversation and tab selection from any app surface. */
 export function useProjectGuide(): ProjectGuideState {
   const context = useContext(ProjectGuideContext);
   if (!context) throw new Error('Project chat needs its workspace provider.');
@@ -32,8 +34,9 @@ export function useProjectGuide(): ProjectGuideState {
 }
 
 /**
- * Keep one project conversation above the current page. First setup opens automatically; Back or
- * Escape restores the prior surface and focus, and reopening preserves the conversation draft.
+ * Keep one project conversation and the selected project tab for every project. Chat is the first
+ * tab and the one a project opens on; opening chat from anywhere else, including Settings, returns
+ * to the project and selects it, so the person never has to find a second button.
  */
 export function ProjectGuide({
   workspace,
@@ -45,82 +48,42 @@ export function ProjectGuide({
   children: ReactNode;
 }): JSX.Element {
   const guide = useGuide(workspace);
-  const [opened, setOpened] = useState<Record<string, boolean>>({});
+  const [tabs, setTabs] = useState<Record<string, ProjectTab>>({});
   const [entries, setEntries] = useState<Record<string, ProjectChatEntry | null>>({});
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [revision, setRevision] = useState(0);
-  const dialog = useRef<HTMLDialogElement>(null);
-  const opener = useRef<HTMLElement | null>(null);
   const id = workspace.project.id;
-  const saved = workspace.projects.some((project) => project.id === id);
-  const visible = saved && !!opened[id];
-  const checked = workspace.runs.some(
-    (run) => (run.kind === 'report' || run.kind === 'verify') && run.status === 'completed',
-  );
-  // Decide the initial presentation once per project; finishing setup never closes the chat.
-  if (saved && opened[id] === undefined && (!workspace.baseline || guide.view))
-    setOpened({ ...opened, [id]: !checked && !guide.view?.setup.complete });
-  useLayoutEffect(() => {
-    const element = dialog.current;
-    if (visible && element && !element.open) {
-      opener.current =
-        document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      element.showModal();
-    } else if (!visible && element?.open) element.close();
-  }, [visible]);
-  /** Close the overlay without changing the page that launched it. */
-  function close(): void {
-    setOpened((current) => ({ ...current, [id]: false }));
-    dialog.current?.close();
-    opener.current?.focus();
+  /** Select a tab; selecting Chat re-reads setup so settings saved elsewhere show at once. */
+  function selectTab(next: ProjectTab): void {
+    setTabs((current) => ({ ...current, [id]: next }));
+    if (next === 'chat') void guide.reload();
   }
-  /** Re-read setup on opening so settings saved elsewhere are immediately reflected. */
+  /** Go to the project's Chat tab from any page, attaching the requested entry. */
   function open(entry?: ProjectChatEntry): void {
     setEntries((current) => ({ ...current, [id]: entry ?? null }));
-    setOpened((current) => ({ ...current, [id]: true }));
-    void guide.reload();
+    if (workspace.area !== 'projects') workspace.setArea('projects');
+    selectTab('chat');
   }
   return (
-    <ProjectGuideContext.Provider value={{ guide, open, close, revision }}>
+    <ProjectGuideContext.Provider
+      value={{
+        guide,
+        open,
+        entry: entries[id] ?? null,
+        clearEntry: () => {
+          setEntries((current) => ({ ...current, [id]: null }));
+          setRevision((current) => current + 1);
+        },
+        tab: tabs[id] ?? 'chat',
+        chatChosen: tabs[id] === 'chat',
+        selectTab,
+        onHelp,
+        draft: drafts[id] ?? '',
+        setDraft: (text) => setDrafts((current) => ({ ...current, [id]: text })),
+        revision,
+      }}
+    >
       {children}
-      <dialog
-        ref={dialog}
-        className="project-guide-dialog"
-        aria-labelledby="project-guide-title"
-        onCancel={(event) => {
-          event.preventDefault();
-          close();
-        }}
-      >
-        <header className="project-guide-header">
-          <button onClick={close} aria-label="Back" className="guide-back">
-            <ArrowLeft size={18} /> Back
-          </button>
-          <div className="project-guide-title">
-            <h2 id="project-guide-title">Chat with Aiden</h2>
-            <p>{scopeName(workspace.project.context, workspace.baseline?.product)}</p>
-          </div>
-          <button onClick={close} aria-label="Close chat" className="guide-close">
-            <X size={20} aria-hidden="true" />
-          </button>
-        </header>
-        {saved && (
-          <GuideChat
-            key={`${id}:${workspace.project.lifecycle?.status ?? 'active'}`}
-            workspace={workspace}
-            guide={guide}
-            visible={visible}
-            entry={entries[id] ?? null}
-            onClearEntry={() => {
-              setEntries((current) => ({ ...current, [id]: null }));
-              setRevision((current) => current + 1);
-            }}
-            onHelp={() => {
-              close();
-              onHelp();
-            }}
-          />
-        )}
-      </dialog>
     </ProjectGuideContext.Provider>
   );
 }

@@ -144,19 +144,22 @@ try {
   await page.getByRole('button', { name: 'Claude', exact: true }).click();
   await expect(page.getByLabel('Authentication', { exact: true })).toHaveValue('subscription');
   await expect(page.getByTestId('claude-connection')).toContainText('Sign in to Claude Code');
-  await expect(page.getByTestId('claude-connection').locator('code')).toHaveText(
-    'claude auth login --claudeai',
-  );
+  await expect(
+    page.getByTestId('claude-connection').getByRole('button', { name: 'Sign in with Claude' }),
+  ).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Sign in with Codex' })).toHaveCount(0);
   await setClaudeFixture(true);
   await page.getByRole('button', { name: 'Check connection' }).click();
   await expect(page.getByTestId('claude-connection')).toContainText('sign-in detected');
-  await expect(page.getByTestId('claude-connection').locator('code')).toHaveCount(0);
+  await expect(
+    page.getByTestId('claude-connection').getByRole('button', { name: 'Sign in with Claude' }),
+  ).toHaveCount(0);
   await setClaudeFixture(false);
   await page.getByRole('button', { name: 'Check connection' }).click();
   await expect(page.getByTestId('claude-connection')).toContainText('Sign in to Claude Code');
   await page.getByRole('button', { name: 'Codex', exact: true }).click();
   await page.getByRole('button', { name: 'A book project' }).click();
+  await page.getByRole('tab', { name: 'Overview', exact: true }).click();
   await page.getByRole('region', { name: 'Project connections' }).waitFor();
   await page.getByRole('tab', { name: 'Activity', exact: true }).click();
   const log = page.getByRole('region', { name: 'Activity' });
@@ -247,6 +250,7 @@ try {
   await page.getByRole('button', { name: 'Integrations', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Connect Linear' })).toBeVisible();
   await page.getByRole('button', { name: 'A book project' }).click();
+  await page.getByRole('tab', { name: 'Overview', exact: true }).click();
   await page.getByRole('region', { name: 'Project connections' }).waitFor();
   if (errors.length) throw new Error(errors.join('\n'));
   console.log(
