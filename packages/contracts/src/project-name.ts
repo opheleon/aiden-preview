@@ -3,6 +3,7 @@ import type { Product } from './index.js';
 /**
  * Use the scoped title, or a bounded scope excerpt for projects saved before titles existed. With
  * `full`, a long first sentence is kept whole for places that wrap, such as the project heading.
+ * Links are left out, so a goal that is only a Notion link reads "New project" until the title.
  */
 export function scopeName(
   context: string,
@@ -10,7 +11,11 @@ export function scopeName(
   full = false,
 ): string {
   if (product?.title) return product.title;
-  const text = (product?.overview || context).replace(/\s+/g, ' ').trim();
+  // A pasted link is not a name; until the scope has a title, a link-only goal is a new project.
+  const text = (product?.overview || context)
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   const sentence = text.split(/[.!?](?:\s|$)/)[0] || text;
   // Long legacy overviews often continue from the outcome into implementation or constraints.
   const outcome = sentence.split(/\s+(?:by \w+ing|without|while|so that)\b/i)[0]!;

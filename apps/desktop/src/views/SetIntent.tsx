@@ -1,9 +1,11 @@
 import { ArrowRight, CircleAlert, Info, SlidersHorizontal } from 'lucide-react';
 import { type JSX, useRef, useState } from 'react';
 
+import type { McpConnection } from '../../../../packages/contracts/src/index';
 import {
   notionContext,
   notionLinks,
+  notionReadTools,
   notionReady,
 } from '../../../../packages/contracts/src/tracker-connections';
 import brandMark from '../assets/brand-mark.svg';
@@ -95,36 +97,76 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
 }
 
 /**
- * When the goal links Notion pages, say whether Aiden can read them, and open Settings →
- * Integrations when Notion still needs connecting or its read tools need approving.
+ * Approve only Notion's page-reading tools for a connected Notion sign-in, the person's one click
+ * on the start screen. Every other Notion tool stays unapproved.
+ * Example: a connected Notion with nothing approved gets notion-fetch and notion-search.
+ */
+async function allowNotionReading(workspace: Workspace, notion: McpConnection): Promise<void> {
+  const rows = await workspace.call('integrationTools', { connectionId: notion.id });
+  const fresh = (await workspace.call('integrations')).find((c) => c.id === notion.id);
+  if (!fresh?.toolFingerprint) throw new Error('Notion did not list its tools. Try again.');
+  const wanted = new Set<string>(notionReadTools);
+  await workspace.call('integrationApprove', {
+    connectionId: notion.id,
+    fingerprint: fresh.toolFingerprint,
+    tools: rows.filter((tool) => tool.readOnly && wanted.has(tool.name)).map((tool) => tool.name),
+  });
+  workspace.setIntegrations(await workspace.call('integrations'));
+}
+
+/**
+ * When the goal links Notion pages, say whether Aiden can read them. A connected Notion that still
+ * needs its read tools approved gets a one-click allow; otherwise Settings → Integrations opens.
  */
 function NotionNotice({ workspace }: { workspace: Workspace }): JSX.Element | null {
+  const [allowing, setAllowing] = useState(false);
+  const [failed, setFailed] = useState('');
   const links = notionLinks(workspace.project.context).length;
   if (!links) return null;
   const notion = workspace.integrations.find(notionContext);
   const ready = !!notion && notionReady(notion);
+  const signedIn = notion?.status === 'connected';
   const pages = links === 1 ? 'this Notion page' : `these ${links} Notion pages`;
+  /** Approve the read tools, keeping any failure on the notice. */
+  async function allow(): Promise<void> {
+    if (!notion) return;
+    setAllowing(true);
+    setFailed('');
+    try {
+      await allowNotionReading(workspace, notion);
+    } catch (error) {
+      setFailed(error instanceof Error ? error.message : 'Could not allow Notion reading.');
+    } finally {
+      setAllowing(false);
+    }
+  }
   return (
     <div className={ready ? 'start-blocker start-note' : 'start-blocker'} role="status">
       {ready ? <Info size={16} /> : <CircleAlert size={16} />}
       <p>
         {ready
           ? `Aiden will read ${pages} when it writes the requirements.`
-          : notion
-            ? `To read ${pages}, approve Notion's read tools in Settings → Integrations.`
+          : signedIn
+            ? `To read ${pages}, allow Aiden to read Notion pages. Only Notion's fetch and search tools are approved.`
             : `To read ${pages}, connect Notion in Settings → Integrations.`}
+        {failed && <span className="start-blocker-fix"> {failed}</span>}
       </p>
-      {!ready && (
-        <button
-          className="start-blocker-action"
-          onClick={() => {
-            workspace.setSettingsTab('integrations');
-            workspace.setArea('settings');
-          }}
-        >
-          Open Integrations
-        </button>
-      )}
+      {!ready &&
+        (signedIn ? (
+          <button className="start-blocker-action" disabled={allowing} onClick={() => void allow()}>
+            {allowing ? 'Allowing…' : 'Allow reading Notion pages'}
+          </button>
+        ) : (
+          <button
+            className="start-blocker-action"
+            onClick={() => {
+              workspace.setSettingsTab('integrations');
+              workspace.setArea('settings');
+            }}
+          >
+            Open Integrations
+          </button>
+        ))}
     </div>
   );
 }

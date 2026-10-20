@@ -141,6 +141,7 @@ export class FixtureRuntime implements AgentRuntime {
         value.title ??= this.f.product.title ?? this.f.product.overview.slice(0, 72);
         value.calls = value.calls.map((c: any) => ({ blocking: false, ...c }));
         value.settledCalls ??= [];
+        value.namedRepositories ??= [];
         value.deliveryPlan ??= [
           {
             id: 'F-1',

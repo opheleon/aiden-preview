@@ -47,6 +47,15 @@ export const ProductSchema = z
     deliveryPlan: DeliveryPlanSchema.optional(),
     /** Repositories this intent is about; absent means every repository in the project. */
     repositories: z.array(z.string().min(1).max(100)).min(1).max(100).optional(),
+    /**
+     * GitHub repositories, as owner/name, that the goal or its linked pages name as the code, so
+     * setup can connect them without asking. Absent when none were named.
+     */
+    namedRepositories: z
+      .array(z.string().regex(/^[\w.-]+\/[\w.-]+$/))
+      .min(1)
+      .max(20)
+      .optional(),
   })
   .strict()
   .superRefine((product, context) => {

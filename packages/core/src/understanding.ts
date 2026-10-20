@@ -48,6 +48,8 @@ export const UnderstandingSchema = z
     settledCalls: z.array(z.string().trim().min(1).max(400)).max(8),
     /** IDs of the repositories the intent is about; empty means all of them. */
     repositories: z.array(z.string()).max(100),
+    /** GitHub owner/name repositories the goal or its linked pages name as the code. */
+    namedRepositories: z.array(z.string().regex(/^[\w.-]+\/[\w.-]+$/)).max(20),
   })
   .strict();
 /** Parsed understand-stage output. */
@@ -57,6 +59,7 @@ const StoredUnderstandingSchema = UnderstandingSchema.partial({
   deliveryPlan: true,
   title: true,
   settledCalls: true,
+  namedRepositories: true,
 }).extend({
   calls: z.array(CallDraftSchema).max(8),
 });
@@ -85,6 +88,9 @@ export function productFromUnderstanding(
     milestones: understanding.milestones,
     ...(understanding.deliveryPlan ? { deliveryPlan: understanding.deliveryPlan } : {}),
     ...(narrowed || (!repositoryIds.length && chosen.length) ? { repositories: chosen } : {}),
+    ...(understanding.namedRepositories?.length
+      ? { namedRepositories: [...new Set(understanding.namedRepositories)] }
+      : {}),
     requirements: understanding.requirements.map((r) => ({
       id: r.id,
       text: r.text,

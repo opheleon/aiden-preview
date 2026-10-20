@@ -32,7 +32,7 @@ import {
   ticketTools,
   validateTicketArguments,
 } from './ticket-tools.js';
-import { assessTool, toolFingerprint } from './tool-policy.js';
+import { approveNeededReads, assessTool, toolFingerprint } from './tool-policy.js';
 export { assessTool, toolFingerprint } from './tool-policy.js';
 
 type Active = { client: Client; transport: Transport; provider?: StoredOAuthProvider };
@@ -300,6 +300,7 @@ export class ConnectionManager {
       connection.message =
         'The server changed its tool definitions. Review and select read tools again.';
     }
+    approveNeededReads(connection, tools);
     connection.toolFingerprint = fingerprint;
     connection.lastTestedAt = new Date().toISOString();
     connection.updatedAt = connection.lastTestedAt;

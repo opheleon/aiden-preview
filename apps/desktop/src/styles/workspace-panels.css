@@ -241,6 +241,17 @@ footer {
   color: var(--body);
 }
 
+/* Both connect buttons share one size and never wrap. */
+.integration-hero .button-row {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+.integration-hero .integration-connect {
+  min-width: 152px;
+  white-space: nowrap;
+}
+
 .connection-row {
   display: flex;
   justify-content: space-between;

@@ -12,6 +12,7 @@ import {
 const understanding: Understanding = {
   title: 'Reschedule calendar events',
   repositories: [],
+  namedRepositories: [],
   overview: 'A calendar.',
   milestones: [],
   deliveryPlan: [

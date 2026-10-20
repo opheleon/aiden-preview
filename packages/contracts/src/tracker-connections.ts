@@ -5,6 +5,11 @@ export type IntegrationPreset = 'linear' | 'jira' | 'notion';
 
 /** Hosted Notion MCP endpoint, used only through read tools the user approves. */
 export const NOTION_MCP_URL = 'https://mcp.notion.com/mcp';
+/**
+ * The read-only Notion tools Aiden uses to read linked pages: fetch a page by link, and search when
+ * a page links to others by title. They come pre-ticked for approval; nothing else does.
+ */
+export const notionReadTools = ['notion-fetch', 'notion-search'] as const;
 
 /** Resolve a preset endpoint; presets remain distinct from legacy read-only endpoints and custom accounts. */
 export function presetUrl(provider: IntegrationPreset): string {
@@ -31,7 +36,7 @@ export function notionContext(connection: McpConnection): boolean {
  * Example: "Spec: https://www.notion.so/acme/Booking-1a2b" yields that one URL.
  */
 export function notionLinks(text: string): string[] {
-  const found = text.match(/https?:\/\/(?:[\w-]+\.)?notion\.(?:so|site)\/[^\s)\]>"']+/gi) ?? [];
+  const found = text.match(/https?:\/\/(?:[\w-]+\.)?notion\.(?:so|site|com)\/[^\s)\]>"']+/gi) ?? [];
   return [...new Set(found.map((link) => link.replace(/[.,;:!?]+$/, '')))];
 }
 /** A Notion connection that can read pages for Aiden: connected, with approved read tools. */

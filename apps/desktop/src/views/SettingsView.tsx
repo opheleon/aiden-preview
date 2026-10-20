@@ -124,10 +124,10 @@ export function SettingsView(props: SettingsViewProps): React.JSX.Element {
               <div className="eyebrow">HOSTED MCP</div>
               <h2>Connect work context</h2>
               <p>
-                Connections are shared by Claude and Codex. Analysts use approved read tools.
-                Automatic ticket writes are authorized separately for a destination in Project
-                settings. Notion is read-only project context: choose it in a project’s Context
-                connections so Aiden can read its specs and notes.
+                Connections are shared by Claude and Codex. Linear: Aiden reads tickets, and
+                publishes them once you choose a destination in Project settings. Notion: Aiden
+                reads the pages you link, using only Notion’s fetch and search tools, which
+                connecting approves.
               </p>
               <CredentialStorageNote connection="Linear or Notion" />
             </div>
@@ -206,7 +206,7 @@ function PresetConnection({
 }: SettingsViewProps & { provider: Exclude<IntegrationPreset, 'jira'> }): React.JSX.Element {
   return (
     <button
-      className={provider === 'linear' ? 'primary' : 'secondary'}
+      className="primary integration-connect"
       disabled={busy}
       onClick={() =>
         void action(async () => {
