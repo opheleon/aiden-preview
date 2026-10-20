@@ -20,7 +20,7 @@ import {
 } from '../../contracts/src/guide.js';
 import { outputSchemaFor } from '../../contracts/src/index.js';
 import { ArtifactFormatError } from '../../runtimes/src/index.js';
-import { noTools, serveTools } from '../../tools/src/mcp.js';
+import { noTools, serveTools, type ToolProvider } from '../../tools/src/mcp.js';
 import { plainText } from '../../verification/src/index.js';
 import type { Engine } from './engine.js';
 import { applyGuideActions } from './guide-actions.js';
@@ -37,6 +37,7 @@ import {
   guideClarifications,
   rewriteGuideRequirements,
 } from './guide-scope.js';
+import { guideTools } from './guide-tools.js';
 import { workflowRoot } from './model-stage.js';
 import { atomic, optionalJson, type Store } from './storage.js';
 
@@ -93,6 +94,7 @@ const ReplySchema = z
               'update-intent',
               'run-check',
               're-estimate',
+              'connect-repositories',
               'skip-step',
             ]),
             url: z.string().nullable(),
@@ -101,6 +103,8 @@ const ReplySchema = z
             context: z.string().nullable(),
             callId: z.string().nullable().optional(),
             step: SetupStepIdSchema.nullable(),
+            owner: z.string().nullable().optional(),
+            repositories: z.array(z.string()).nullable().optional(),
           })
           .strict(),
       )
@@ -181,19 +185,20 @@ function validated(reply: Reply): { widgets: GuideWidget[]; actions: GuideAction
   };
 }
 
-/** Run one structured model call in the project's runtime folder, with no tools. */
+/** Run one structured model call in the project's runtime folder, with only the given tools. */
 async function modelCall<T>(
   engine: Engine,
   facts: GuideFacts,
   promptFile: string,
   input: unknown,
   schema: z.ZodType<T>,
+  provider: ToolProvider = noTools,
 ): Promise<T | null> {
   const instructions = await readFile(path.join(workflowRoot, 'workflows/v1', promptFile), 'utf8');
   const jsonSchema = outputSchemaFor(schema);
   const cwd = path.join(engine.store.project(facts.project.id), 'guide-runtime');
   await mkdir(cwd, { recursive: true, mode: 0o700 });
-  const tools = await serveTools(noTools);
+  const tools = await serveTools(provider);
   try {
     const result = await engine.runtime.run({
       // The project's own provider and billing mode; the Guide never switches either.
@@ -356,6 +361,7 @@ export function askGuide(engine: Engine, projectId: string, turn: GuideTurn): Pr
         ...(await guideInput(engine, facts)),
       },
       ReplySchema,
+      guideTools(),
     );
     if (!reply) throw new Error('The Guide could not answer that. Try asking another way.');
     const { widgets, actions } = validated(reply);

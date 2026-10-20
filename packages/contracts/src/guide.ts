@@ -32,7 +32,7 @@ export type VerifyMethod = z.infer<typeof VerifyMethodSchema>;
  */
 export const GuideWidgetSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('confirm-requirements') }).strict(),
-  /** Add code folders so Aiden can estimate, or continue without code. */
+  /** What code is connected, with a way to continue without code. */
   z.object({ type: z.literal('connect-code') }).strict(),
   z
     .object({ type: z.literal('verify-options'), recommended: VerifyMethodSchema.optional() })
@@ -94,6 +94,29 @@ export const GuideActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('run-check') }).strict(),
   /** Size the work again from the agreed requirements and the latest code check. */
   z.object({ type: z.literal('re-estimate') }).strict(),
+  /**
+   * Copy repositories from one GitHub account into the project, read-only. An empty list means
+   * all of the account's active repositories, newest first, up to a cap.
+   */
+  z
+    .object({
+      type: z.literal('connect-repositories'),
+      owner: z
+        .string()
+        .trim()
+        .regex(/^[\w.-]+$/)
+        .max(100),
+      repositories: z
+        .array(
+          z
+            .string()
+            .trim()
+            .regex(/^[\w.-]+$/)
+            .max(100),
+        )
+        .max(30),
+    })
+    .strict(),
   z.object({ type: z.literal('skip-step'), step: SetupStepIdSchema }).strict(),
 ]);
 /** One setup change the Guide asked Aiden to make. */

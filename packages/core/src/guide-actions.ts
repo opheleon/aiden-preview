@@ -1,6 +1,7 @@
 import type { GuideAction, SetupStepId } from '../../contracts/src/guide.js';
 import { publicError } from '../../runtimes/src/index.js';
 import type { Engine } from './engine.js';
+import { startGithubConnect } from './github-code.js';
 import { readSetupState, writeSetupState } from './guide-context.js';
 import { answerGuideClarification, requireGuideScope } from './guide-scope.js';
 import { configureGuideVerification } from './guide-verification.js';
@@ -77,6 +78,8 @@ async function applyOne(
       return 'Check started.';
     case 're-estimate':
       return reestimate(engine, projectId);
+    case 'connect-repositories':
+      return startGithubConnect(engine, projectId, action.owner, action.repositories);
     case 'skip-step':
       await skipSetupStep(engine, projectId, action.step);
       return `Setup step skipped: ${action.step}.`;

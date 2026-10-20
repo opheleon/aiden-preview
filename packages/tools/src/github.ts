@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 
 import type { Repository } from './git.js';
 import { git, validateRepository } from './git.js';
+import { githubCliEnv } from './github-accounts.js';
 const exec = promisify(execFile);
 
 /** One GitHub repository named by a person, in canonical owner/name form. */
@@ -75,7 +76,7 @@ async function clone(
       timeout: cloneTimeoutMs,
       maxBuffer: 1024 * 1024,
       signal,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_ASKPASS: '', SSH_ASKPASS: '' },
+      env: { ...githubCliEnv(), GIT_TERMINAL_PROMPT: '0', GIT_ASKPASS: '', SSH_ASKPASS: '' },
     },
   );
 }
@@ -83,7 +84,7 @@ async function clone(
 /** Whether the GitHub CLI is installed, so its sign-in can reach private repositories. */
 async function hasGithubCli(): Promise<boolean> {
   try {
-    await exec('gh', ['--version'], { timeout: 10_000 });
+    await exec('gh', ['--version'], { timeout: 10_000, env: githubCliEnv() });
     return true;
   } catch {
     return false;

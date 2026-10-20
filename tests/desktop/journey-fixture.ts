@@ -123,9 +123,9 @@ export async function addFixtureRepositories(scope: Page | ReturnType<Page['getB
 }
 
 /**
- * Hand a project to Aiden from its goal, confirm the requirements, and connect the fixture's
- * GitHub repositories in the setup chat, then wait for its first brief. Blocking questions hold
- * setup in the chat, so a blocked journey connects the code from Project settings instead.
+ * Hand a project to Aiden from its goal, confirm the requirements in the setup chat, and connect
+ * the fixture's GitHub repositories from Project settings, then wait for its first brief. The
+ * fixture Guide cannot pick repositories itself, and blocking questions hold confirmation back.
  */
 export async function createProject(
   _app: ElectronApplication,
@@ -137,22 +137,19 @@ export async function createProject(
   await page.getByRole('button', { name: /Hand it to Aiden/ }).click();
   const chat = page.getByRole('tabpanel', { name: 'Chat' });
   await expect(chat).toBeVisible();
-  if (blocked) {
-    await page
-      .getByRole('button', { name: /^Actions for / })
-      .first()
-      .click();
-    await page.getByRole('menuitem', { name: 'Project settings' }).click();
-    await addFixtureRepositories(page);
-    await page.getByRole('button', { name: /Save repositories/ }).click();
-    await page.getByText(/Repositories saved|Saved\./).waitFor();
-    await page.locator('.project-row .project-link').first().click();
-  } else {
+  if (!blocked) {
     await chat.getByRole('button', { name: 'Looks right' }).click();
-    const code = chat.getByRole('region', { name: 'Connect your code' });
-    await addFixtureRepositories(code);
-    await code.getByRole('button', { name: 'Use these repositories', exact: true }).click();
+    await expect(chat.getByRole('region', { name: 'Connect your code' })).toBeVisible();
   }
+  await page
+    .getByRole('button', { name: /^Actions for / })
+    .first()
+    .click();
+  await page.getByRole('menuitem', { name: 'Project settings' }).click();
+  await addFixtureRepositories(page);
+  await page.getByRole('button', { name: /Save repositories/ }).click();
+  await page.getByText(/Repositories saved|Saved\./).waitFor();
+  await page.locator('.project-row .project-link').first().click();
   await page.getByRole('tab', { name: 'Overview', exact: true }).click();
   await page.getByRole('progressbar').waitFor();
   if (blocked) {

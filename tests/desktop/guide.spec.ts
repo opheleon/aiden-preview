@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 
 import { expect, test } from '@playwright/test';
 
-import { addFixtureRepositories, desktopFixture } from './journey-fixture.js';
+import { desktopFixture } from './journey-fixture.js';
 
 test('intent-only setup opens on the Chat tab, saves web settings, and keeps the draft across pages', async ({
   browserName,
@@ -122,13 +122,33 @@ test('intent-only setup opens on the Chat tab, saves web settings, and keeps the
     await page.getByRole('button', { name: 'A book project', exact: true }).click();
     await expect(chat.getByLabel('Message the Guide')).toHaveValue('Keep this draft');
     expect(await fixture.calls()).not.toContain('assess');
-    await reply('connect-code', 'Synthetic reply: paste the GitHub repositories here.');
+    await writeFile(
+      fixture.control,
+      JSON.stringify({
+        guideReply: {
+          reply: 'Synthetic reply: copying acme/frontend and acme/backend.',
+          widgets: [{ type: 'connect-code', recommended: null, url: null, link: null }],
+          actions: [
+            {
+              type: 'connect-repositories',
+              owner: 'acme',
+              repositories: ['frontend', 'backend'],
+              url: null,
+              allowMutations: null,
+              manual: null,
+              context: null,
+              step: null,
+            },
+          ],
+        },
+      }),
+    );
     await page.getByRole('button', { name: 'A book project', exact: true }).click();
-    await chat.getByLabel('Message the Guide').fill('Connect my code');
+    await chat.getByLabel('Message the Guide').fill('It is under acme; just frontend and backend.');
     await chat.getByRole('button', { name: 'Send', exact: true }).click();
-    const code = chat.getByRole('region', { name: 'Connect your code' });
-    await addFixtureRepositories(code);
-    await code.getByRole('button', { name: 'Use these repositories', exact: true }).click();
+    await expect(
+      chat.getByText(/Connected acme\/frontend, acme\/backend from GitHub/),
+    ).toBeVisible();
     await expect.poll(async () => (await fixture.calls()).includes('assess')).toBe(true);
     await expect(chat.getByRole('region', { name: 'Code check results' })).toBeVisible();
     await expect(chat).toBeVisible();

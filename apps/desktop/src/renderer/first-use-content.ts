@@ -24,7 +24,7 @@ export const firstUseSteps = [
     title: 'Set the intent',
     summary: 'Start from a customer call, a brief, or a sentence.',
     points: [
-      'Tell Aiden what you’re building, or paste a Notion page link, and select Hand it to Aiden. You paste your GitHub repositories in the setup chat next.',
+      'Tell Aiden what you’re building, or paste a Notion page link, and select Hand it to Aiden. In the setup chat next, Aiden finds your code on GitHub.',
       'Aiden writes down what done means in plain language and plans the work in usable steps.',
     ],
     detail:
