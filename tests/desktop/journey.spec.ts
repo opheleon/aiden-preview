@@ -60,7 +60,7 @@ test('one handoff produces a brief with evidence, exports, restart, cancellation
     await app.evaluate(({ dialog }, file) => {
       dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath: file });
     }, jsonFile);
-    await page.getByLabel('More').click();
+    await page.getByLabel('Actions for A book project').click();
     await page.getByRole('menuitem', { name: 'Export JSON' }).click();
     await page.getByText('JSON report exported.').waitFor();
     const report = ReportSchema.parse(JSON.parse(await readFile(jsonFile, 'utf8')));
@@ -70,13 +70,13 @@ test('one handoff produces a brief with evidence, exports, restart, cancellation
     await app.evaluate(({ dialog }, file) => {
       dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath: file });
     }, markdown);
-    await page.getByLabel('More').click();
+    await page.getByLabel('Actions for A book project').click();
     await page.getByRole('menuitem', { name: 'Export Markdown' }).click();
     await page.getByText('Markdown report exported.').waitFor();
     const exported = await readFile(markdown, 'utf8');
     expect(exported).toContain('FIXTURE REPORT');
     expect(exported).not.toContain('## Estimation');
-    await page.getByLabel('More').click();
+    await page.getByLabel('Actions for A book project').click();
     await expect(page.getByRole('menuitem', { name: /Change branch/ })).toHaveCount(0);
     await page.screenshot({ path: info.outputPath('project-menu.png') });
     await page.getByRole('menuitem', { name: 'Project settings' }).click();

@@ -1,85 +1,13 @@
-import { MoreHorizontal, Square } from 'lucide-react';
-import { type JSX, type ReactNode, useRef, useState } from 'react';
+import { Square } from 'lucide-react';
+import type { JSX, ReactNode } from 'react';
 
 import type { LookReason, RunManifest } from '../../../../packages/contracts/src/index';
 import { scopeName } from '../../../../packages/contracts/src/project-name';
 import { useProjectGuide } from '../components/ProjectGuide';
-import { OutcomeDialog, outcomeReady, ProjectOutcome } from '../components/ProjectOutcome';
+import { ProjectOutcome } from '../components/ProjectOutcome';
 import type { CodingDeliveryState } from '../hooks/useCodingDelivery';
 import type { Workspace } from '../hooks/useWorkspace';
 import { timeAgo } from '../renderer/time';
-const api = window.aiden;
-
-/**
- * The overflow menu: exports, settings, and the project's outcome decision
- * stay one click away without taking space on the brief.
- */
-function Overflow({
-  workspace,
-  onOutcome,
-}: {
-  workspace: Workspace;
-  onOutcome: (mode: 'accept' | 'close') => void;
-}): JSX.Element {
-  const { project, report, action, setNotice, setArea, setSettingsTab } = workspace;
-  const lifecycle = project.lifecycle;
-  const closed = lifecycle?.status === 'closed';
-  const menu = useRef<HTMLDetailsElement>(null);
-  /** Close the menu, then act, so the next open starts fresh. */
-  const choose = (fn: () => void) => () => {
-    if (menu.current) menu.current.open = false;
-    fn();
-  };
-  /** Save the latest report in the chosen format. */
-  const exportAs = (format: 'markdown' | 'json') =>
-    void action(async () => {
-      if (report && (await api?.saveExport({ projectId: project.id, runId: report.id, format })))
-        setNotice(`${format === 'json' ? 'JSON' : 'Markdown'} report exported.`);
-    });
-  return (
-    <details className="overflow-menu" ref={menu}>
-      <summary aria-label="More">
-        <MoreHorizontal size={16} />
-      </summary>
-      <div role="menu">
-        <button role="menuitem" disabled={!report} onClick={choose(() => exportAs('markdown'))}>
-          Export Markdown
-        </button>
-        <button role="menuitem" disabled={!report} onClick={choose(() => exportAs('json'))}>
-          Export JSON
-        </button>
-        {outcomeReady(workspace) && !closed && (
-          <button
-            role="menuitem"
-            disabled={workspace.busy || !workspace.baseline || !lifecycle}
-            onClick={choose(() => onOutcome('accept'))}
-          >
-            {lifecycle?.acceptanceCurrent ? 'Update acceptance' : 'Accept outcome'}
-          </button>
-        )}
-        {/* Any open project can be closed, including one whose setup never finished. */}
-        {!closed && (
-          <button
-            role="menuitem"
-            disabled={workspace.busy}
-            onClick={choose(() => onOutcome('close'))}
-          >
-            Close project
-          </button>
-        )}
-        <button
-          role="menuitem"
-          onClick={choose(() => {
-            setSettingsTab('project');
-            setArea('settings');
-          })}
-        >
-          Project settings
-        </button>
-      </div>
-    </details>
-  );
-}
 
 /** What Aiden is doing right now, with a way to stop it. */
 function LiveLine({ workspace }: { workspace: Workspace }): JSX.Element | null {
@@ -245,20 +173,13 @@ export function BriefHeader({
   /** Work that stopped early: what happened, and the button that recovers from it. */
   note: { text: string; label: string; run: () => void } | null;
 }): JSX.Element {
-  const [outcome, setOutcome] = useState<'accept' | 'close'>();
   const monitoring = monitoringLabel(workspace.project.repositories);
   return (
     <>
       <header className="brief-top">
         <TitleLines workspace={workspace} monitoring={monitoring} />
-        <div className="button-row">
-          <Overflow workspace={workspace} onOutcome={setOutcome} />
-        </div>
       </header>
       <ProjectOutcome key={workspace.project.id} workspace={workspace} quiet={!allDone} />
-      {outcome && (
-        <OutcomeDialog workspace={workspace} mode={outcome} dismiss={() => setOutcome(undefined)} />
-      )}
       {navigation}
       {showStatus && attention}
       {showStatus && (

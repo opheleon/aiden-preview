@@ -3,6 +3,7 @@ import { type JSX, useState } from 'react';
 
 import { helpLinks } from '../../../../packages/contracts/src/guide';
 import { scopeName } from '../../../../packages/contracts/src/project-name';
+import type { OutcomeRequest } from '../components/ProjectMenu';
 import { OutcomeDialog } from '../components/ProjectOutcome';
 import { ProjectRow } from '../components/ProjectRow';
 import { SidebarUpdate } from '../components/SidebarUpdate';
@@ -38,7 +39,7 @@ export function WorkspaceSidebar({
   onGettingStarted: () => void;
 }): JSX.Element {
   const { projects, project, area, setArea, action } = workspace;
-  const [closing, setClosing] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState<OutcomeRequest | null>(null);
   return (
     <aside className="sidebar">
       <div className="sidebar-heading">
@@ -53,14 +54,14 @@ export function WorkspaceSidebar({
         </button>
       </div>
       <nav className="project-nav">
-        <ProjectLinks workspace={workspace} closed={false} onClose={setClosing} />
+        <ProjectLinks workspace={workspace} closed={false} onOutcome={setOutcome} />
         {projects.some((p) => p.lifecycle?.status === 'closed') && (
           <details
             className="closed-projects"
             open={project.lifecycle?.status === 'closed' || undefined}
           >
             <summary>Closed projects</summary>
-            <ProjectLinks workspace={workspace} closed onClose={setClosing} />
+            <ProjectLinks workspace={workspace} closed onOutcome={setOutcome} />
           </details>
         )}
       </nav>
@@ -96,39 +97,48 @@ export function WorkspaceSidebar({
           api={api}
         />
       </div>
-      {closing && closing === project.id && (
-        <OutcomeDialog workspace={workspace} mode="close" dismiss={() => setClosing(null)} />
+      {outcome && outcome.projectId === project.id && (
+        <OutcomeDialog workspace={workspace} mode={outcome.mode} dismiss={() => setOutcome(null)} />
       )}
     </aside>
   );
 }
 
-/** Separate active and closed projects while retaining access to their saved runs. */
+/** Projects shown before Show more; the open project always stays visible. */
+const listed = 5;
+
+/** Separate active and closed projects; long lists show the newest few until Show more. */
 function ProjectLinks({
   workspace,
   closed,
-  onClose,
+  onOutcome,
 }: {
   workspace: Workspace;
   closed: boolean;
-  onClose: (projectId: string) => void;
+  onOutcome: (request: OutcomeRequest) => void;
 }): JSX.Element {
   const { projects, project } = workspace;
+  const [all, setAll] = useState(false);
+  const group = projects.filter((p) => (p.lifecycle?.status === 'closed') === closed);
+  const shown = all ? group : group.filter((p, index) => index < listed || p.id === project.id);
   return (
     <>
-      {projects
-        .filter((p) => (p.lifecycle?.status === 'closed') === closed)
-        .map((p) => (
-          <ProjectRow
-            key={p.id}
-            workspace={workspace}
-            project={p}
-            name={
-              p.id === project.id ? scopeName(project.context, workspace.baseline?.product) : p.name
-            }
-            onClose={onClose}
-          />
-        ))}
+      {shown.map((p) => (
+        <ProjectRow
+          key={p.id}
+          workspace={workspace}
+          project={p}
+          name={
+            p.id === project.id ? scopeName(project.context, workspace.baseline?.product) : p.name
+          }
+          onOutcome={onOutcome}
+        />
+      ))}
+      {group.length > listed && (
+        <button className="project-more" onClick={() => setAll(!all)}>
+          {all ? 'Show less' : 'Show more'}
+        </button>
+      )}
     </>
   );
 }

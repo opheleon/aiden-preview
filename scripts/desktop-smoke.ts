@@ -186,7 +186,7 @@ try {
   await app.evaluate(({ dialog }, target) => {
     dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath: target });
   }, exportFile);
-  await page.getByLabel('More').click();
+  await page.getByLabel('Actions for A book project').click();
   await page.getByRole('menuitem', { name: 'Export Markdown' }).click();
   await page.getByText('Markdown report exported.').waitFor();
   if (!(await readFile(exportFile, 'utf8')).includes('FIXTURE REPORT'))
@@ -195,7 +195,7 @@ try {
   await app.evaluate(({ dialog }, target) => {
     dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath: target });
   }, jsonFile);
-  await page.getByLabel('More').click();
+  await page.getByLabel('Actions for A book project').click();
   await page.getByRole('menuitem', { name: 'Export JSON' }).click();
   await page.getByText('JSON report exported.').waitFor();
   if (ReportSchema.parse(JSON.parse(await readFile(jsonFile, 'utf8'))).id !== run.runId)

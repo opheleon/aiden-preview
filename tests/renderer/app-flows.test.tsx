@@ -17,9 +17,9 @@ async function openProject() {
   await screen.findByRole('region', { name: 'Project connections' });
 }
 
-/** Open the overflow menu and pick one item. */
+/** Open the project's … menu and pick one item. */
 async function menu(item: string) {
-  await userEvent.click(screen.getByLabelText('More'));
+  await userEvent.click(screen.getByLabelText('Actions for Synthetic books'));
   await userEvent.click(screen.getByRole('menuitem', { name: item }));
 }
 
@@ -164,14 +164,14 @@ test('the brief keeps only touch points on screen; the rest lives in one menu', 
   expect(screen.queryByRole('region', { name: 'Project outcome' })).toBeNull();
   for (const name of ['Refresh', 'Refresh status', 'Schedule', 'App URL', 'Markdown', 'Check now'])
     expect(screen.queryByRole('button', { name })).toBeNull();
-  await userEvent.click(screen.getByLabelText('More'));
+  await userEvent.click(screen.getByLabelText('Actions for Synthetic books'));
   expect(screen.getByRole('menuitem', { name: 'Close project' })).toBeEnabled();
   // The fixture project has no lifecycle record yet, so acceptance waits for one.
   expect(screen.getByRole('menuitem', { name: 'Accept outcome' })).toBeDisabled();
   expect(screen.queryByRole('menuitem', { name: /Change branch/ })).toBeNull();
-  await userEvent.click(screen.getByLabelText('More'));
+  await userEvent.click(screen.getByLabelText('Actions for Synthetic books'));
   await menu('Export Markdown');
-  expect(screen.getByLabelText('More').closest('details')).not.toHaveAttribute('open');
+  expect(screen.queryByRole('menu')).toBeNull();
   expect(f.api.saveExport).toHaveBeenCalledWith(expect.objectContaining({ format: 'markdown' }));
   expect(await screen.findByText('Markdown report exported.')).toBeVisible();
   await menu('Export JSON');

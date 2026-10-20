@@ -334,35 +334,16 @@ nav {
   flex-shrink: 0;
 }
 
-.project-row-menu {
+.project-nav .project-row-trigger {
   position: absolute;
   right: 4px;
   opacity: 0;
 }
 
-.project-row:hover .project-row-menu,
-.project-row:focus-within .project-row-menu,
-.project-row-menu[open] {
+.project-row:hover .project-row-trigger,
+.project-row:focus-within .project-row-trigger,
+.project-row-trigger[aria-expanded='true'] {
   opacity: 1;
-}
-
-.project-row-menu > summary {
-  width: 24px;
-  height: 24px;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-}
-
-.project-row-menu > summary:hover {
-  color: var(--ink);
-}
-
-/* The sidebar list scrolls, so the menu is placed against the window, under its button. */
-.project-row-menu [role='menu'] {
-  position: fixed;
-  z-index: 20;
-  min-width: 170px;
 }
 
 .project-dot,
@@ -444,4 +425,77 @@ nav button {
   border-radius: 6px;
   min-height: 30px;
   gap: 8px;
+}
+
+.project-row-trigger {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.project-row-trigger:hover,
+.project-row-trigger[aria-expanded='true'] {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--paper2) 80%, transparent);
+}
+
+.project-more {
+  justify-content: flex-start;
+  height: 30px;
+  padding: 0 8px 0 24px;
+  color: var(--muted);
+  background: transparent;
+}
+
+/* A project's actions, drawn above the window under its "…" button. */
+.project-menu {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  min-width: 210px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 0 12px 36px rgb(23 21 43 / 14%);
+}
+
+.project-menu [role='menuitem'] {
+  justify-content: flex-start;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: left;
+}
+
+.project-menu [role='menuitem']:is(:hover, :focus-visible):not(:disabled) {
+  background: var(--paper2);
+}
+
+.project-menu [role='menuitem']:disabled {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.project-menu .project-menu-danger {
+  color: #b42318;
+}
+
+.project-menu hr {
+  width: 100%;
+  margin: 5px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
 }

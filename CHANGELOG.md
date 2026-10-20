@@ -12,7 +12,7 @@
 
 - Show delivery step outcomes, how Aiden knows each requirement's status, and delivery finding summaries inline instead of behind info icons and hover text.
 
-- Show each project on one line in the sidebar, fading long names at the edge, with a … menu for Project settings and Close project. Make the sidebar footer compact and remove Ask Aiden about this project now that Chat is a tab.
+- Show each project on one line in the sidebar, fading long names at the edge, with a … menu that holds every project action: Project settings, exports, Accept outcome, Reopen, and Close project. The header menu is gone, and long lists show five projects until Show more. Make the sidebar footer compact and remove Ask Aiden about this project now that Chat is a tab.
 
 - Make the closing note optional when closing a project; acceptance still asks what you reviewed.
 

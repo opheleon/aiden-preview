@@ -11,7 +11,7 @@ test('project settings discover remote choices on demand and save a project-spec
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
   expect(screen.queryByRole('button', { name: 'Change branch' })).toBeNull();
-  await userEvent.click(screen.getByLabelText('More'));
+  await userEvent.click(screen.getByLabelText('Actions for Synthetic books'));
   expect(screen.queryByRole('menuitem', { name: /Change branch/ })).toBeNull();
   await userEvent.click(screen.getByRole('menuitem', { name: 'Project settings' }));
   const settings = await screen.findByRole('region', { name: 'Testing settings' });
@@ -30,7 +30,7 @@ test('project settings discover remote choices on demand and save a project-spec
       monitoredBranch: { remote: 'origin', branch: 'release' },
     }),
   );
-  await userEvent.click(await screen.findByLabelText('More'));
+  await userEvent.click(await screen.findByLabelText('Actions for Synthetic books'));
   await userEvent.click(screen.getByRole('menuitem', { name: 'Project settings' }));
   expect(await screen.findByText('origin/release')).toBeVisible();
   expect(f.api.request).toHaveBeenCalledWith('look', expect.anything());
