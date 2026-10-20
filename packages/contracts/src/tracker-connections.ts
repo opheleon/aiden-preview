@@ -25,6 +25,23 @@ export function readOnlyLinear(connection: McpConnection): boolean {
 export function notionContext(connection: McpConnection): boolean {
   return connection.url.replace(/\/$/, '') === NOTION_MCP_URL;
 }
+/**
+ * Notion page links in pasted text, in order and without repeats, so Aiden can read the pages a
+ * person linked instead of the link text alone.
+ * Example: "Spec: https://www.notion.so/acme/Booking-1a2b" yields that one URL.
+ */
+export function notionLinks(text: string): string[] {
+  const found = text.match(/https?:\/\/(?:[\w-]+\.)?notion\.(?:so|site)\/[^\s)\]>"']+/gi) ?? [];
+  return [...new Set(found.map((link) => link.replace(/[.,;:!?]+$/, '')))];
+}
+/** A Notion connection that can read pages for Aiden: connected, with approved read tools. */
+export function notionReady(connection: McpConnection): boolean {
+  return (
+    notionContext(connection) &&
+    connection.status === 'connected' &&
+    connection.approvedTools.length > 0
+  );
+}
 /** Linear and Notion connections remain available for setup; other saved servers are experimental. */
 export function experimentalIntegration(connection: McpConnection): boolean {
   return (

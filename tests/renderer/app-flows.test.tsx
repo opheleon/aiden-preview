@@ -36,26 +36,23 @@ test('setting the intent is one screen, and Aiden starts with only the intent', 
   expect(start).toBeDisabled();
   expect(start).toHaveAccessibleDescription('To start, describe what you are building.');
   await userEvent.type(screen.getByLabelText('What are you building?'), 'List books');
-  // The folder and verification are optional; the Guide asks about them after the start.
+  // Code folders and checks come later in the setup chat, which says what happens next.
   expect(start).toBeEnabled();
   expect(start).not.toHaveAccessibleDescription();
-  expect(screen.getByText(/asks how to check the work/)).toBeVisible();
+  expect(
+    screen.getByText(/asks you to connect your code so it can estimate the work/),
+  ).toBeVisible();
   expect(screen.queryByText('Verification setup: surfaces and connections')).toBeNull();
-  await userEvent.click(screen.getByRole('button', { name: 'Import a file' }));
-  expect(screen.getByLabelText('What are you building?')).toHaveValue(
-    'List books\n\nImported fixture intent',
-  );
-  await userEvent.click(screen.getByRole('button', { name: 'Add the project folder (optional)' }));
-  expect(await screen.findByRole('button', { name: 'synthetic · 1 repository' })).toBeVisible();
-  expect(screen.getByText('Synthetic discovery warning')).toBeVisible();
+  for (const name of ['Import a file', 'Add the project folder (optional)'])
+    expect(screen.queryByRole('button', { name })).toBeNull();
   await userEvent.selectOptions(screen.getByLabelText('Model provider'), 'claude');
   await userEvent.click(start);
   await waitFor(() =>
     expect(f.request).toHaveBeenCalledWith('prepare', {
       autoAccept: true,
       project: expect.objectContaining({
-        name: 'List books Imported fixture intent',
-        context: 'List books\n\nImported fixture intent',
+        name: 'List books',
+        context: 'List books',
         runtime: { provider: 'claude', auth: 'subscription' },
       }),
     }),
@@ -104,31 +101,6 @@ test('starting needs a connected model, and Connect opens its sign-in controls',
     f.request.mockImplementation(original);
   }
 });
-
-test.each(['/no-git', String.raw`C:\projects\no-git`])(
-  'a folder without Git is a note, not a blocker: %s',
-  async (rootPath) => {
-    const original = f.request.getMockImplementation()!;
-    f.request.mockImplementation((method: string, p?: unknown) =>
-      method === 'discoverRepositories'
-        ? Promise.resolve({ rootPath, warnings: [], repositories: [] })
-        : original(method, p),
-    );
-    try {
-      render(<App />);
-      await userEvent.click(await screen.findByRole('button', { name: 'Create project' }));
-      await userEvent.type(screen.getByLabelText('What are you building?'), 'List books');
-      await userEvent.click(
-        screen.getByRole('button', { name: 'Add the project folder (optional)' }),
-      );
-      expect(await screen.findByText(/No Git repository was found in no-git/)).toBeVisible();
-      expect(screen.getByRole('button', { name: 'Choose a different folder' })).toBeVisible();
-      expect(screen.getByRole('button', { name: /Hand it to Aiden/ })).toBeEnabled();
-    } finally {
-      f.request.mockImplementation(original);
-    }
-  },
-);
 
 test('a project whose first rewrite is running shows it, and a stopped one says so', async () => {
   f.reset(false);

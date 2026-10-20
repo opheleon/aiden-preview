@@ -105,16 +105,6 @@ export function registerFileIpc(
     });
     return r.canceled ? null : r.filePaths[0];
   });
-  ipcMain.handle('aiden:chooseContext', async (event) => {
-    authorized(event);
-    const r = await dialog.showOpenDialog(window, {
-      properties: ['openFile'],
-      filters: [{ name: 'Project context', extensions: ['md', 'txt'] }],
-    });
-    const selectedPath = r.filePaths[0];
-    if (r.canceled || !selectedPath) return null;
-    return readFile(selectedPath, 'utf8');
-  });
   ipcMain.handle('aiden:openExternal', async (event, value: string) => {
     authorized(event);
     const url = new URL(value);

@@ -438,7 +438,6 @@ export function appFixture() {
     setUpdatePreferences: vi.fn().mockImplementation((value: unknown) => Promise.resolve(value)),
     onUpdateStatus: () => () => {},
     chooseProjectFolder: vi.fn().mockResolvedValue('/synthetic'),
-    chooseContext: vi.fn().mockResolvedValue('Imported fixture intent'),
     openExternal: vi.fn().mockResolvedValue(undefined),
     saveExport: vi.fn().mockResolvedValue(true),
     openVerificationReport: vi.fn().mockResolvedValue(undefined),

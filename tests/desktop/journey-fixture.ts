@@ -110,7 +110,11 @@ export async function desktopFixture() {
   };
 }
 
-/** Hand a project to Aiden in one step and wait for its first brief; nothing asks for approval. */
+/**
+ * Hand a project to Aiden from its goal, confirm the requirements, and connect the fixture code in
+ * the setup chat, then wait for its first brief. Blocking questions hold setup in the chat, so a
+ * blocked journey connects the code from Project settings instead.
+ */
 export async function createProject(
   app: ElectronApplication,
   page: Page,
@@ -118,16 +122,28 @@ export async function createProject(
   blocked = false,
 ) {
   await page.getByLabel('What are you building?').fill('Users can list and create books.');
+  await page.getByRole('button', { name: /Hand it to Aiden/ }).click();
+  const chat = page.getByRole('tabpanel', { name: 'Chat' });
+  await expect(chat).toBeVisible();
   await app.evaluate(({ dialog }, folder) => {
     dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [folder] });
   }, root);
-  await page
-    .getByRole('button', { name: 'Add the project folder (optional)', exact: true })
-    .click();
-  await page.getByRole('button', { name: /· 2 repositories/ }).waitFor();
-  await page.getByRole('button', { name: /Hand it to Aiden/ }).click();
-  // The project opens on its Chat tab; the journey continues from the Overview.
-  await expect(page.getByRole('tabpanel', { name: 'Chat' })).toBeVisible();
+  if (blocked) {
+    await page
+      .getByRole('button', { name: /^Actions for / })
+      .first()
+      .click();
+    await page.getByRole('menuitem', { name: 'Project settings' }).click();
+    await page.getByRole('button', { name: 'Add a folder', exact: true }).click();
+    await page.getByText('Repositories included · 2').waitFor();
+    await page.getByRole('button', { name: 'Save and run check', exact: true }).click();
+    await page.locator('.project-row .project-link').first().click();
+  } else {
+    await chat.getByRole('button', { name: 'Looks right' }).click();
+    const code = chat.getByRole('region', { name: 'Connect your code' });
+    await code.getByRole('button', { name: 'Add a folder', exact: true }).click();
+    await code.getByRole('button', { name: 'Use these folders', exact: true }).click();
+  }
   await page.getByRole('tab', { name: 'Overview', exact: true }).click();
   await page.getByRole('progressbar').waitFor();
   if (blocked) {

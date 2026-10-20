@@ -1,21 +1,24 @@
-import { ArrowRight, CircleAlert, FileText, FolderKanban, Info } from 'lucide-react';
+import { ArrowRight, CircleAlert, Info } from 'lucide-react';
 import { type JSX, useRef } from 'react';
 
+import {
+  notionContext,
+  notionLinks,
+  notionReady,
+} from '../../../../packages/contracts/src/tracker-connections';
 import brandMark from '../assets/brand-mark.svg';
-import { folderName } from '../components/ProjectFolders';
 import RuntimeSettings from '../components/RuntimeSettings';
-import { projectFolders } from '../hooks/project-folders';
 import type { Workspace } from '../hooks/useWorkspace';
 import { providerName, runtimeReady } from '../renderer/runtime-readiness';
 const api = window.aiden;
 
 /**
- * The whole start: say what you are building. The project folder is optional; after the start the
- * Guide plays back the requirements and asks how the work should be checked.
+ * The whole start: say what you are building, or paste a Notion page link. Code folders and checks
+ * come later in the setup chat, where the person can ask what each step means.
  */
 export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element {
-  const { project, setProject, busy, scanning, scanProjectFolder, start, action } = workspace;
-  const { folder, repos, blocker } = startState(workspace);
+  const { project, setProject, busy, start } = workspace;
+  const blocker = startHint(workspace);
   const missing = blocker?.blocking ? blocker.why : '';
   const model = useRef<HTMLDetailsElement>(null);
   return (
@@ -29,53 +32,26 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
         What are you <span className="serif">building?</span>
       </h1>
       <p className="goal-starter-lead">
-        Paste or type anything that says what you want. Aiden plans usable features in delivery
-        order, assesses the code and tracks delivery, and surfaces what needs you. Include your
-        target date and constraints if you have them.
+        Paste or type anything that says what you want, or paste a link to a Notion page and Aiden
+        reads it. Aiden plans usable features in delivery order, assesses the code and tracks
+        delivery, and surfaces what needs you. Include your target date and constraints if you have
+        them.
       </p>
       <div className="chat-composer">
         <textarea
           className="chat-composer-textarea"
           aria-label="What are you building?"
-          placeholder="Paste or type what you are building…"
+          placeholder="Describe what you are building, or paste a Notion page link…"
           maxLength={20000}
           rows={4}
           value={project.context}
           onChange={(event) => setProject({ ...project, context: event.target.value })}
         />
         <div className="chat-composer-footer">
-          <button
-            className="text-button"
-            onClick={() =>
-              void action(async () => {
-                const text = await api?.chooseContext();
-                if (text)
-                  setProject((p) => ({
-                    ...p,
-                    context: p.context ? `${p.context}\n\n${text}` : text,
-                  }));
-              })
-            }
-          >
-            <FileText size={14} /> Import a file
-          </button>
-          <button
-            className="text-button"
-            disabled={scanning}
-            title={folder ? 'Add another code folder' : undefined}
-            onClick={() => void workspace.addProjectFolder()}
-          >
-            <FolderKanban size={14} />
-            {scanning
-              ? 'Finding repositories…'
-              : folder
-                ? `${folder} · ${repos} ${repos === 1 ? 'repository' : 'repositories'}`
-                : 'Add the project folder (optional)'}
-          </button>
           <ProviderPicker workspace={workspace} />
           <button
             className="primary goal-starter-create"
-            disabled={busy || scanning || !!blocker?.blocking}
+            disabled={busy || !!blocker.blocking}
             aria-describedby={missing ? 'start-hint' : undefined}
             onClick={() => void start()}
           >
@@ -83,13 +59,8 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
           </button>
         </div>
       </div>
-      <StartBlocker
-        scanning={scanning}
-        blocker={blocker}
-        folder={folder}
-        onChooseFolder={() => void scanProjectFolder(true)}
-        onConnect={() => openModelControls(model.current)}
-      />
+      <NotionNotice workspace={workspace} />
+      <StartBlocker blocker={blocker} onConnect={() => openModelControls(model.current)} />
       <details ref={model}>
         <summary>Model connection and effort</summary>
         <RuntimeSettings
@@ -101,11 +72,6 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
           onChange={(runtime) => setProject((current) => ({ ...current, runtime }))}
         />
       </details>
-      {project.discoveryWarnings?.map((warning) => (
-        <p className="inline-note" role="status" key={warning}>
-          {warning}
-        </p>
-      ))}
       <div className="goal-starter-next">
         <span>
           <b>You</b> set the goal
@@ -121,6 +87,41 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
         </span>
       </div>
     </section>
+  );
+}
+
+/**
+ * When the goal links Notion pages, say whether Aiden can read them, and open Settings →
+ * Integrations when Notion still needs connecting or its read tools need approving.
+ */
+function NotionNotice({ workspace }: { workspace: Workspace }): JSX.Element | null {
+  const links = notionLinks(workspace.project.context).length;
+  if (!links) return null;
+  const notion = workspace.integrations.find(notionContext);
+  const ready = !!notion && notionReady(notion);
+  const pages = links === 1 ? 'this Notion page' : `these ${links} Notion pages`;
+  return (
+    <div className={ready ? 'start-blocker start-note' : 'start-blocker'} role="status">
+      {ready ? <Info size={16} /> : <CircleAlert size={16} />}
+      <p>
+        {ready
+          ? `Aiden will read ${pages} when it writes the requirements.`
+          : notion
+            ? `To read ${pages}, approve Notion's read tools in Settings → Integrations.`
+            : `To read ${pages}, connect Notion in Settings → Integrations.`}
+      </p>
+      {!ready && (
+        <button
+          className="start-blocker-action"
+          onClick={() => {
+            workspace.setSettingsTab('integrations');
+            workspace.setArea('settings');
+          }}
+        >
+          Open Integrations
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -165,104 +166,55 @@ function openModelControls(details: HTMLDetailsElement | null): void {
   details.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
 }
 
-/** The chosen folder, its repository count, and what still blocks or informs the start. */
-function startState(workspace: Workspace): {
-  folder: string | undefined;
-  repos: number;
-  blocker: StartBlockerInfo | undefined;
-} {
-  const { project, scanning } = workspace;
-  const folder = projectFolders(project).map(folderName).join(', ') || undefined;
-  const repos = project.repositories.length;
-  const connected = runtimeReady(workspace.diagnostics, project.runtime);
-  const disconnected = connected === false ? providerName(project.runtime.provider) : undefined;
-  return {
-    folder,
-    repos,
-    blocker: scanning
-      ? undefined
-      : startHint(!!project.context.trim(), folder, repos, disconnected),
-  };
-}
-
 /** Something the person should know before starting: a blocker, or a note that does not block. */
 interface StartBlockerInfo {
   why: string;
   fix: string;
-  chooseFolder: boolean;
   /** The selected provider needs connecting; offers to open the model connection controls. */
   connect?: string;
   blocking: boolean;
 }
 
 /**
- * Say what is still needed before Aiden can start. The intent and a connected model are required;
- * a folder without a Git repository is a note, because code can be connected later in the Guide.
+ * Say what is still needed before Aiden can start, or what happens after. The goal and a connected
+ * model are required; everything else, including the code folders, comes in the setup chat.
  * Example: an empty box blocks; Claude not signed in blocks and offers to connect it.
  */
-function startHint(
-  hasIntent: boolean,
-  folder: string | undefined,
-  repos: number,
-  disconnected?: string,
-): StartBlockerInfo | undefined {
-  if (!hasIntent)
+function startHint(workspace: Workspace): StartBlockerInfo {
+  const { project } = workspace;
+  const connected = runtimeReady(workspace.diagnostics, project.runtime);
+  const name = providerName(project.runtime.provider);
+  if (!project.context.trim())
     return {
       why: 'To start, describe what you are building.',
-      fix: 'Type or paste your goal in the box above, or use Import a file. The project folder is optional.',
-      chooseFolder: false,
+      fix: 'Type or paste your goal in the box above, or paste a Notion page link.',
       blocking: true,
     };
-  if (disconnected)
+  if (connected === false)
     return {
-      why: `Connect ${disconnected} before handing this to Aiden.`,
-      fix: `Aiden works through your own ${disconnected} account. Install it if needed and sign in; your subscription or API-key billing applies.`,
-      chooseFolder: false,
-      connect: disconnected,
+      why: `Connect ${name} before handing this to Aiden.`,
+      fix: `Aiden works through your own ${name} account. Install it if needed and sign in; your subscription or API-key billing applies.`,
+      connect: name,
       blocking: true,
-    };
-  if (folder && !repos)
-    return {
-      why: `No Git repository was found in ${folder}. You can start now and connect your code later in the Guide.`,
-      fix: 'Code checks need a Git repository. Web, API, and manual checks do not.',
-      chooseFolder: true,
-      blocking: false,
     };
   return {
-    why: 'After you start, Aiden plays back the requirements and asks how to check the work.',
-    fix: folder
-      ? 'Aiden will also check the code in this folder.'
-      : 'No folder needed. You can connect your code, a web app, or an API in the setup chat.',
-    chooseFolder: false,
+    why: 'What happens next: Aiden plays back the requirements for you to confirm, asks you to connect your code so it can estimate the work, then asks how to check it.',
+    fix: 'Each step is in the setup chat, where you can ask what it means. Nothing else is needed here.',
     blocking: false,
   };
 }
 
 /**
- * Explain prominently why the start button is disabled and how to fix it.
- * Example: an empty intent shows the reason and the fix; a folder without Git offers another folder.
+ * Explain prominently why the start button is disabled and how to fix it, or what happens next.
+ * Example: an empty intent shows the reason and the fix; a signed-out model offers to connect it.
  */
 function StartBlocker({
-  scanning,
   blocker,
-  folder,
-  onChooseFolder,
   onConnect,
 }: {
-  scanning: boolean;
-  blocker: StartBlockerInfo | undefined;
-  folder: string | undefined;
-  onChooseFolder: () => void;
+  blocker: StartBlockerInfo;
   onConnect: () => void;
-}): JSX.Element | null {
-  if (scanning)
-    return (
-      <p className="start-blocker" role="status">
-        <FolderKanban size={16} />
-        <span>Finding repositories in the project folder. You can start when this finishes.</span>
-      </p>
-    );
-  if (!blocker) return null;
+}): JSX.Element {
   return (
     <div className={blocker.blocking ? 'start-blocker' : 'start-blocker start-note'}>
       {blocker.blocking ? <CircleAlert size={16} /> : <Info size={16} />}
@@ -270,11 +222,6 @@ function StartBlocker({
         <p id={blocker.blocking ? 'start-hint' : undefined}>{blocker.why}</p>
         <p className="start-blocker-fix">{blocker.fix}</p>
       </div>
-      {blocker.chooseFolder && (
-        <button className="start-blocker-action" onClick={onChooseFolder}>
-          {folder ? 'Choose a different folder' : 'Browse for a folder'}
-        </button>
-      )}
       {blocker.connect && (
         <button className="start-blocker-action" onClick={onConnect}>
           Connect {blocker.connect}

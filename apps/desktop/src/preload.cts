@@ -10,7 +10,6 @@ const bridge: DesktopBridge = {
       );
     }),
   chooseProjectFolder: () => ipcRenderer.invoke('aiden:chooseProjectFolder'),
-  chooseContext: () => ipcRenderer.invoke('aiden:chooseContext'),
   openExternal: (url) => ipcRenderer.invoke('aiden:openExternal', url),
   saveExport: (params) => ipcRenderer.invoke('aiden:export', params),
   openDeviceReport: (runId) => ipcRenderer.invoke('aiden:openDeviceReport', runId),

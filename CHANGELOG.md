@@ -8,6 +8,8 @@
 
 - Show whether Claude or Codex is connected on the start screen and block Hand it to Aiden until it is, with a Connect button. Add Sign in with Claude, which opens Claude Code's own sign-in and rechecks the connection automatically, plus a Claude Code installation link.
 
+- Paste a Notion page link on the start screen and Aiden reads it, and the pages it relies on, when it writes the requirements. The start screen says when Notion still needs connecting. Import a file and the start screen's folder button are removed; code folders are connected in the setup chat.
+
 - Reorder setup: agree the requirements, connect the code, then choose checks. The new Connect code step accepts several folders, keeps confirmed requirements, reads the code, and estimates the work; without code, Aiden suggests its best-guess slices but gives no estimate, and no longer sizes the work from the requirements alone. Ask Aiden to re-estimate once code is connected.
 
 - Keep setup to one compact line at the top of the chat, with every step and its explanation under Show steps. The ticket tracker is now the optional last setup step, offered in the chat once the required steps are done.

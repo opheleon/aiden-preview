@@ -12,7 +12,7 @@ Linear is optional. Connect it in Settings → Integrations whenever you want Ai
 
 ## Set the intent
 
-Start from a customer call, a brief, or a sentence. Select the plus button beside Projects, tell Aiden what you’re building, and select Hand it to Aiden. Adding the project folder is optional; you can connect your code later.
+Start from a customer call, a brief, a sentence, or a Notion page link. Select the plus button beside Projects, tell Aiden what you’re building or paste the link, and select Hand it to Aiden. With Notion connected and its read tools approved in Settings → Integrations, Aiden reads the linked page, and the pages it relies on, when it writes the requirements. You connect your code in the setup chat that follows.
 
 The project opens on its Chat tab, with the setup checklist at the top. The Guide plays back the requirements Aiden understood and takes your corrections. Next it asks you to connect your code folders, one or more, so it can estimate the work; without code it suggests delivery slices but gives no estimate. Then it asks how to check the work: a web app, an API, or checking it yourself, alongside code checks. See [Project Guide](guide.md).
 

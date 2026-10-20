@@ -22,6 +22,7 @@ import type { DiscoverOptions } from '../../verification/src/index.js';
 import { commitBaseline } from './baseline.js';
 import { requireCheckableScope } from './blockers.js';
 import { closeCoding } from './coding-jobs.js';
+import { withLinkedSources } from './context-sources.js';
 import { DeviceVerification } from './device-verification.js';
 import {
   exportReport,
@@ -106,7 +107,7 @@ export class Engine {
     input: Project,
     options: Pick<RunExtras, 'autoAccept' | 'reason'> & { verification?: VerificationUpdate } = {},
   ): Promise<{ runId: string }> {
-    const parsed = ProjectSchema.parse(input);
+    const parsed = withLinkedSources(ProjectSchema.parse(input), await this.integrations.list());
     delete parsed.lifecycle;
     const project = await validateProjectRepositories(parsed);
     const { verification, ...extra } = options;
