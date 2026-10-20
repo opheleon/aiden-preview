@@ -86,8 +86,11 @@ export async function connectGithubCode(
   return { runId: look?.runId ?? null, repositories: [...kept, ...repositories] };
 }
 
-/** Projects whose repositories are being copied right now, so a second request waits its turn. */
-const connecting = new Set<string>();
+/**
+ * Copies waiting or running per project. They run one at a time, and only the last one starts the
+ * code check, so naming repositories under two owners gives one check that reads all of them.
+ */
+const copies = new Map<string, { tail: Promise<void>; waiting: number }>();
 
 /**
  * Pick repositories from one GitHub account: the named ones, or with none named, its active
@@ -113,6 +116,7 @@ async function chooseRepositories(
  * Start copying repositories the Guide chose in the chat, and return at once: copies can take
  * minutes, longer than one chat turn. When they finish, the thread gets an event line and a code
  * check starts, which the app follows like any other run. A failure is written to the thread too.
+ * Requests for the same project queue behind each other.
  * Example: ("acme", ["web", "api"]) returns "Copying acme/web and acme/api…" right away.
  */
 export function startGithubConnect(
@@ -121,21 +125,22 @@ export function startGithubConnect(
   owner: string,
   names: string[],
 ): string {
-  if (connecting.has(projectId))
-    throw new Error('Aiden is still copying repositories for this project.');
-  connecting.add(projectId);
   const what = names.length
     ? names.map((name) => `${owner}/${name}`).join(', ')
     : `the active repositories in ${owner}`;
-  void (async () => {
+  const queue = copies.get(projectId) ?? { tail: Promise.resolve(), waiting: 0 };
+  queue.waiting += 1;
+  copies.set(projectId, queue);
+  queue.tail = queue.tail.then(async () => {
     try {
       const { links, capped } = await chooseRepositories(owner, names);
       await connectGithubCode(engine, projectId, links, { keep: true, check: false });
       const { baseline } = await engine.state(projectId);
-      const event = `Connected ${links.join(', ')} from GitHub.${capped ? ` That is the ${maxConnectedRepositories} most recently pushed; name others to add them.` : ''}${baseline ? ' Aiden is reading the code.' : ''}`;
+      const last = queue.waiting === 1;
+      const event = `Connected ${links.join(', ')} from GitHub.${capped ? ` That is the ${maxConnectedRepositories} most recently pushed; name others to add them.` : ''}${baseline && last ? ' Aiden is reading the code.' : ''}`;
       // Record the event before the check starts, so the chat shows it when it follows the run.
       await recordGuideEvent(engine, projectId, event).catch(() => {});
-      if (baseline) await startLook(engine, projectId, 'you');
+      if (baseline && last) await startLook(engine, projectId, 'you');
     } catch (error) {
       await recordGuideEvent(
         engine,
@@ -143,8 +148,9 @@ export function startGithubConnect(
         `Could not connect ${what}: ${publicError(error)}`,
       ).catch(() => {});
     } finally {
-      connecting.delete(projectId);
+      queue.waiting -= 1;
+      if (!queue.waiting && copies.get(projectId) === queue) copies.delete(projectId);
     }
-  })();
+  });
   return `Copying ${what} from GitHub. A large repository can take a few minutes.`;
 }
