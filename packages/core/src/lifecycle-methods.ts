@@ -67,6 +67,7 @@ const writes = new Set<WorkerMethod>([
   'askGuide',
   'guideEvent',
   'configureGuideVerification',
+  'connectCode',
   'confirmRequirements',
   'skipSetupStep',
   'confirmAction',
@@ -83,7 +84,24 @@ const reconciles = new Set<WorkerMethod>([
   'heads',
 ]);
 
-/** Block stale UI writes on closed projects and reject decisions while a worker mutation is in flight. */
+const stillFinishing =
+  'A project operation is still finishing. Wait for it to finish, then try again.';
+/** How long a decision waits for other operations on the project to finish. */
+const settleTimeoutMs = 20_000;
+
+/** Wait until no operation is in flight for the project, or fail after the settle timeout. */
+async function settled(pending: Map<string, number>, projectId: string): Promise<void> {
+  const deadline = Date.now() + settleTimeoutMs;
+  while (pending.get(projectId)) {
+    if (Date.now() > deadline) throw new Error(stillFinishing);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
+/**
+ * Block stale UI writes on closed projects. A decision first waits for operations already in
+ * flight, then holds off new writes until it is saved.
+ */
 export function guardLifecycleMethods(
   engine: Engine,
   methods: Record<WorkerMethod, (params: unknown) => unknown>,
@@ -101,13 +119,20 @@ export function guardLifecycleMethods(
         .parse(input);
       const projectId = p.projectId ?? p.project?.id;
       if (!projectId) return call(input);
-      if (deciding.has(projectId) || (decisions.has(method) && pending.get(projectId)))
-        throw new Error(
-          'A project operation is still finishing. Wait for it to finish, then try again.',
-        );
+      if (deciding.has(projectId)) throw new Error(stillFinishing);
       if (decisions.has(method)) deciding.add(projectId);
-      pending.set(projectId, (pending.get(projectId) ?? 0) + 1);
       return (async () => {
+        // A decision waits briefly for routine reads and writes, such as the checks that start
+        // when a project opens, instead of failing because one happened to be in flight.
+        if (decisions.has(method)) {
+          try {
+            await settled(pending, projectId);
+          } catch (error) {
+            deciding.delete(projectId);
+            throw error;
+          }
+        }
+        pending.set(projectId, (pending.get(projectId) ?? 0) + 1);
         try {
           if (writes.has(method)) await requireOpenProject(engine.store, projectId);
           return await call(input);

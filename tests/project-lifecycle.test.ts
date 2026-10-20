@@ -167,7 +167,7 @@ void test('project decisions reject active code, browser, and delivery operation
   }
 });
 
-void test('an in-flight worker write cannot cross a project decision', async () => {
+void test('a project decision waits for an in-flight write and blocks new ones meanwhile', async () => {
   const f = await setup();
   try {
     let finish!: () => void;
@@ -183,13 +183,15 @@ void test('an in-flight worker write cannot cross a project decision', async () 
     };
     const write = f.methods.updateRuntime({ ...f.params, runtime: f.project.runtime });
     await ready;
-    await assert.rejects(
-      async () => await f.methods.closeProject({ ...f.params, note: 'Closing' }),
+    // The close waits for the write instead of failing, and no new write starts meanwhile.
+    const closing = f.methods.closeProject({ ...f.params, note: 'Closing' });
+    assert.throws(
+      () => f.methods.updateRuntime({ ...f.params, runtime: f.project.runtime }),
       /still finishing/,
     );
     finish();
     await write;
-    await f.methods.closeProject({ ...f.params, note: 'Now idle' });
+    await closing;
   } finally {
     await f.close();
   }
