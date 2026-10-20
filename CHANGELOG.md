@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.5
 
 - Make Chat the first project tab and the one each project opens on, replacing the chat overlay. Sidebar and Settings entries return to it, and drafts survive tab and page changes.
 
@@ -10,13 +10,13 @@
 
 - Keep the start screen to the heading and the box: what is still missing shows as a tooltip on Hand it to Aiden, and a model that is not connected offers Connect beside the provider.
 
-- Connect code by pasting GitHub repository links. Aiden makes a fresh read-only clone of each in the project's own folder (pushing disabled, hooks never run), using your Git or GitHub CLI sign-in for private repositories. Local project folders are no longer supported.
+- Aiden finds your code on GitHub in the setup chat. It lists the GitHub organizations you belong to, asks which one the project is under and which repositories matter, and uses all active ones (up to 30) if none do. Repositories named in the goal, a linked Notion page, or the chat connect right away with no questions. Each project gets a fresh read-only copy in its own folder (pushing disabled, hooks never run), using your Git or GitHub CLI sign-in for private repositories. Local project folders are no longer supported.
 
 - Sizing now explores the code: estimates read the latest code check's snapshots with file listing, search, and reads, so touch points, existing patterns, and test coverage come from the code.
 
-- Paste a Notion page link on the start screen and Aiden reads it, and the pages it relies on, when it writes the requirements. The start screen says when Notion still needs connecting. Import a file and the start screen's folder button are removed; code folders are connected in the setup chat.
+- Paste a Notion page link, including `app.notion.com` links, on the start screen and Aiden reads it, and the pages it relies on, when it writes the requirements. A link-only goal shows as New project until the requirements name it. Import a file and the start screen's folder button are removed.
 
-- Reorder setup: agree the requirements, connect the code, then choose checks. The new Connect code step accepts several folders, keeps confirmed requirements, reads the code, and estimates the work; without code, Aiden suggests its best-guess slices but gives no estimate, and no longer sizes the work from the requirements alone. Ask Aiden to re-estimate once code is connected.
+- Reorder setup: agree the requirements, connect the code, then choose checks, which you can do while Aiden copies and reads the code. Without code, Aiden suggests its best-guess slices but gives no estimate, and no longer sizes the work from the requirements alone. Ask Aiden to re-estimate once code is connected.
 
 - Keep setup to one compact line at the top of the chat, with every step and its explanation under Show steps. The ticket tracker is now the optional last setup step, offered in the chat once the required steps are done.
 
@@ -26,9 +26,15 @@
 
 - Make the closing note optional when closing a project; acceptance still asks what you reviewed.
 
+- Show remaining effort when the code check finds requirements entirely missing; those reuse their full size, and the second estimator pass runs only for partly built requirements.
+
+- Fix stretched checkboxes in settings lists, keep the tool review's save button in reach, and give Connect Linear and Connect Notion the same size.
+
+- Refresh the README, getting-started guide, Guide and daily-workflow docs, troubleshooting, and the first-run introduction for chat-first setup, GitHub code, and Notion pages.
+
 - Lead chat answers with the direct answer and add numbered next steps naming the exact control when a question asks how to do something.
 
-- Connect Notion in Settings → Integrations as read-only project context. After you approve its read tools and choose it in a project's Context connections, Aiden can read specs and notes from Notion. Notion is never offered as a ticket destination.
+- Connect Notion in Settings → Integrations so Aiden can read the pages you link. Connecting approves only Notion's fetch and search tools; older connections get a one-click Allow reading Notion pages on the start screen. Notion is never offered as a ticket destination.
 
 ## 1.2.4
 
