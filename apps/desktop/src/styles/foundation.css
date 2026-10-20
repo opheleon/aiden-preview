@@ -291,31 +291,78 @@ nav {
   gap: 2px;
 }
 
-.project-nav button {
-  height: auto;
-  min-height: 36px;
-  padding: 8px;
-  line-height: 1.4;
+/* One line per project: the name fades at the edge, and a "…" menu appears on hover. */
+.project-nav .project-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border-radius: 7px;
+}
+
+.project-row:hover,
+.project-row:focus-within,
+.project-row.selected {
+  background: color-mix(in srgb, var(--paper2) 55%, transparent);
+}
+
+.project-nav .project-link {
+  flex: 1;
+  justify-content: flex-start;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
   color: var(--muted);
+  background: transparent;
+}
+
+.project-row.selected .project-link {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .project-nav .project-name {
-  display: -webkit-box;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  text-align: left;
+  white-space: nowrap;
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
 }
 
 .project-nav .project-dot {
   flex-shrink: 0;
 }
 
-.project-nav button.selected {
+.project-row-menu {
+  position: absolute;
+  right: 4px;
+  opacity: 0;
+}
+
+.project-row:hover .project-row-menu,
+.project-row:focus-within .project-row-menu,
+.project-row-menu[open] {
+  opacity: 1;
+}
+
+.project-row-menu > summary {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+
+.project-row-menu > summary:hover {
   color: var(--ink);
-  background: color-mix(in srgb, var(--paper2) 55%, transparent);
-  font-weight: 600;
+}
+
+/* The sidebar list scrolls, so the menu is placed against the window, under its button. */
+.project-row-menu [role='menu'] {
+  position: fixed;
+  z-index: 20;
+  min-width: 170px;
 }
 
 .project-dot,

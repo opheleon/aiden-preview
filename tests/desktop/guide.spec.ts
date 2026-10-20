@@ -115,11 +115,11 @@ test('intent-only setup opens on the Chat tab, saves web settings, and keeps the
     await expect(chat.getByLabel('Where does the app run?')).toHaveValue(`${url}/`);
     await page.getByRole('button', { name: 'Settings', exact: true }).first().click();
     await expect(page.getByRole('heading', { name: /Application settings/ })).toBeVisible();
-    await page.getByRole('button', { name: 'Ask Aiden about this project' }).click();
+    await page.getByRole('button', { name: 'A book project', exact: true }).click();
     await expect(chat.getByLabel('Message the Guide')).toHaveValue('Keep this draft');
     expect(await fixture.calls()).not.toContain('assess');
     await reply('choose-folder', 'Synthetic reply: connect the project folder here.');
-    await page.getByRole('button', { name: 'Ask Aiden about this project' }).click();
+    await page.getByRole('button', { name: 'A book project', exact: true }).click();
     await chat.getByLabel('Message the Guide').fill('Connect my code');
     await chat.getByRole('button', { name: 'Send', exact: true }).click();
     await desktop.app.evaluate(({ dialog }, folder) => {

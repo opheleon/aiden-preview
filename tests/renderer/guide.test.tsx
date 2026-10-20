@@ -156,7 +156,7 @@ test('the Chat tab keeps its draft across tabs, and Settings returns to it', asy
   expect(screen.getByLabelText('Message the Guide')).toHaveValue('Keep this draft');
   await userEvent.click(screen.getAllByRole('button', { name: 'Settings' })[0]!);
   expect(screen.getByRole('heading', { name: /Application settings/ })).toBeVisible();
-  await userEvent.click(screen.getByRole('button', { name: 'Ask Aiden about this project' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Synthetic books' }));
   expect(await chatPanel()).toBeVisible();
   expect(screen.getByLabelText('Message the Guide')).toHaveValue('Keep this draft');
   expect(

@@ -2,7 +2,7 @@
 
 Every project has one conversation with Aiden that helps you set up the project and keep it running. Chat is the first project tab, before Overview, Scope, and Activity, and every project opens on it. The setup checklist stays visible at the top, with the conversation and inline setup controls below.
 
-Select the **Chat** tab, or **Ask Aiden about this project** in the sidebar from any page, including Settings. Switching tabs or pages keeps your unsent draft and conversation. If the project's model is not connected, a notice at the top of Chat links to **Settings → Model**.
+Select the **Chat** tab, or the project in the sidebar from any page, including Settings. Each project row's **…** menu holds Project settings and Close project. Switching tabs or pages keeps your unsent draft and conversation. If the project's model is not connected, a notice at the top of Chat links to **Settings → Model**.
 
 A subdued **Thinking** indicator appears while the initial requirements and subsequent replies are pending. It stops when the reply or error arrives, respects reduced-motion preferences, and keeps retry controls beside the failed turn.
 

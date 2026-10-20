@@ -1,9 +1,10 @@
 import { BookOpen, ExternalLink, MessageCircle, Plus, Settings2 } from 'lucide-react';
-import type { JSX } from 'react';
+import { type JSX, useState } from 'react';
 
 import { helpLinks } from '../../../../packages/contracts/src/guide';
 import { scopeName } from '../../../../packages/contracts/src/project-name';
-import { useProjectGuide } from '../components/ProjectGuide';
+import { OutcomeDialog } from '../components/ProjectOutcome';
+import { ProjectRow } from '../components/ProjectRow';
 import { SidebarUpdate } from '../components/SidebarUpdate';
 import type { Workspace } from '../hooks/useWorkspace';
 import { newProject } from '../renderer/project-state';
@@ -37,7 +38,7 @@ export function WorkspaceSidebar({
   onGettingStarted: () => void;
 }): JSX.Element {
   const { projects, project, area, setArea, action } = workspace;
-  const { open } = useProjectGuide();
+  const [closing, setClosing] = useState<string | null>(null);
   return (
     <aside className="sidebar">
       <div className="sidebar-heading">
@@ -52,24 +53,18 @@ export function WorkspaceSidebar({
         </button>
       </div>
       <nav className="project-nav">
-        <ProjectLinks workspace={workspace} closed={false} />
+        <ProjectLinks workspace={workspace} closed={false} onClose={setClosing} />
         {projects.some((p) => p.lifecycle?.status === 'closed') && (
           <details
             className="closed-projects"
             open={project.lifecycle?.status === 'closed' || undefined}
           >
             <summary>Closed projects</summary>
-            <ProjectLinks workspace={workspace} closed />
+            <ProjectLinks workspace={workspace} closed onClose={setClosing} />
           </details>
         )}
       </nav>
       <div className="sidebar-bottom">
-        {projects.some((p) => p.id === project.id) && (
-          <button className="sidebar-section" onClick={() => open()}>
-            <MessageCircle size={17} />
-            <span>Ask Aiden about this project</span>
-          </button>
-        )}
         <button className="sidebar-section" data-guide-trigger onClick={onGettingStarted}>
           <BookOpen size={17} />
           <span>Help / Getting started</span>
@@ -101,6 +96,9 @@ export function WorkspaceSidebar({
           api={api}
         />
       </div>
+      {closing && closing === project.id && (
+        <OutcomeDialog workspace={workspace} mode="close" dismiss={() => setClosing(null)} />
+      )}
     </aside>
   );
 }
@@ -109,37 +107,27 @@ export function WorkspaceSidebar({
 function ProjectLinks({
   workspace,
   closed,
+  onClose,
 }: {
   workspace: Workspace;
   closed: boolean;
+  onClose: (projectId: string) => void;
 }): JSX.Element {
-  const { projects, project, load, area } = workspace;
+  const { projects, project } = workspace;
   return (
     <>
       {projects
         .filter((p) => (p.lifecycle?.status === 'closed') === closed)
         .map((p) => (
-          <div key={p.id}>
-            <button
-              className={p.id === project.id && area === 'projects' ? 'selected' : ''}
-              aria-current={p.id === project.id ? 'page' : undefined}
-              onClick={() => void load(p.id)}
-            >
-              <span className="project-dot" aria-hidden="true" />
-              <span
-                className="project-name"
-                title={
-                  p.id === project.id
-                    ? scopeName(project.context, workspace.baseline?.product)
-                    : p.name
-                }
-              >
-                {p.id === project.id
-                  ? scopeName(project.context, workspace.baseline?.product)
-                  : p.name}
-              </span>
-            </button>
-          </div>
+          <ProjectRow
+            key={p.id}
+            workspace={workspace}
+            project={p}
+            name={
+              p.id === project.id ? scopeName(project.context, workspace.baseline?.product) : p.name
+            }
+            onClose={onClose}
+          />
         ))}
     </>
   );
