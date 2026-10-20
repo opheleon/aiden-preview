@@ -14,7 +14,7 @@ test('acceptance preserves progress; closing persists across restart and reopeni
     const progress = await page.getByRole('progressbar').getAttribute('aria-valuenow');
     // Before any decision the outcome lives in the menu; afterwards the decision gets a card.
     await expect(page.getByRole('region', { name: 'Project outcome' })).toHaveCount(0);
-    await page.getByLabel('More').click();
+    await page.getByLabel('Actions for A book project').click();
     await page.getByRole('menuitem', { name: 'Accept outcome' }).click();
     const dialog = page.getByRole('dialog', { name: 'Accept outcome' });
     await expect(
@@ -32,7 +32,9 @@ test('acceptance preserves progress; closing persists across restart and reopeni
     await page.getByRole('button', { name: 'Close project', exact: true }).click();
     await expect(page.getByLabel('Forget saved test credentials')).toBeChecked();
     await page.screenshot({ path: info.outputPath('close-project-options.png') });
-    await page.getByLabel('Closing note').fill('Delivery finished for this synthetic fixture.');
+    await page
+      .getByLabel('Closing note (optional)')
+      .fill('Delivery finished for this synthetic fixture.');
     await page
       .getByRole('dialog')
       .getByRole('button', { name: 'Close project', exact: true })

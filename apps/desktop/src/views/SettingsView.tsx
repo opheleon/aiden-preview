@@ -2,7 +2,12 @@ import { ChevronRight, Plug, Settings2, ShieldCheck } from 'lucide-react';
 
 import type { WorkerResult } from '../../../../packages/contracts/src/api';
 import type { WorkerMethod, WorkerParams } from '../../../../packages/contracts/src/api.js';
-import type { McpConnection, McpTool, Project } from '../../../../packages/contracts/src/index';
+import type {
+  IntegrationPreset,
+  McpConnection,
+  McpTool,
+  Project,
+} from '../../../../packages/contracts/src/index';
 import {
   experimentalIntegration,
   readOnlyLinear,
@@ -119,13 +124,17 @@ export function SettingsView(props: SettingsViewProps): React.JSX.Element {
               <div className="eyebrow">HOSTED MCP</div>
               <h2>Connect work context</h2>
               <p>
-                Connections are shared by Claude and Codex. Analysts use approved read tools.
-                Automatic ticket writes are authorized separately for a destination in Project
-                settings.
+                Connections are shared by Claude and Codex. Linear: Aiden reads tickets, and
+                publishes them once you choose a destination in Project settings. Notion: Aiden
+                reads the pages you link, using only Notion’s fetch and search tools, which
+                connecting approves.
               </p>
-              <CredentialStorageNote connection="Linear" />
+              <CredentialStorageNote connection="Linear or Notion" />
             </div>
-            <TrackerConnections {...props} />
+            <div className="button-row">
+              <PresetConnection {...props} provider="linear" />
+              <PresetConnection {...props} provider="notion" />
+            </div>
           </section>
           <p className="fine-print">
             Jira and custom MCP are experimental. New connections are hidden while we complete
@@ -186,23 +195,24 @@ function PreferenceSettings(props: SettingsViewProps): React.JSX.Element {
   );
 }
 
-/** Offer Linear setup while preserving experimental accounts for existing projects. */
-function TrackerConnections({
+/** Offer one-click Linear or Notion setup while preserving experimental accounts for existing projects. */
+function PresetConnection({
   busy,
   action,
   setBusy,
   call,
   setIntegrations,
-}: SettingsViewProps): React.JSX.Element {
+  provider,
+}: SettingsViewProps & { provider: Exclude<IntegrationPreset, 'jira'> }): React.JSX.Element {
   return (
     <button
-      className="primary"
+      className="primary integration-connect"
       disabled={busy}
       onClick={() =>
         void action(async () => {
           setBusy(true);
           try {
-            const connection = await call('integrationPreset', { provider: 'linear' });
+            const connection = await call('integrationPreset', { provider });
             if (connection.status !== 'authorization_required')
               await call('integrationConnect', { connectionId: connection.id });
           } finally {
@@ -212,7 +222,7 @@ function TrackerConnections({
         })
       }
     >
-      <Plug size={15} /> Connect Linear
+      <Plug size={15} /> Connect {provider === 'linear' ? 'Linear' : 'Notion'}
     </button>
   );
 }

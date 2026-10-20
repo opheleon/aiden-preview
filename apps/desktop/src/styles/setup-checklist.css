@@ -1,49 +1,66 @@
+/* Setup is one compact line at the top of the chat; its steps open on demand. */
 .setup-checklist {
   flex-shrink: 0;
-  padding-bottom: 12px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
 }
 
 .setup-heading,
-.setup-current,
-.setup-extras {
+.setup-current {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  gap: 10px;
 }
 
 .setup-heading {
-  justify-content: space-between;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .setup-current {
+  flex-shrink: 0;
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
 }
 
+.setup-current svg {
+  align-self: center;
+  color: var(--brand);
+}
+
 .setup-next-action {
-  margin: 4px 0 0;
+  flex: 1 1 160px;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.setup-toggle {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 14px;
 }
 
 .setup-steps {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
   list-style: none;
-  margin: 12px 0 4px;
+  margin: 12px 0 2px;
   padding: 0;
 }
 
 .setup-item {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 10px;
   min-width: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .setup-marker {
@@ -54,11 +71,26 @@
   height: 22px;
   border: 1px solid var(--border);
   border-radius: 50%;
-  font-size: 11px;
+  font-size: 12px;
 }
 
-.setup-item-next {
+.setup-item-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.45;
+}
+
+.setup-item-label {
   color: var(--ink);
+}
+
+.setup-optional {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.setup-item-next .setup-item-label {
   font-weight: 600;
 }
 
@@ -75,65 +107,4 @@
 
 .setup-item-skipped .setup-marker {
   border-style: dashed;
-}
-
-.setup-item-label {
-  min-width: 0;
-  line-height: 1.4;
-}
-
-.setup-info {
-  display: inline-flex;
-  flex: 0 0 28px;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  min-height: 28px;
-  padding: 4px;
-  color: var(--muted);
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-}
-
-.setup-info:is(:hover, :focus-visible) {
-  color: var(--brand);
-  background: var(--paper2);
-}
-
-.setup-extras {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.setup-info-anchor {
-  display: inline-flex;
-  flex: 0 0 28px;
-}
-
-.setup-tooltip {
-  position: fixed;
-  z-index: 10;
-  width: min(288px, calc(100vw - 32px));
-  padding-top: 7px;
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.6;
-  text-align: left;
-}
-
-.setup-tooltip-content {
-  display: block;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--paper);
-  box-shadow: 0 4px 16px #00000014;
-}
-
-@media (width <= 680px) {
-  .setup-steps {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }

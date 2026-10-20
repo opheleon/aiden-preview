@@ -9,6 +9,7 @@ import {
   type RunManifest,
   type Stage,
 } from '../../contracts/src/index.js';
+import { notionLinks } from '../../contracts/src/tracker-connections.js';
 import { deliveryTickets } from '../../reporting/src/tickets.js';
 import { ToolBroker } from '../../tools/src/broker.js';
 import { serveTools } from '../../tools/src/mcp.js';
@@ -16,6 +17,7 @@ import { appendActivity, counted, recordStep } from './activity.js';
 import { commitBaseline } from './baseline.js';
 import { answeredDecisions, openDecisions, readCalls, replaceOpenDecisions } from './calls.js';
 import { requestClarification } from './clarification.js';
+import { contextSources } from './context-sources.js';
 import { executeEstimate } from './estimation-workflow.js';
 import { createModelStage, type ModelStage } from './model-stage.js';
 import { assessReport } from './report-analysis.js';
@@ -86,6 +88,8 @@ async function understandIntent(
     UnderstandingSchema,
     {
       context: run.project.context,
+      linkedPages: notionLinks(run.project.context),
+      contextSources: await contextSources(context, run.project),
       previous,
       openCalls,
       repositories: await Promise.all(run.project.repositories.map(describeRepository)),

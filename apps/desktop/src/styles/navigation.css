@@ -62,7 +62,7 @@ nav button.selected {
 }
 
 main {
-  margin-left: 240px;
+  margin-left: 280px;
   padding-top: 44px;
   min-width: 0;
 }
@@ -220,6 +220,18 @@ select {
   color: var(--ink);
   font-size: 13px;
   line-height: 1.55;
+}
+
+/* Checkboxes and radios keep their own size; the text-field rule above must not stretch them. */
+input[type='checkbox'],
+input[type='radio'] {
+  display: inline-block;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin: 3px 0 0;
+  padding: 0;
+  accent-color: var(--brand-dark);
 }
 
 input::placeholder,

@@ -12,13 +12,14 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 
 import {
   type ExternalReadReceipt,
+  type IntegrationPreset,
   type McpAuth,
   type McpConnection,
   McpConnectionSchema,
   type McpTool,
 } from '../../contracts/src/index.js';
 import type { TicketSettings, TicketTools } from '../../contracts/src/tickets.js';
-import { trackerConnection, trackerUrl } from '../../contracts/src/tracker-connections.js';
+import { presetConnection, presetUrl } from '../../contracts/src/tracker-connections.js';
 import { atomic, hash, optionalJson, uid } from '../../core/src/storage.js';
 import { SecretVault } from './credentials.js';
 import { type LinearOperation, linearOperation } from './linear-projects.js';
@@ -31,7 +32,7 @@ import {
   ticketTools,
   validateTicketArguments,
 } from './ticket-tools.js';
-import { assessTool, toolFingerprint } from './tool-policy.js';
+import { approveNeededReads, assessTool, toolFingerprint } from './tool-policy.js';
 export { assessTool, toolFingerprint } from './tool-policy.js';
 
 type Active = { client: Client; transport: Transport; provider?: StoredOAuthProvider };
@@ -71,7 +72,7 @@ export class ConnectionManager {
     return value;
   }
   /** Reuse a preset connection, coalescing double clicks without merging unrelated credentials. */
-  preset(provider: 'linear' | 'jira'): Promise<McpConnection> {
+  preset(provider: IntegrationPreset): Promise<McpConnection> {
     const pending = this.presets.get(provider);
     if (pending) return pending;
     const result = this.ensurePreset(provider).finally(() => this.presets.delete(provider));
@@ -79,14 +80,14 @@ export class ConnectionManager {
     return result;
   }
   /** Keep read-only legacy entries separate; publishing requires the explicit read/write preset. */
-  private async ensurePreset(provider: 'linear' | 'jira'): Promise<McpConnection> {
-    const existing = trackerConnection(await this.list(), provider);
+  private async ensurePreset(provider: IntegrationPreset): Promise<McpConnection> {
+    const existing = presetConnection(await this.list(), provider);
     return (
       existing ??
       this.add({
-        name: provider === 'linear' ? 'Linear' : 'Jira',
+        name: { linear: 'Linear', jira: 'Jira', notion: 'Notion' }[provider],
         provider: provider === 'linear' ? 'linear' : 'custom',
-        url: trackerUrl(provider),
+        url: presetUrl(provider),
         auth: 'oauth',
       })
     );
@@ -299,6 +300,7 @@ export class ConnectionManager {
       connection.message =
         'The server changed its tool definitions. Review and select read tools again.';
     }
+    approveNeededReads(connection, tools);
     connection.toolFingerprint = fingerprint;
     connection.lastTestedAt = new Date().toISOString();
     connection.updatedAt = connection.lastTestedAt;
@@ -496,5 +498,3 @@ export class ConnectionManager {
         await this.disconnect(connection.id).catch(() => {});
   }
 }
-
-export const LINEAR_READONLY_MCP_URL = 'https://mcp.linear.app/mcp/readonly';

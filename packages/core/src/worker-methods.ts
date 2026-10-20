@@ -28,6 +28,7 @@ import { readCalls, settleAppUrlCalls } from './calls.js';
 import { cancelCoding, codingJobs, startCodingJob } from './coding-jobs.js';
 import { confirmAction, readConfirmations } from './confirmations.js';
 import { Engine } from './engine.js';
+import { connectGithubCode } from './github-code.js';
 import { guideMethods } from './guide-methods.js';
 import { guardLifecycleMethods, lifecycleMethods } from './lifecycle-methods.js';
 import { linearTeams, publishLinearTickets } from './linear-projects.js';
@@ -46,7 +47,10 @@ import { syncTickets } from './ticket-sync.js';
 import { readAppUrl, saveVerificationSettings } from './verification-settings.js';
 import { readVerification } from './verification-workflow.js';
 /** Provider controls separate authentication/model discovery from run execution. */
-export type RuntimeControls = Pick<Runtimes, 'diagnostics' | 'models' | 'setKey' | 'loginCodex'>;
+export type RuntimeControls = Pick<
+  Runtimes,
+  'diagnostics' | 'models' | 'setKey' | 'loginCodex' | 'loginClaude'
+>;
 /** Validate unknown worker inputs before dispatching a typed operation. */
 function operation<T>(
   schema: z.ZodType<T>,
@@ -183,6 +187,10 @@ function functionMethods(engine: Engine) {
         .strict(),
       (p) => saveMonitoredBranch(engine.store, p.projectId, p.repositoryId, p.monitoredBranch),
     ),
+    connectCode: operation(
+      project.extend({ repositories: z.array(z.string().trim().min(1).max(300)).max(20) }),
+      (p) => connectGithubCode(engine, p.projectId, p.repositories),
+    ),
     look: operation(
       project.extend({
         reason: z.enum(['commit', 'morning', 'ticket']).optional(),
@@ -255,8 +263,8 @@ function runtimeMethods(engine: Engine, runtimes: RuntimeControls) {
         return { saved: 'memory-only' };
       },
     ),
-    login: operation(z.object({ provider: z.literal('codex') }).strict(), () =>
-      runtimes.loginCodex(),
+    login: operation(z.object({ provider: z.enum(['codex', 'claude']) }).strict(), (p) =>
+      p.provider === 'claude' ? runtimes.loginClaude() : runtimes.loginCodex(),
     ),
     updateRuntime: operation(project.extend({ runtime: RuntimeSchema }), (p) =>
       engine.updateRuntime(p.projectId, p.runtime),
@@ -268,8 +276,9 @@ function runtimeMethods(engine: Engine, runtimes: RuntimeControls) {
 function integrationMethods(engine: Engine) {
   return {
     integrations: operation(z.object({}).strict(), () => engine.integrations.list()),
-    integrationPreset: operation(z.object({ provider: z.enum(['linear', 'jira']) }).strict(), (p) =>
-      engine.integrations.preset(p.provider),
+    integrationPreset: operation(
+      z.object({ provider: z.enum(['linear', 'jira', 'notion']) }).strict(),
+      (p) => engine.integrations.preset(p.provider),
     ),
     integrationAdd: operation(
       z

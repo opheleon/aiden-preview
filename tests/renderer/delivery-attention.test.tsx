@@ -9,6 +9,7 @@ import type { Product, RunManifest } from '../../packages/contracts/src/index';
 import type { TicketState } from '../../packages/contracts/src/tickets';
 import { appFixture } from './app-fixture';
 import { report } from './fixtures';
+import { selectTab } from './project-tabs';
 
 const f = appFixture();
 const { default: App } = await import('../../apps/desktop/src/App');
@@ -171,6 +172,7 @@ test('overview prioritizes the disconnect as one line per finding, with the full
   f.addRun(run);
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  await selectTab('Overview');
   const attention = await screen.findByRole('region', { name: 'Delivery attention' });
   expect(
     within(attention).getByRole('heading', { name: 'Delivery at risk · 1 deviation' }),
@@ -179,11 +181,11 @@ test('overview prioritizes the disconnect as one line per finding, with the full
     attention.compareDocumentPosition(screen.getByRole('region', { name: 'Status' })) &
       Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
-  // The finding is one line: the feature and its label, which explains itself on hover.
-  expect(within(attention).getByText('Delivery deviation')).toHaveAttribute(
-    'title',
-    'TES-13 is marked Done, but its requirements are incomplete.',
-  );
+  // The finding is one row: the feature, its label, and its summary in plain view.
+  expect(within(attention).getByText('Delivery deviation')).toBeVisible();
+  expect(
+    within(attention).getByText('TES-13 is marked Done, but its requirements are incomplete.'),
+  ).toBeVisible();
   expect(within(attention).queryByText(/The implementation is absent/)).toBeNull();
   const feature = screen.getByRole('region', { name: 'Read books' });
   expect(within(feature).getAllByText('Delivery deviation')).toHaveLength(2);

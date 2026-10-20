@@ -14,6 +14,7 @@ import type {
   EstimateOverrides,
   EstimationSnapshot,
   Evidence,
+  IntegrationPreset,
   McpAuth,
   McpConnection,
   McpTool,
@@ -71,7 +72,7 @@ export type WorkerAPI = {
   acceptOutcome: { params: ProjectRef & { note: string; evidenceKey: string }; result: Project };
   /** Pause project monitoring while retaining evidence and external tracker state. */
   closeProject: {
-    params: ProjectRef & { note: string; forgetCredentials?: boolean };
+    params: ProjectRef & { note?: string; forgetCredentials?: boolean };
     result: Project;
   };
   /** Resume monitoring for a closed project. */
@@ -208,10 +209,10 @@ export type WorkerAPI = {
   diagnostics: { params: Record<string, never>; result: RuntimeDiagnostic[] };
   models: { params: { runtime: RuntimeConfig }; result: RuntimeModel[] };
   setKey: { params: { provider: 'codex' | 'claude'; key: string }; result: { saved: string } };
-  login: { params: { provider: 'codex' }; result: { authUrl?: string } };
+  login: { params: { provider: 'codex' | 'claude' }; result: { authUrl?: string } };
   updateRuntime: { params: ProjectRef & { runtime: RuntimeConfig }; result: null };
   integrations: { params: Record<string, never>; result: McpConnection[] };
-  integrationPreset: { params: { provider: 'linear' | 'jira' }; result: McpConnection };
+  integrationPreset: { params: { provider: IntegrationPreset }; result: McpConnection };
   integrationAdd: {
     params: {
       name: string;
@@ -240,6 +241,10 @@ export type WorkerAPI = {
   integrationDisconnect: { params: { connectionId: string }; result: McpConnection };
   integrationRemove: { params: { connectionId: string }; result: { removed: boolean } };
   updateSources: { params: ProjectRef & { sources: ProjectSources }; result: null };
+  connectCode: {
+    params: ProjectRef & { repositories: string[] };
+    result: { runId: string | null; repositories: Project['repositories'] };
+  };
   estimate: {
     params: ProjectRef & { reportId?: string; refreshHistory?: boolean };
     result: { runId: string };

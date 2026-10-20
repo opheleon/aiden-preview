@@ -277,3 +277,17 @@
     opacity: 0.35;
   }
 }
+
+.chat-steps {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding-left: 22px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.chat-steps li::marker {
+  color: var(--color-muted-foreground);
+  font-variant-numeric: tabular-nums;
+}

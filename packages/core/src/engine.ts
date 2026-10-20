@@ -22,6 +22,7 @@ import type { DiscoverOptions } from '../../verification/src/index.js';
 import { commitBaseline } from './baseline.js';
 import { requireCheckableScope } from './blockers.js';
 import { closeCoding } from './coding-jobs.js';
+import { withLinkedSources } from './context-sources.js';
 import { DeviceVerification } from './device-verification.js';
 import {
   exportReport,
@@ -106,7 +107,7 @@ export class Engine {
     input: Project,
     options: Pick<RunExtras, 'autoAccept' | 'reason'> & { verification?: VerificationUpdate } = {},
   ): Promise<{ runId: string }> {
-    const parsed = ProjectSchema.parse(input);
+    const parsed = withLinkedSources(ProjectSchema.parse(input), await this.integrations.list());
     delete parsed.lifecycle;
     const project = await validateProjectRepositories(parsed);
     const { verification, ...extra } = options;
@@ -131,6 +132,24 @@ export class Engine {
       );
       p.runtime = ProjectSchema.shape.runtime.parse(config);
       await atomic(path.join(this.store.project(projectId), 'project.json'), p);
+    } finally {
+      await release();
+    }
+  }
+  /**
+   * Save the project's repositories without rewriting its requirements, after checking each one
+   * is a committed Git repository. Connected code lives in the project's own folder, so no
+   * separate project folder is kept.
+   */
+  async updateCode(projectId: string, repositories: Project['repositories']): Promise<Project> {
+    const release = await this.lock(projectId);
+    try {
+      const file = path.join(this.store.project(projectId), 'project.json');
+      const updated: Project = { ...ProjectSchema.parse(await json(file)), repositories };
+      delete updated.rootPath;
+      const next = await validateProjectRepositories(ProjectSchema.parse(updated));
+      await atomic(file, next);
+      return next;
     } finally {
       await release();
     }

@@ -88,50 +88,6 @@
   color: var(--color-brand-dark);
 }
 
-/* Explanatory text behind an (i) button. */
-.info-tip {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
-.info-tip-button {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px;
-  border: 0;
-  border-radius: 999px;
-  background: none;
-  color: var(--color-muted-foreground);
-  cursor: pointer;
-}
-
-.info-tip-button:hover,
-.info-tip-button:focus-visible,
-.info-tip-button[aria-expanded='true'] {
-  color: var(--color-brand-dark);
-}
-
-.info-tip-panel {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 5;
-  display: grid;
-  gap: 6px;
-  width: min(360px, 80vw);
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-background);
-  box-shadow: 0 8px 30px #17152b22;
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.5;
-  white-space: normal;
-  text-align: left;
-}
-
 /* A pop-up's title fills the heading so Close sits at the right edge. */
 .modal-heading {
   flex: 1;
@@ -269,4 +225,14 @@
 
 .linear-team-options [aria-selected='true'] {
   background: var(--color-paper2);
+}
+
+/* How Aiden knows a requirement's status, readable without hovering the chip. */
+.req-main {
+  min-width: 0;
+}
+
+.req-main .row-how {
+  display: block;
+  margin-top: 2px;
 }

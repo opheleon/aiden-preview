@@ -1,4 +1,4 @@
-import { type JSX, type ReactNode, useState } from 'react';
+import { type JSX, type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from 'react';
 
 import type { CriterionResult } from '../../../../packages/contracts/src/index';
 import type { TicketState } from '../../../../packages/contracts/src/tickets';
@@ -21,7 +21,7 @@ import type { Workspace } from '../hooks/useWorkspace';
 import { briefData } from '../renderer/brief-data';
 import { deliveryAttention } from '../renderer/delivery-attention';
 import { BriefHeader } from './BriefHeader';
-import { SetupBanner } from './GuideChat';
+import { GuideChat, SetupBanner } from './GuideChat';
 import { ProjectHistory } from './ProjectHistory';
 import { ProjectRunHistory } from './ProjectRunHistory';
 const api = window.aiden;
@@ -38,7 +38,7 @@ function Panel({
 }): JSX.Element {
   return (
     <section
-      className="project-panel"
+      className={`project-panel project-${id}-panel`}
       role="tabpanel"
       id={`project-panel-${id}`}
       aria-labelledby={`project-tab-${id}`}
@@ -47,6 +47,63 @@ function Panel({
       {children}
     </section>
   );
+}
+
+/** The project conversation on its Chat tab, with the draft and entry kept above the page. */
+function ProjectChat({
+  workspace,
+  visible,
+}: {
+  workspace: Workspace;
+  visible: boolean;
+}): JSX.Element {
+  const chat = useProjectGuide();
+  const frame = useRef<HTMLDivElement>(null);
+  useFillViewport(frame, visible);
+  return (
+    <div ref={frame} className="project-chat-frame">
+      <GuideChat
+        key={workspace.project.lifecycle?.status ?? 'active'}
+        workspace={workspace}
+        guide={chat.guide}
+        visible={visible}
+        chosen={chat.chatChosen}
+        entry={chat.entry}
+        draft={chat.draft}
+        setDraft={chat.setDraft}
+        onClearEntry={chat.clearEntry}
+        onHelp={chat.onHelp}
+      />
+    </div>
+  );
+}
+
+/**
+ * Size the chat to the space left below the project header, so the composer stays on screen when
+ * the header wraps in a narrow window. Re-measured on resize and whenever the page above changes.
+ */
+function useFillViewport(frame: RefObject<HTMLDivElement | null>, visible: boolean): void {
+  useLayoutEffect(() => {
+    const element = frame.current;
+    if (!visible || !element) return;
+    /** Fit the frame between its current top edge and the bottom of the window. */
+    const fit = (): void => {
+      const top = element.getBoundingClientRect().top;
+      element.style.setProperty(
+        '--project-chat-height',
+        `${Math.max(320, innerHeight - top - 24)}px`,
+      );
+    };
+    fit();
+    const page = element.parentElement?.parentElement;
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit);
+    if (page) observer?.observe(page);
+    addEventListener('resize', fit);
+    return () => {
+      observer?.disconnect();
+      removeEventListener('resize', fit);
+    };
+  }, [frame, visible]);
 }
 
 /** Work that stopped early, with the button that recovers from it. */
@@ -104,7 +161,7 @@ export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
   const tracker = useTrackerTickets(workspace);
   const coding = delivery.enabled || delivery.jobs.length > 0;
   const { guide, open: openChat } = useProjectGuide();
-  const { tab, select: selectTab } = useProjectTab(workspace, coding);
+  const { tab, select: selectTab } = useProjectTab(coding);
   const data = briefData(workspace);
   const { report, product, check, stateMap, actions, unverified, state, status, update } = data;
   const { attention, allDone } = overview(workspace, data, tracker.state);
@@ -140,8 +197,11 @@ export function Brief({ workspace }: { workspace: Workspace }): JSX.Element {
         }
         note={recovery(workspace, state, () => openChat({ type: 'run' }))}
       />
+      <Panel id="chat" tab={tab}>
+        <ProjectChat workspace={workspace} visible={tab === 'chat'} />
+      </Panel>
       <Panel id="overview" tab={tab}>
-        <SetupBanner setup={guide.view?.setup} onOpen={openChat} />
+        <SetupBanner setup={guide.view?.setup} onOpen={() => openChat()} />
         <ActionItems
           title="Needs you"
           items={actions.filter((a) => !a.requirementId || a.call)}

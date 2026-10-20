@@ -104,6 +104,7 @@ export async function configureGuideVerification(
     );
     await writeSetupState(engine.store, projectId, {
       ...state,
+      checksConfirmedAt: new Date().toISOString(),
       verifiedTargets: Object.fromEntries(
         Object.entries({ ...state.verifiedTargets, ...checked }).filter(
           ([method, key]) => keys[method] === key,

@@ -15,7 +15,7 @@ test('requirements progress stays compact, animated, and cancellable at both win
     const { page } = desktop;
     await page.getByLabel('What are you building?').fill('Users can list and create books.');
     await page.getByRole('button', { name: /Hand it to Aiden/ }).click();
-    const chat = page.getByRole('dialog', { name: 'Chat with Aiden' });
+    const chat = page.getByRole('tabpanel', { name: 'Chat' });
     const status = chat.getByRole('status', { name: 'Project work in progress' });
     await expect(status).toHaveText('Writing requirements');
     await expect.poll(async () => (await fixture.calls()).includes('understand')).toBe(true);

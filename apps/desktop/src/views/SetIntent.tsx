@@ -1,21 +1,36 @@
-import { ArrowRight, CircleAlert, FileText, FolderKanban, Info } from 'lucide-react';
-import type { JSX } from 'react';
+import { ArrowRight, CircleAlert, Info, SlidersHorizontal } from 'lucide-react';
+import { type JSX, useRef, useState } from 'react';
 
+import type { McpConnection } from '../../../../packages/contracts/src/index';
+import {
+  notionContext,
+  notionLinks,
+  notionReadTools,
+  notionReady,
+} from '../../../../packages/contracts/src/tracker-connections';
 import brandMark from '../assets/brand-mark.svg';
 import RuntimeSettings from '../components/RuntimeSettings';
 import type { Workspace } from '../hooks/useWorkspace';
+import { providerName, runtimeReady } from '../renderer/runtime-readiness';
 const api = window.aiden;
 
 /**
- * The whole start: say what you are building. The project folder is optional; after the start the
- * Guide plays back the requirements and asks how the work should be checked.
+ * The whole start: say what you are building, or paste a Notion page link. Code folders and checks
+ * come later in the setup chat, where the person can ask what each step means.
  */
 export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element {
-  const { project, setProject, busy, scanning, scanProjectFolder, start, action } = workspace;
-  const folder = project.rootPath?.split(/[\\/]/).at(-1) || project.rootPath;
-  const repos = project.repositories.length;
-  const blocker = scanning ? undefined : startHint(!!project.context.trim(), folder, repos);
-  const missing = blocker?.blocking ? blocker.why : '';
+  const { project, setProject, busy, start } = workspace;
+  const missing = startHint(workspace);
+  const [showModel, setShowModel] = useState(false);
+  const model = useRef<HTMLDivElement>(null);
+  /** Open the model settings below the box, bring them into view, and focus their first action. */
+  function openModel(): void {
+    setShowModel(true);
+    requestAnimationFrame(() => {
+      model.current?.scrollIntoView?.({ block: 'nearest' });
+      model.current?.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
+    });
+  }
   return (
     <section className="goal-starter set-intent" aria-label="New project">
       <div className="goal-starter-brand">
@@ -26,16 +41,11 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
       <h1>
         What are you <span className="serif">building?</span>
       </h1>
-      <p className="goal-starter-lead">
-        Paste or type anything that says what you want. Aiden plans usable features in delivery
-        order, assesses the code and tracks delivery, and surfaces what needs you. Include your
-        target date and constraints if you have them.
-      </p>
       <div className="chat-composer">
         <textarea
           className="chat-composer-textarea"
           aria-label="What are you building?"
-          placeholder="Paste or type what you are building…"
+          placeholder="Describe what you are building, or paste a Notion page link…"
           maxLength={20000}
           rows={4}
           value={project.context}
@@ -43,176 +53,186 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
         />
         <div className="chat-composer-footer">
           <button
-            className="text-button"
-            onClick={() =>
-              void action(async () => {
-                const text = await api?.chooseContext();
-                if (text)
-                  setProject((p) => ({
-                    ...p,
-                    context: p.context ? `${p.context}\n\n${text}` : text,
-                  }));
-              })
-            }
+            className="text-button goal-starter-model"
+            aria-expanded={showModel}
+            aria-controls="start-model-settings"
+            onClick={() => (showModel ? setShowModel(false) : openModel())}
           >
-            <FileText size={14} /> Import a file
+            <SlidersHorizontal size={14} aria-hidden="true" /> Model and effort
           </button>
-          <button
-            className="text-button"
-            disabled={scanning}
-            onClick={() => void scanProjectFolder(true)}
-          >
-            <FolderKanban size={14} />
-            {scanning
-              ? 'Finding repositories…'
-              : folder
-                ? `${folder} · ${repos} ${repos === 1 ? 'repository' : 'repositories'}`
-                : 'Add the project folder (optional)'}
-          </button>
-          <select
-            className="chat-model-select"
-            aria-label="Model provider"
-            value={project.runtime.provider}
-            onChange={(event) =>
-              setProject({
-                ...project,
-                runtime: {
-                  provider: event.target.value as 'claude' | 'codex',
-                  auth: 'subscription',
-                },
-              })
-            }
-          >
-            <option value="codex">Codex</option>
-            <option value="claude">Claude</option>
-          </select>
-          <button
-            className="primary goal-starter-create"
-            disabled={busy || scanning || !project.context.trim()}
-            aria-describedby={missing ? 'start-hint' : undefined}
-            onClick={() => void start()}
-          >
-            Hand it to Aiden <ArrowRight size={15} />
-          </button>
+          <div className="goal-starter-actions">
+            <ProviderPicker workspace={workspace} onConnect={openModel} />
+            {/* A disabled button gets no hover, so its wrapper says what is still needed. */}
+            <span className="goal-starter-start" title={missing || undefined}>
+              <button
+                className="primary goal-starter-create"
+                disabled={busy || !!missing}
+                aria-describedby={missing ? 'start-hint' : undefined}
+                onClick={() => void start()}
+              >
+                Hand it to Aiden <ArrowRight size={15} />
+              </button>
+              <span id="start-hint" hidden>
+                {missing}
+              </span>
+            </span>
+          </div>
         </div>
       </div>
-      <StartBlocker
-        scanning={scanning}
-        blocker={blocker}
-        folder={folder}
-        onChooseFolder={() => void scanProjectFolder(true)}
-      />
-      <details>
-        <summary>Model and effort</summary>
-        <RuntimeSettings
-          runtime={project.runtime}
-          diagnostics={workspace.diagnostics}
-          api={api}
-          disabled={busy}
-          onRefresh={workspace.refresh}
-          onChange={(runtime) => setProject((current) => ({ ...current, runtime }))}
-        />
-      </details>
-      {project.discoveryWarnings?.map((warning) => (
-        <p className="inline-note" role="status" key={warning}>
-          {warning}
-        </p>
-      ))}
-      <div className="goal-starter-next">
-        <span>
-          <b>You</b> set the goal
-        </span>
-        <span>
-          <b>You</b> make the calls
-        </span>
-        <span>
-          <b>You</b> accept the outcome
-        </span>
-        <span>
-          <b>Aiden</b> does the rest
-        </span>
-      </div>
+      <NotionNotice workspace={workspace} />
+      {showModel && (
+        <div id="start-model-settings" className="goal-starter-settings" ref={model}>
+          <RuntimeSettings
+            runtime={project.runtime}
+            diagnostics={workspace.diagnostics}
+            api={api}
+            disabled={busy}
+            onRefresh={workspace.refresh}
+            onChange={(runtime) => setProject((current) => ({ ...current, runtime }))}
+          />
+        </div>
+      )}
     </section>
   );
 }
 
-/** Something the person should know before starting: a blocker, or a note that does not block. */
-interface StartBlockerInfo {
-  why: string;
-  fix: string;
-  chooseFolder: boolean;
-  blocking: boolean;
+/**
+ * Approve only Notion's page-reading tools for a connected Notion sign-in, the person's one click
+ * on the start screen. Every other Notion tool stays unapproved.
+ * Example: a connected Notion with nothing approved gets notion-fetch and notion-search.
+ */
+async function allowNotionReading(workspace: Workspace, notion: McpConnection): Promise<void> {
+  const rows = await workspace.call('integrationTools', { connectionId: notion.id });
+  const fresh = (await workspace.call('integrations')).find((c) => c.id === notion.id);
+  if (!fresh?.toolFingerprint) throw new Error('Notion did not list its tools. Try again.');
+  const wanted = new Set<string>(notionReadTools);
+  await workspace.call('integrationApprove', {
+    connectionId: notion.id,
+    fingerprint: fresh.toolFingerprint,
+    tools: rows.filter((tool) => tool.readOnly && wanted.has(tool.name)).map((tool) => tool.name),
+  });
+  workspace.setIntegrations(await workspace.call('integrations'));
 }
 
 /**
- * Say what is still needed before Aiden can start. Only the intent is required; a folder without a
- * Git repository is a note, because code can be connected later in the Guide.
- * Example: an empty box blocks; a folder with no repository explains and offers another folder.
+ * When the goal links Notion pages, say whether Aiden can read them. A connected Notion that still
+ * needs its read tools approved gets a one-click allow; otherwise Settings → Integrations opens.
  */
-function startHint(
-  hasIntent: boolean,
-  folder: string | undefined,
-  repos: number,
-): StartBlockerInfo | undefined {
-  if (!hasIntent)
-    return {
-      why: 'To start, describe what you are building.',
-      fix: 'Type or paste your goal in the box above, or use Import a file. The project folder is optional.',
-      chooseFolder: false,
-      blocking: true,
-    };
-  if (folder && !repos)
-    return {
-      why: `No Git repository was found in ${folder}. You can start now and connect your code later in the Guide.`,
-      fix: 'Code checks need a Git repository. Web, API, and manual checks do not.',
-      chooseFolder: true,
-      blocking: false,
-    };
-  return {
-    why: 'After you start, Aiden plays back the requirements and asks how to check the work.',
-    fix: folder
-      ? 'Aiden will also check the code in this folder.'
-      : 'No folder needed. You can connect your code, a web app, or an API in the setup chat.',
-    chooseFolder: false,
-    blocking: false,
-  };
-}
-
-/**
- * Explain prominently why the start button is disabled and how to fix it.
- * Example: an empty intent shows the reason and the fix; a folder without Git offers another folder.
- */
-function StartBlocker({
-  scanning,
-  blocker,
-  folder,
-  onChooseFolder,
-}: {
-  scanning: boolean;
-  blocker: StartBlockerInfo | undefined;
-  folder: string | undefined;
-  onChooseFolder: () => void;
-}): JSX.Element | null {
-  if (scanning)
-    return (
-      <p className="start-blocker" role="status">
-        <FolderKanban size={16} />
-        <span>Finding repositories in the project folder. You can start when this finishes.</span>
-      </p>
-    );
-  if (!blocker) return null;
+function NotionNotice({ workspace }: { workspace: Workspace }): JSX.Element | null {
+  const [allowing, setAllowing] = useState(false);
+  const [failed, setFailed] = useState('');
+  const links = notionLinks(workspace.project.context).length;
+  if (!links) return null;
+  const notion = workspace.integrations.find(notionContext);
+  const ready = !!notion && notionReady(notion);
+  const signedIn = notion?.status === 'connected';
+  const pages = links === 1 ? 'this Notion page' : `these ${links} Notion pages`;
+  /** Approve the read tools, keeping any failure on the notice. */
+  async function allow(): Promise<void> {
+    if (!notion) return;
+    setAllowing(true);
+    setFailed('');
+    try {
+      await allowNotionReading(workspace, notion);
+    } catch (error) {
+      setFailed(error instanceof Error ? error.message : 'Could not allow Notion reading.');
+    } finally {
+      setAllowing(false);
+    }
+  }
   return (
-    <div className={blocker.blocking ? 'start-blocker' : 'start-blocker start-note'}>
-      {blocker.blocking ? <CircleAlert size={16} /> : <Info size={16} />}
-      <div>
-        <p id={blocker.blocking ? 'start-hint' : undefined}>{blocker.why}</p>
-        <p className="start-blocker-fix">{blocker.fix}</p>
-      </div>
-      {blocker.chooseFolder && (
-        <button className="start-blocker-action" onClick={onChooseFolder}>
-          {folder ? 'Choose a different folder' : 'Browse for a folder'}
-        </button>
-      )}
+    <div className={ready ? 'start-blocker start-note' : 'start-blocker'} role="status">
+      {ready ? <Info size={16} /> : <CircleAlert size={16} />}
+      <p>
+        {ready
+          ? `Aiden will read ${pages} when it writes the requirements.`
+          : signedIn
+            ? `To read ${pages}, allow Aiden to read Notion pages. Only Notion's fetch and search tools are approved.`
+            : `To read ${pages}, connect Notion in Settings → Integrations.`}
+        {failed && <span className="start-blocker-fix"> {failed}</span>}
+      </p>
+      {!ready &&
+        (signedIn ? (
+          <button className="start-blocker-action" disabled={allowing} onClick={() => void allow()}>
+            {allowing ? 'Allowing…' : 'Allow reading Notion pages'}
+          </button>
+        ) : (
+          <button
+            className="start-blocker-action"
+            onClick={() => {
+              workspace.setSettingsTab('integrations');
+              workspace.setArea('settings');
+            }}
+          >
+            Open Integrations
+          </button>
+        ))}
     </div>
   );
+}
+
+/**
+ * The provider choice with whether it is connected, read from the loaded diagnostics. When it is
+ * not connected, the status itself opens the sign-in steps.
+ */
+function ProviderPicker({
+  workspace,
+  onConnect,
+}: {
+  workspace: Workspace;
+  onConnect: () => void;
+}): JSX.Element {
+  const { project, setProject } = workspace;
+  const name = providerName(project.runtime.provider);
+  const connected = runtimeReady(workspace.diagnostics, project.runtime);
+  const label = connected ? 'Connected' : connected === false ? 'Not connected' : 'Checking…';
+  return (
+    <>
+      <select
+        className="chat-model-select"
+        aria-label="Model provider"
+        value={project.runtime.provider}
+        onChange={(event) =>
+          setProject({
+            ...project,
+            runtime: { provider: event.target.value as 'claude' | 'codex', auth: 'subscription' },
+          })
+        }
+      >
+        <option value="codex">Codex</option>
+        <option value="claude">Claude</option>
+      </select>
+      {connected === false ? (
+        <button
+          className="text-button provider-connect"
+          aria-label={`Connect ${name}`}
+          onClick={onConnect}
+        >
+          Not connected · Connect
+        </button>
+      ) : (
+        <span
+          className={`connection provider-ready ${connected ? 'ready' : ''}`}
+          aria-label={`${name} connection`}
+        >
+          <span />
+          {label}
+        </span>
+      )}
+    </>
+  );
+}
+
+/**
+ * What still stops the start, as one short sentence for the button's tooltip, or empty when
+ * Aiden can start. The goal and a connected model are required; everything else comes later in
+ * the setup chat.
+ * Example: an empty box gives "Describe what you are building first."
+ */
+function startHint(workspace: Workspace): string {
+  const { project } = workspace;
+  if (!project.context.trim()) return 'Describe what you are building first.';
+  if (runtimeReady(workspace.diagnostics, project.runtime) === false)
+    return `Connect ${providerName(project.runtime.provider)} first.`;
+  return '';
 }

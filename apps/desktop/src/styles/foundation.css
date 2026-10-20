@@ -237,7 +237,7 @@ small {
 }
 
 .sidebar {
-  width: 240px;
+  width: 280px;
   position: fixed;
   top: 44px;
   bottom: 0;
@@ -289,33 +289,6 @@ nav {
   min-height: 0;
   margin-top: 0;
   gap: 2px;
-}
-
-.project-nav button {
-  height: auto;
-  min-height: 36px;
-  padding: 8px;
-  line-height: 1.4;
-  color: var(--muted);
-}
-
-.project-nav .project-name {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-.project-nav .project-dot {
-  flex-shrink: 0;
-}
-
-.project-nav button.selected {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--paper2) 55%, transparent);
-  font-weight: 600;
 }
 
 .project-dot,

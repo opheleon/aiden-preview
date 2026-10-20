@@ -1,81 +1,20 @@
-/* Project chat overlays any surface without losing the user's place. */
-.project-guide-dialog {
-  width: min(900px, calc(100vw - 48px));
-  height: min(900px, calc(100dvh - 64px));
-  max-width: none;
-  max-height: none;
-  margin: auto;
-  padding: 24px 32px;
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  background: var(--paper);
-  color: var(--ink);
-  box-shadow: 0 24px 100px #14131a26;
-}
-
-.project-guide-dialog[open] {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.project-guide-dialog::backdrop {
-  background: #14131a38;
-  backdrop-filter: blur(3px);
-}
-
-.project-guide-header {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 20px;
-}
-
-.project-guide-title {
-  flex: 1;
+/* Project chat is the first project tab: the thread scrolls inside the page, composer below. */
+.project-chat-frame {
   min-width: 0;
-  overflow-wrap: anywhere;
 }
 
-.guide-close {
-  display: inline-flex;
-  flex: 0 0 36px;
-  align-items: center;
-  justify-content: center;
-  min-height: 36px;
-  padding: 8px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--muted);
+.project-chat-panel .guide-tab {
+  height: var(--project-chat-height, max(440px, calc(100dvh - 300px)));
 }
 
-.guide-close:is(:hover, :focus-visible) {
-  background: var(--paper2);
-  color: var(--ink);
+/* Long setup explanations scroll on their own so the composer always stays in view. */
+.project-chat-panel .setup-checklist {
+  max-height: 45%;
+  overflow: auto;
+  scrollbar-width: thin;
 }
 
-.project-guide-header h2 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.project-guide-header p {
-  margin: 3px 0 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.guide-back {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 8px;
-}
-
-.project-guide-dialog :is(button, summary):focus-visible {
+.project-chat-panel :is(button, summary):focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 3px;
 }
@@ -93,6 +32,7 @@
 }
 
 .guide-thread {
+  font-size: 16px;
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -129,6 +69,11 @@
   max-width: 85%;
 }
 
+/* Messages and steps read at the thread's size, not the smaller page default. */
+.brief .guide-thread :is(.chat-you, .chat-aiden, .chat-steps, .guide-saved-results) {
+  font-size: inherit;
+}
+
 .guide-thread .guide-reply {
   display: block;
   max-width: 100%;
@@ -140,7 +85,7 @@
 .guide-event {
   margin: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
@@ -152,7 +97,7 @@
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .guide-card .guide-card,
@@ -293,6 +238,7 @@
   background: transparent;
   box-shadow: none;
   font: inherit;
+  font-size: 16px;
   line-height: 1.6;
 }
 
@@ -306,7 +252,7 @@
 
 .guide-composer-footer small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .guide-send {
@@ -331,19 +277,12 @@
 }
 
 @media (width <= 720px) {
-  .project-guide-dialog {
-    width: calc(100vw - 16px);
-    height: calc(100dvh - 16px);
-    padding: 16px;
-    border-radius: 16px;
-  }
-
   .guide-tab {
     width: 100%;
   }
 
   .guide-composer-footer small {
-    font-size: 10px;
+    font-size: 11px;
   }
 }
 
@@ -358,7 +297,7 @@
   margin: 0;
   padding: 4px 0;
   color: var(--ink);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
 }
 
@@ -457,4 +396,32 @@
   .guide-clarification {
     animation: none;
   }
+}
+
+/* A finished check where it happened in the conversation. */
+.guide-result {
+  display: grid;
+  gap: 8px;
+}
+
+.guide-result:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.guide-result > details > summary {
+  width: fit-content;
+  color: var(--brand);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.guide-saved-results {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
 }

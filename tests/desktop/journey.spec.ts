@@ -60,7 +60,7 @@ test('one handoff produces a brief with evidence, exports, restart, cancellation
     await app.evaluate(({ dialog }, file) => {
       dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath: file });
     }, jsonFile);
-    await page.getByLabel('More').click();
+    await page.getByLabel('Actions for A book project').click();
     await page.getByRole('menuitem', { name: 'Export JSON' }).click();
     await page.getByText('JSON report exported.').waitFor();
     const report = ReportSchema.parse(JSON.parse(await readFile(jsonFile, 'utf8')));
@@ -70,13 +70,13 @@ test('one handoff produces a brief with evidence, exports, restart, cancellation
     await app.evaluate(({ dialog }, file) => {
       dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath: file });
     }, markdown);
-    await page.getByLabel('More').click();
+    await page.getByLabel('Actions for A book project').click();
     await page.getByRole('menuitem', { name: 'Export Markdown' }).click();
     await page.getByText('Markdown report exported.').waitFor();
     const exported = await readFile(markdown, 'utf8');
     expect(exported).toContain('FIXTURE REPORT');
     expect(exported).not.toContain('## Estimation');
-    await page.getByLabel('More').click();
+    await page.getByLabel('Actions for A book project').click();
     await expect(page.getByRole('menuitem', { name: /Change branch/ })).toHaveCount(0);
     await page.screenshot({ path: info.outputPath('project-menu.png') });
     await page.getByRole('menuitem', { name: 'Project settings' }).click();
@@ -85,7 +85,7 @@ test('one handoff produces a brief with evidence, exports, restart, cancellation
     await expect(testing.getByRole('region', { name: 'Project verification' })).toBeVisible();
     await page.screenshot({ path: info.outputPath('testing-settings.png'), fullPage: true });
     await testing.getByRole('button', { name: 'Edit verification in chat' }).click();
-    const chat = page.getByRole('dialog', { name: 'Chat with Aiden' });
+    const chat = page.getByRole('tabpanel', { name: 'Chat' });
     await expect(chat.getByRole('button', { name: 'Check access & save' })).toHaveCount(0);
     await expect(chat.getByRole('button', { name: 'Save settings' })).toBeEnabled();
     expect(desktop.errors).toEqual([]);
@@ -93,6 +93,7 @@ test('one handoff produces a brief with evidence, exports, restart, cancellation
     desktop = await fixture.launch(info);
     ({ page, app } = desktop);
     await page.getByRole('button', { name: project, exact: true }).click();
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click();
     await page.getByRole('region', { name: 'Project connections' }).waitFor();
     expect(await fixture.calls()).toEqual(initialCalls);
     await writeFile(fixture.control, JSON.stringify({ pause: true }));
@@ -107,6 +108,7 @@ test('one handoff produces a brief with evidence, exports, restart, cancellation
     desktop = await fixture.launch(info);
     ({ page } = desktop);
     await page.getByRole('button', { name: project, exact: true }).click();
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click();
     await page.getByRole('region', { name: 'Project connections' }).waitFor();
     await expect(page.getByText(stoppedNote)).toBeVisible();
     expect(await fixture.calls()).toEqual(cancelledCalls);
@@ -150,6 +152,7 @@ test('quitting during a look preserves the last brief and waits for an explicit 
     await desktop.close();
     desktop = await fixture.launch(info);
     await desktop.page.getByRole('button', { name: 'A book project', exact: true }).click();
+    await desktop.page.getByRole('tab', { name: 'Overview', exact: true }).click();
     await desktop.page.getByRole('region', { name: 'Project connections' }).waitFor();
     expect(await fixture.calls()).toEqual(submitted);
     const recovered = await desktop.page.evaluate(

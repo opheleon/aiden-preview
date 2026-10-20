@@ -8,7 +8,6 @@ import type {
 import type { WorkerClient } from '../../../packages/core/src/client.js';
 import type { IpcAuthorization } from './desktop-ipc.js';
 const methods = new Set([
-  'discoverRepositories',
   'projects',
   'guide',
   'askGuide',
@@ -64,6 +63,7 @@ const methods = new Set([
   'integrationDisconnect',
   'integrationRemove',
   'updateSources',
+  'connectCode',
   'estimate',
   'estimation',
   'estimateOverrides',

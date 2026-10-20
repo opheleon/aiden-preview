@@ -10,7 +10,7 @@ Use the Node version in `.node-version` and exact pnpm version in `package.json`
 
 Run `pnpm check` before opening a PR and `pnpm test:desktop` for desktop changes. See the [README](../README.md#development) for individual commands. Tests use synthetic provider output; live checks require sign-in and spend quota. Never label fixture output as a live model result.
 
-Desktop screenshots and traces belong in ignored `test-results/`. Only deliberately selected documentation images belong in `docs/screenshots/`; the README uses `report-fixture.png`. CI uploads failure evidence.
+Desktop screenshots and traces belong in ignored `test-results/`. Only deliberately selected documentation images belong in `docs/screenshots/`; the README uses `start-screen.png` and `setup-chat.png`. CI uploads failure evidence.
 
 ## Coding standards
 

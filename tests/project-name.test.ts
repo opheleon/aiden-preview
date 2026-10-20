@@ -74,6 +74,9 @@ void test('legacy scope labels remain readable with long or empty intent', () =>
   );
   assert.equal(scopeName('Search by author'), 'Search by author');
   assert.equal(scopeName('  Calendar\n scheduling. More details.'), 'Calendar scheduling');
-  assert.equal(scopeName('x'.repeat(100)).length, 72);
-  assert.match(scopeName('A useful outcome with several words '.repeat(5)), /…$/);
+  assert.equal(scopeName('x'.repeat(100)).length, 71);
+  // Long names end at a word with no ellipsis; the sidebar fades them and the heading shows all.
+  const long = 'A useful outcome with several words, '.repeat(5);
+  assert.doesNotMatch(scopeName(long), /[…,]$/);
+  assert.equal(scopeName(long, undefined, true), long.replace(/\s+/g, ' ').trim());
 });

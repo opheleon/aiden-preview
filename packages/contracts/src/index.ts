@@ -16,6 +16,7 @@ export * from './ids.js';
 export * from './integrations.js';
 export * from './project-lifecycle.js';
 export * from './runtime.js';
+export type { IntegrationPreset } from './tracker-connections.js';
 export * from './verification.js';
 
 export const id = z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/);
@@ -46,6 +47,15 @@ export const ProductSchema = z
     deliveryPlan: DeliveryPlanSchema.optional(),
     /** Repositories this intent is about; absent means every repository in the project. */
     repositories: z.array(z.string().min(1).max(100)).min(1).max(100).optional(),
+    /**
+     * GitHub repositories, as owner/name, that the goal or its linked pages name as the code, so
+     * setup can connect them without asking. Absent when none were named.
+     */
+    namedRepositories: z
+      .array(z.string().regex(/^[\w.-]+\/[\w.-]+$/))
+      .min(1)
+      .max(20)
+      .optional(),
   })
   .strict()
   .superRefine((product, context) => {
@@ -65,6 +75,15 @@ export const ProjectSchema = z
           id,
           path: z.string().min(1),
           notes: z.string(),
+          /** Where Aiden cloned this repository from, for repositories connected by link. */
+          source: z
+            .object({
+              kind: z.literal('github'),
+              name: z.string().regex(/^[\w.-]+\/[\w.-]+$/),
+              url: z.string().url(),
+            })
+            .strict()
+            .optional(),
           monitoredBranch: z
             .object({
               remote: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/),

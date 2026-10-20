@@ -129,3 +129,14 @@
     justify-self: start;
   }
 }
+
+/* What the finding is, readable without hovering the badge. */
+.attention-main {
+  min-width: 0;
+}
+
+.attention-main .attention-summary {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+}

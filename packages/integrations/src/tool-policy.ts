@@ -1,4 +1,5 @@
-import { type McpTool } from '../../contracts/src/index.js';
+import { type McpConnection, type McpTool } from '../../contracts/src/index.js';
+import { notionContext, notionReadTools } from '../../contracts/src/tracker-connections.js';
 import { hash } from '../../core/src/storage.js';
 const WRITE_PATTERN =
   /(^|[_\-.])(create|update|delete|remove|write|set|save|add|edit|move|archive|restore|comment|assign|upload|send|publish)([_\-.]|$)/i;
@@ -46,4 +47,22 @@ export function toolFingerprint(tools: McpTool[]): string {
       }))
       .sort((a, b) => a.name.localeCompare(b.name)),
   );
+}
+
+/**
+ * On a new Notion connection, approve the read-only tools Aiden needs to read linked pages, fetch
+ * and search, and say so; every other tool stays unapproved. Other servers start with none.
+ * Example: a first Notion connection is saved with notion-fetch and notion-search approved.
+ */
+export function approveNeededReads(connection: McpConnection, tools: McpTool[]): void {
+  // Only the first look at a new connection; a later review is the person's own choice.
+  if (connection.toolFingerprint || connection.approvedTools.length || !notionContext(connection))
+    return;
+  const needed = new Set<string>(notionReadTools);
+  connection.approvedTools = tools
+    .filter((tool) => tool.readOnly && needed.has(tool.name))
+    .map((tool) => tool.name)
+    .sort();
+  if (connection.approvedTools.length)
+    connection.message = `Connected. Aiden reads linked pages with ${connection.approvedTools.join(' and ')}.`;
 }

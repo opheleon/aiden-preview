@@ -1,26 +1,45 @@
-import {
-  AlertTriangle,
-  Check,
-  FolderGit2,
-  FolderKanban,
-  RefreshCw,
-  ShieldCheck,
-} from 'lucide-react';
-import React from 'react';
+import { Check, FolderGit2, GitBranch, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
 
+import type { WorkerParams, WorkerResult } from '../../../../packages/contracts/src/api';
 import type { Project } from '../../../../packages/contracts/src/index';
+import { connectedRepositories, GithubRepositories } from '../components/GithubRepositories';
 
 interface RepositorySetupProps {
   project: Project;
   setProject: React.Dispatch<React.SetStateAction<Project>>;
+  setProjects: (projects: Project[]) => void;
   busy: boolean;
-  scanning: boolean;
-  scanProjectFolder: (choose?: boolean) => Promise<void>;
+  call: <K extends 'connectCode' | 'projects'>(
+    method: K,
+    params?: WorkerParams<K>,
+  ) => Promise<WorkerResult<K>>;
 }
 
-/** Review discovered repositories and branch notes before preparing requirements. */
+/**
+ * The project's GitHub repositories and their branch notes. Aiden keeps a read-only copy of each;
+ * saving the list clones new ones and starts a check without rewriting the requirements.
+ */
 export function RepositorySetup(props: RepositorySetupProps): React.JSX.Element {
-  const { project, setProject, busy, scanning, scanProjectFolder } = props;
+  const { project, setProject, busy } = props;
+  const [repositories, setRepositories] = useState(() => connectedRepositories(project));
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  /** Clone or refresh the listed repositories and save them as the project's code. */
+  async function save(): Promise<void> {
+    setSaving(true);
+    setMessage('');
+    try {
+      const result = await props.call('connectCode', { projectId: project.id, repositories });
+      setProject((current) => ({ ...current, repositories: result.repositories }));
+      props.setProjects(await props.call('projects'));
+      setMessage(result.runId ? 'Repositories saved. Aiden is checking the code.' : 'Saved.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not save the repositories.');
+    } finally {
+      setSaving(false);
+    }
+  }
   return (
     <section className="card">
       <div className="card-heading">
@@ -28,8 +47,11 @@ export function RepositorySetup(props: RepositorySetupProps): React.JSX.Element 
           <FolderGit2 size={19} />
         </div>
         <div>
-          <h2>Project workspace</h2>
-          <p>Choose one folder. Aiden finds the Git repositories inside it.</p>
+          <h2>Code</h2>
+          <p>
+            The GitHub repositories for this project. Aiden keeps its own read-only copy of each and
+            reads the monitored branch. Each project gets its own fresh copies.
+          </p>
         </div>
       </div>
       <label>
@@ -40,78 +62,24 @@ export function RepositorySetup(props: RepositorySetupProps): React.JSX.Element 
           onChange={(e) => setProject({ ...project, name: e.target.value })}
         />
       </label>
-      <div className="label-row">
-        <span>Project folder</span>
-        <span>One folder for this project</span>
+      <GithubRepositories
+        value={repositories}
+        onChange={setRepositories}
+        disabled={busy || saving}
+      />
+      <div className="button-row">
+        <button className="secondary" disabled={busy || saving} onClick={() => void save()}>
+          <GitBranch size={15} /> {saving ? 'Copying repositories…' : 'Save repositories'}
+        </button>
       </div>
-      {project.rootPath && (
-        <div className="repo project-root" data-testid="project-root">
-          <div className="repo-heading">
-            <FolderKanban size={19} />
-            <div>
-              <strong>{project.rootPath.split(/[\\/]/).at(-1) || project.rootPath}</strong>
-              <small title={project.rootPath}>{project.rootPath}</small>
-            </div>
-          </div>
-        </div>
-      )}
-      {!project.rootPath && project.repositories.length > 0 && (
-        <p className="inline-note">
-          This saved project uses individually selected repositories. Choose their parent folder to
-          use one project folder, or continue with the saved selection.
-        </p>
-      )}
-      <button
-        className="add-repo"
-        disabled={busy || scanning}
-        onClick={() => void scanProjectFolder(true)}
-      >
-        <FolderKanban size={17} />
-        {scanning
-          ? 'Finding repositories…'
-          : project.rootPath
-            ? 'Change project folder'
-            : 'Choose project folder'}
-      </button>
-      {(project.rootPath || project.repositories.length > 0) && (
-        <>
-          <div className="label-row">
-            <span>Repositories included · {project.repositories.length}</span>
-            {project.rootPath && (
-              <button
-                className="text-button"
-                disabled={busy || scanning}
-                onClick={() => void scanProjectFolder()}
-              >
-                <RefreshCw size={13} /> Rescan folder
-              </button>
-            )}
-          </div>
-          <p className="inline-note">
-            All repositories listed below are assessed as one project. Branches and history stay
-            separate. Rescan to discover added or moved repositories.
-          </p>
-        </>
-      )}
-      {project.discoveryWarnings?.map((warning) => (
-        <div className="callout warning" role="status" key={warning}>
-          <AlertTriangle size={16} />
-          <div>{warning}</div>
-        </div>
-      ))}
+      {message && <p role="status">{message}</p>}
       {project.repositories.map((r, i) => (
         <div className="repo" key={r.id} data-testid="discovered-repository">
           <div className="repo-heading">
             <FolderGit2 size={17} />
             <div>
-              <strong>{r.path.split(/[\\/]/).at(-1)}</strong>
-              <small title={r.path}>
-                {project.rootPath
-                  ? r.path === project.rootPath
-                    ? 'Project root'
-                    : r.path.slice(project.rootPath === '/' ? 1 : project.rootPath.length + 1)
-                  : r.path}
-              </small>
+              <strong>{r.source?.name ?? r.path.split(/[\\/]/).at(-1)}</strong>
+              <small title={r.source?.url ?? r.path}>{r.source?.url ?? r.path}</small>
             </div>
             <Check size={15} aria-label="Included" />
           </div>

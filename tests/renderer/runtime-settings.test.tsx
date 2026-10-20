@@ -254,6 +254,72 @@ test('account switching guidance names the selected provider', () => {
   expect(screen.queryByText(/Claude accounts/)).toBeNull();
   rerender(<RuntimeSettings runtime={{ provider: 'claude', auth: 'subscription' }} {...props} />);
   expect(
-    screen.getByText(/To switch Claude accounts, sign in again through Claude Code/),
+    screen.getByText(/To switch Claude accounts, choose Sign in with Claude again/),
   ).toBeVisible();
+});
+
+test('Claude sign-in opens Claude Code login, then rechecks until the subscription connects', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const request = vi.fn((method: string) => Promise.resolve(method === 'models' ? [] : {}));
+  const refresh = vi.fn().mockResolvedValue(undefined);
+  const signedOut = {
+    provider: 'claude' as const,
+    installed: true,
+    ready: false,
+    subscription: false,
+    subscriptionState: 'sign_in_required' as const,
+    apiKey: false,
+    message: 'Sign in to Claude Code with your paid Claude plan.',
+  };
+  const props = {
+    runtime: { provider: 'claude' as const, auth: 'subscription' as const },
+    api: { request } as unknown as DesktopBridge,
+    onChange: vi.fn(),
+    onRefresh: refresh,
+  };
+  const { rerender } = render(<RuntimeSettings {...props} diagnostics={[signedOut]} />);
+  expect(screen.getByText(/A Terminal window opens with Claude Code sign-in/)).toBeVisible();
+  expect(screen.queryByText('claude auth login --claudeai')).toBeNull();
+  await userEvent.click(screen.getByRole('button', { name: 'Sign in with Claude' }));
+  expect(request).toHaveBeenCalledWith('login', { provider: 'claude' });
+  expect(screen.getByRole('button', { name: 'Waiting for sign-in…' })).toBeDisabled();
+  await act(() => vi.advanceTimersByTimeAsync(5000));
+  expect(refresh).toHaveBeenCalled();
+  rerender(
+    <RuntimeSettings
+      {...props}
+      diagnostics={[
+        { ...signedOut, ready: true, subscription: true, subscriptionState: 'authenticated' },
+      ]}
+    />,
+  );
+  expect(await screen.findByText('Claude is connected. You can start a project.')).toBeVisible();
+  expect(screen.getByText('Subscription credentials available')).toBeVisible();
+  vi.useRealTimers();
+});
+
+test('missing Claude Code offers only the official installation guide', async () => {
+  const openExternal = vi.fn().mockResolvedValue(undefined);
+  render(
+    <RuntimeSettings
+      runtime={{ provider: 'claude', auth: 'subscription' }}
+      diagnostics={[
+        {
+          provider: 'claude',
+          installed: false,
+          ready: false,
+          subscription: false,
+          subscriptionState: 'unavailable',
+          apiKey: false,
+          message: 'Claude runtime unavailable. Install Claude Code, then check connection.',
+        },
+      ]}
+      api={{ request: vi.fn().mockResolvedValue([]), openExternal } as unknown as DesktopBridge}
+      onChange={vi.fn()}
+      onRefresh={() => Promise.resolve()}
+    />,
+  );
+  expect(screen.queryByRole('button', { name: 'Sign in with Claude' })).toBeNull();
+  await userEvent.click(screen.getByRole('button', { name: 'Claude Code installation guide' }));
+  expect(openExternal).toHaveBeenCalledWith('https://docs.claude.com/en/docs/claude-code/setup');
 });

@@ -137,6 +137,11 @@ function activity(state: EventContext, event: RunEvent): void {
       .catch(failed(state, 'Could not load calls.'));
 }
 
+/** The connected repositories as one comparable string of IDs. */
+function repositoryKey(repositories: { id: string }[]): string {
+  return repositories.map((r) => r.id).join(',');
+}
+
 /** Follow a running run: its stage, live line, and any criterion a verification just finished. */
 function progress(state: EventContext, event: RunEvent): void {
   // Keep the run's stage tracker in step with the worker between full refreshes.
@@ -146,7 +151,16 @@ function progress(state: EventContext, event: RunEvent): void {
     void state
       .call('state', { projectId: state.projectId })
       .then((saved) => {
-        if (state.current()) state.setRuns(withLiveStages(saved.runs, state.stages));
+        if (!state.current()) return;
+        state.setRuns(withLiveStages(saved.runs, state.stages));
+        // A run the chat started can follow new code, such as repositories the Guide connected;
+        // pick those up without touching other unsaved edits.
+        state.setProject((current) =>
+          current.id === saved.project.id &&
+          repositoryKey(current.repositories) !== repositoryKey(saved.project.repositories)
+            ? { ...current, repositories: saved.project.repositories }
+            : current,
+        );
       })
       .catch(failed(state, 'Could not refresh runs.'));
   }

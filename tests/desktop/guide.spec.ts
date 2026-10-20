@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test';
 
 import { desktopFixture } from './journey-fixture.js';
 
-test('intent-only setup uses the shared chat, saves web settings, and restores the underlying page', async ({
+test('intent-only setup opens on the Chat tab, saves web settings, and keeps the draft across pages', async ({
   browserName,
 }, info) => {
   info.annotations.push({ type: 'browser engine', description: browserName });
@@ -38,13 +38,13 @@ test('intent-only setup uses the shared chat, saves web settings, and restores t
     const { page } = desktop;
     await page.getByLabel('What are you building?').fill('Users can list and create books.');
     await page.getByRole('button', { name: /Hand it to Aiden/ }).click();
-    const chat = page.getByRole('dialog', { name: 'Chat with Aiden' });
+    const chat = page.getByRole('tabpanel', { name: 'Chat' });
     await expect(chat).toBeVisible();
-    await expect(chat.getByRole('list', { name: 'Setup' })).toBeVisible();
+    await expect(chat.getByRole('region', { name: 'Project setup' })).toBeVisible();
     await expect(chat.getByRole('status', { name: 'Setup status' })).toHaveText(
       'Setup not complete',
     );
-    await expect(chat.getByRole('button', { name: 'Close chat' })).toBeInViewport();
+    await expect(chat.getByLabel('Message the Guide')).toBeInViewport();
     const thinking = chat.getByRole('status', { name: 'Aiden is thinking' });
     await expect(thinking).toHaveText('Thinking');
     const label = thinking.locator('span');
@@ -63,40 +63,37 @@ test('intent-only setup uses the shared chat, saves web settings, and restores t
       chat.getByText('Synthetic setup playback. Check these requirements.'),
     ).toBeVisible();
     await expect(thinking).not.toBeVisible();
-    await chat.getByRole('button', { name: 'Back', exact: true }).click();
-    await page.getByRole('button', { name: 'Open the Guide', exact: true }).click();
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click();
+    await page.getByRole('button', { name: 'Go to Chat', exact: true }).click();
     await expect(chat.getByRole('button', { name: 'Looks right' })).toBeVisible();
     await expect(chat.getByRole('region', { name: 'Change project scope' })).toHaveCount(0);
-    const composerBounds = await chat.getByLabel('Message the Guide').boundingBox();
-    await chat.getByRole('button', { name: 'About Choose checks' }).hover();
-    const tooltip = chat.getByRole('tooltip', { name: 'About Choose checks' });
-    await expect(tooltip).toBeVisible();
-    expect(await chat.getByLabel('Message the Guide').boundingBox()).toEqual(composerBounds);
-    await tooltip.hover();
-    await expect(tooltip).toBeVisible();
+    // Setup is one compact line; Show steps opens every step and what it involves.
+    await chat.getByRole('button', { name: 'Show steps' }).click();
+    await expect(
+      chat.getByText(/Review the requirements and resolve any open questions/),
+    ).toBeVisible();
+    await expect(chat.getByText(/Choose code, web, API, or manual checks/)).toBeVisible();
     await page.screenshot({
-      path: info.outputPath('setup-step-tooltip.png'),
+      path: info.outputPath('setup-step-explanations.png'),
       animations: 'disabled',
     });
     await page.setViewportSize({ width: 600, height: 800 });
-    await chat.getByRole('button', { name: 'About Choose checks' }).hover();
-    await expect(tooltip).toBeInViewport();
-    const tooltipBounds = await tooltip.boundingBox();
-    expect(tooltipBounds!.x).toBeGreaterThanOrEqual(0);
-    expect(tooltipBounds!.x + tooltipBounds!.width).toBeLessThanOrEqual(600);
     await expect(chat.getByLabel('Message the Guide')).toBeInViewport();
     expect(await chat.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
     await page.screenshot({
-      path: info.outputPath('setup-step-tooltip-narrow.png'),
+      path: info.outputPath('setup-step-explanations-narrow.png'),
       animations: 'disabled',
     });
-    await page.keyboard.press('Escape');
-    await expect(tooltip).not.toBeVisible();
+    await chat.getByRole('button', { name: 'Hide steps' }).click();
     await expect(chat).toBeVisible();
     await page.setViewportSize({ width: 1320, height: 868 });
     await page.screenshot({ path: info.outputPath('01-setup-chat.png') });
     await reply('verify-options', 'Synthetic verification choice. How should I check the work?');
     await chat.getByRole('button', { name: 'Looks right' }).click();
+    // Without a code folder, the next step recommends connecting code; this journey continues without it.
+    await expect(chat.getByRole('region', { name: 'Connect your code' })).toBeVisible();
+    await page.screenshot({ path: info.outputPath('02-connect-code.png') });
+    await chat.getByRole('button', { name: 'No code yet' }).click();
     await page.screenshot({ path: info.outputPath('02-checklist.png') });
     await chat.getByRole('checkbox', { name: /Web app/ }).click();
     await chat.getByLabel('Where does the app run?').fill(`${url}/unavailable`);
@@ -110,40 +107,48 @@ test('intent-only setup uses the shared chat, saves web settings, and restores t
     await chat.getByRole('button', { name: 'Confirm setup', exact: true }).click();
     await chat.getByRole('button', { name: 'Later', exact: true }).click();
     await expect(chat.getByText(/Setup complete/)).toBeVisible();
-    await chat.getByRole('button', { name: 'Setup details' }).click();
-    await chat.getByRole('button', { name: 'About First check' }).hover();
-    await expect(chat.getByRole('tooltip', { name: 'About First check' })).toBeVisible();
-    await chat.getByRole('button', { name: 'Setup details' }).click();
+    await chat.getByRole('button', { name: 'Show steps' }).click();
+    await expect(chat.getByRole('list', { name: 'Setup' })).toBeVisible();
+    await chat.getByRole('button', { name: 'Hide steps' }).click();
     await chat.getByLabel('Message the Guide').fill('Keep this draft');
     await page.screenshot({ path: info.outputPath('02-setup-complete.png') });
-    await chat.getByRole('button', { name: 'Close chat', exact: true }).click();
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click();
     await expect(chat).not.toBeVisible();
     await page.getByRole('button', { name: 'Settings', exact: true }).first().click();
     await page.getByRole('button', { name: 'Edit verification in chat' }).click();
     await expect(chat.getByLabel('Where does the app run?')).toHaveValue(`${url}/`);
-    await chat.getByRole('button', { name: 'Back' }).click();
-    await page.getByRole('button', { name: 'Ask Aiden about this project' }).click();
-    await expect(chat.getByLabel('Message the Guide')).toHaveValue('Keep this draft');
-    await page.keyboard.press('Escape');
-    await expect(chat).not.toBeVisible();
+    await page.getByRole('button', { name: 'Settings', exact: true }).first().click();
     await expect(page.getByRole('heading', { name: /Application settings/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Ask Aiden about this project' })).toBeFocused();
+    await page.getByRole('button', { name: 'A book project', exact: true }).click();
+    await expect(chat.getByLabel('Message the Guide')).toHaveValue('Keep this draft');
     expect(await fixture.calls()).not.toContain('assess');
-    await reply('choose-folder', 'Synthetic reply: connect the project folder here.');
-    await page.getByRole('button', { name: 'Ask Aiden about this project' }).click();
-    await chat.getByLabel('Message the Guide').fill('Connect my code');
-    await chat.getByRole('button', { name: 'Send', exact: true }).click();
-    await desktop.app.evaluate(({ dialog }, folder) => {
-      dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [folder] });
-    }, fixture.root);
-    await chat.getByRole('button', { name: 'Choose the folder', exact: true }).click();
-    await expect(chat.getByText(/Found 2 repositories/)).toBeVisible();
-    await reply(
-      'confirm-requirements',
-      'Synthetic reply: code connected, review the updated requirements.',
+    await writeFile(
+      fixture.control,
+      JSON.stringify({
+        guideReply: {
+          reply: 'Synthetic reply: copying acme/frontend and acme/backend.',
+          widgets: [{ type: 'connect-code', recommended: null, url: null, link: null }],
+          actions: [
+            {
+              type: 'connect-repositories',
+              owner: 'acme',
+              repositories: ['frontend', 'backend'],
+              url: null,
+              allowMutations: null,
+              manual: null,
+              context: null,
+              step: null,
+            },
+          ],
+        },
+      }),
     );
-    await chat.getByRole('button', { name: 'Check access' }).click();
-    await chat.getByRole('button', { name: 'Confirm setup' }).click();
+    await page.getByRole('button', { name: 'A book project', exact: true }).click();
+    await chat.getByLabel('Message the Guide').fill('It is under acme; just frontend and backend.');
+    await chat.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(
+      chat.getByText(/Connected acme\/frontend, acme\/backend from GitHub/),
+    ).toBeVisible();
     await expect.poll(async () => (await fixture.calls()).includes('assess')).toBe(true);
     await expect(chat.getByRole('region', { name: 'Code check results' })).toBeVisible();
     await expect(chat).toBeVisible();
@@ -158,13 +163,15 @@ test('intent-only setup uses the shared chat, saves web settings, and restores t
     await expect(chat.getByRole('status', { name: 'Setup status' })).toContainText(
       'Setup complete',
     );
-    await expect(chat.getByRole('button', { name: 'Close chat', exact: true })).toBeInViewport();
+    await expect(chat.getByLabel('Message the Guide')).toBeInViewport();
     await page.screenshot({
       path: info.outputPath('03-check-results-in-chat.png'),
       animations: 'disabled',
     });
-    await chat.getByRole('button', { name: 'Close chat', exact: true }).click();
-    await expect(chat).not.toBeVisible();
+    // The finished check is saved in the thread, and the Overview links back to it.
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click();
+    await page.getByRole('button', { name: 'View results in chat', exact: true }).click();
+    await expect(chat.getByRole('region', { name: 'Code check results' })).toBeInViewport();
     expect(desktop.errors).toEqual([]);
   } finally {
     await desktop.close();
@@ -217,7 +224,7 @@ test('clarification is a conversation with one composer and review comes before 
     const { page } = desktop;
     await page.getByLabel('What are you building?').fill('Users can list and create books.');
     await page.getByRole('button', { name: /Hand it to Aiden/ }).click();
-    const chat = page.getByRole('dialog', { name: 'Chat with Aiden' });
+    const chat = page.getByRole('tabpanel', { name: 'Chat' });
     await expect(chat.getByRole('status', { name: 'Aiden is thinking' })).toBeVisible();
     await expect(chat.getByRole('group', { name: 'Answer choices' })).toHaveCount(0);
     await expect(
@@ -239,8 +246,8 @@ test('clarification is a conversation with one composer and review comes before 
       'aria-pressed',
       'true',
     );
-    await chat.getByRole('button', { name: 'Back', exact: true }).click();
-    await page.getByRole('button', { name: 'Ask Aiden', exact: true }).click();
+    await page.getByRole('tab', { name: 'Scope', exact: true }).click();
+    await page.getByRole('tab', { name: 'Chat', exact: true }).click();
     await expect(chat.getByLabel('Message the Guide')).toHaveValue('');
     await expect(chat.getByRole('button', { name: 'Day', exact: true })).toHaveAttribute(
       'aria-pressed',

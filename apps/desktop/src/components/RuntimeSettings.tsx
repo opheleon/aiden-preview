@@ -4,6 +4,8 @@ import { type JSX, useCallback, useEffect, useRef, useState } from 'react';
 import type { RuntimeDiagnostic, RuntimeModel } from '../../../../packages/contracts/src/api';
 import type { RuntimeConfig } from '../../../../packages/contracts/src/index';
 import type { DesktopBridge } from '../bridge';
+import { runtimeReady } from '../renderer/runtime-readiness';
+import { ClaudeSignIn } from './ClaudeSignIn';
 import { EffortSelector } from './EffortSelector';
 
 /** Provider controls and callbacks scoped to a project's chosen authentication profile. */
@@ -39,8 +41,7 @@ function RuntimeProfile({
   const [error, setError] = useState('');
   const generation = useRef(0);
   const status = diagnostics.find((d) => d.provider === runtime.provider);
-  const ready =
-    !!status?.installed && (runtime.auth === 'subscription' ? status.subscription : status.apiKey);
+  const ready = !!runtimeReady(diagnostics, runtime);
   const { provider, auth } = runtime;
   /** Load models for this credential profile, ignoring superseded requests and unmounts. */
   const requestModels = useCallback((): Promise<void> => {
@@ -138,7 +139,7 @@ function RuntimeProfile({
       <p className="fine-print">
         Subscription uses the provider’s currently signed-in account.{' '}
         {runtime.provider === 'claude'
-          ? 'To switch Claude accounts, sign in again through Claude Code.'
+          ? 'To switch Claude accounts, choose Sign in with Claude again.'
           : 'To switch Codex accounts, choose Sign in with Codex again.'}{' '}
         Check connection refreshes status and models without changing your selection. Aiden never
         switches authentication methods automatically. Provider limits and charges may apply.
@@ -253,12 +254,13 @@ function AuthenticationControls({
           </button>
         </>
       ) : runtime.provider === 'claude' ? (
-        <div aria-live="polite" data-testid="claude-connection">
-          <p>{status?.message ?? 'Checking Claude subscription sign-in…'}</p>
-          {status?.subscriptionState === 'sign_in_required' && (
-            <code>claude auth login --claudeai</code>
-          )}
-        </div>
+        <ClaudeSignIn
+          status={status}
+          api={api}
+          action={action}
+          onRefresh={onRefresh}
+          setMessage={setMessage}
+        />
       ) : (
         <button
           className="secondary"

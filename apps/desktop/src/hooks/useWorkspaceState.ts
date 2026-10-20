@@ -26,7 +26,6 @@ function useProjectState() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [diagnostics, setDiagnostics] = useState<RuntimeDiagnostic[]>([]);
   const [busy, setBusy] = useState(false);
-  const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
   const [live, setLive] = useState('');
   /** The latest step of each run this window has seen, for live run lists. */
@@ -55,8 +54,6 @@ function useProjectState() {
     setDiagnostics,
     busy,
     setBusy,
-    scanning,
-    setScanning,
     error,
     setError,
     live,

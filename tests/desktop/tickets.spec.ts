@@ -49,6 +49,7 @@ test('an existing plan can connect later, publish, and resync its linked tickets
     });
     await page.reload();
     await page.getByRole('button', { name: 'A book project', exact: true }).first().click();
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click();
     await page.getByRole('button', { name: 'Tickets', exact: true }).click();
     const tickets = page.getByRole('dialog', { name: 'Tickets' });
     await page.getByRole('button', { name: 'Connect tracker', exact: true }).click();

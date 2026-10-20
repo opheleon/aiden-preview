@@ -1,20 +1,17 @@
-import { useState } from 'react';
-
+import { useProjectGuide } from '../components/ProjectGuide';
 import type { ProjectTab } from '../components/ProjectTabs';
-import type { Workspace } from './useWorkspace';
 
-/** The selected project tab, independent of the project chat overlay. */
+/** The selected project tab and how to change it. */
 export type ProjectTabState = {
   tab: ProjectTab;
   select: (next: ProjectTab) => void;
 };
 
-/** Remember the selected project section while chat opens and closes above it. */
-export function useProjectTab(workspace: Workspace, coding: boolean): ProjectTabState {
-  const [selected, setSelected] = useState<Record<string, ProjectTab>>({});
-  const saved = selected[workspace.project.id] ?? 'overview';
-  return {
-    tab: saved === 'coding' && !coding ? 'overview' : saved,
-    select: (next) => setSelected((current) => ({ ...current, [workspace.project.id]: next })),
-  };
+/**
+ * The selected project section, kept per project while the person visits other pages. A Coding
+ * selection falls back to Chat when coding delivery is off.
+ */
+export function useProjectTab(coding: boolean): ProjectTabState {
+  const { tab, selectTab } = useProjectGuide();
+  return { tab: tab === 'coding' && !coding ? 'chat' : tab, select: selectTab };
 }

@@ -16,6 +16,7 @@ import {
 import type { DeliveryFeature, Product } from '../../packages/contracts/src/index';
 import { appFixture } from './app-fixture';
 import { report } from './fixtures';
+import { selectTab } from './project-tabs';
 
 const f = appFixture();
 const { default: App } = await import('../../apps/desktop/src/App');
@@ -45,6 +46,7 @@ test('planned projects show one ordered work hierarchy and actions remain inside
   f.setReport({ ...report, baseline: product });
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  await selectTab('Overview');
   expect(screen.getByRole('progressbar')).toBeVisible();
   expect(screen.getByRole('region', { name: 'Browse books' })).toBeVisible();
   expect(screen.getByText('Remaining effort:')).toBeVisible();
@@ -53,15 +55,9 @@ test('planned projects show one ordered work hierarchy and actions remain inside
   expect(browse).toHaveTextContent('Delivery deviation');
   const create = screen.getByRole('region', { name: 'Create books' });
   expect(create).toHaveTextContent('Waiting on prerequisites');
-  // The outcome and rationale wait behind the (i) button instead of taking a paragraph each.
-  expect(within(browse).queryByText('Find a book in the library.')).toBeNull();
-  await userEvent.click(within(browse).getByRole('button', { name: 'About F-1' }));
+  // The outcome is in plain view; the rationale is part of the opened row.
   expect(within(browse).getByText('Find a book in the library.')).toBeVisible();
-  expect(within(browse).getByText('Deliver reading before editing.')).toBeVisible();
-  expect(within(browse).getByRole('button', { name: 'About F-1' })).toHaveAttribute(
-    'aria-expanded',
-    'true',
-  );
+  expect(within(browse).getByText('Deliver reading before editing.')).not.toBeVisible();
   expect(browse.querySelector('details')).not.toHaveAttribute('open');
   await userEvent.click(within(browse).getByRole('heading', { name: 'F-1 Browse books' }));
   await userEvent.click(within(create).getByRole('heading', { name: 'F-2 Create books' }));
@@ -229,6 +225,7 @@ test('a blocking decision pauses its feature, dependents wait on it, and tickets
   Object.assign(navigator, { clipboard: { writeText: copy } });
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  await selectTab('Overview');
   await userEvent.click(screen.getByRole('tab', { name: 'Scope' }));
   const browse = await screen.findByRole('region', { name: 'Browse books' });
   const create = screen.getByRole('region', { name: 'Create books' });
@@ -259,12 +256,20 @@ test('a blocking decision pauses its feature, dependents wait on it, and tickets
   expect(ticket).not.toContain('dependent editing wait');
 });
 
-test('project tabs keep history out of the overview and support keyboard navigation', async () => {
+test('a project opens on Chat first, and the tabs keep history out of the overview', async () => {
   f.reset();
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  const tabs = within(screen.getByRole('tablist', { name: 'Project sections' })).getAllByRole(
+    'tab',
+  );
+  expect(tabs.map((tab) => tab.textContent)).toEqual(['Chat', 'Overview', 'Scope', 'Activity']);
+  const chat = screen.getByRole('tab', { name: 'Chat' });
+  expect(chat).toHaveAttribute('aria-selected', 'true');
+  expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Chat');
+  expect(screen.queryByRole('button', { name: 'Ask Aiden' })).toBeNull();
   const overview = screen.getByRole('tab', { name: 'Overview' });
-  expect(overview).toHaveAttribute('aria-selected', 'true');
+  await userEvent.click(overview);
   expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Overview');
   expect(screen.queryByRole('region', { name: 'Activity' })).toBeNull();
   expect(screen.queryByRole('tab', { name: 'Coding' })).toBeNull();
@@ -275,7 +280,9 @@ test('project tabs keep history out of the overview and support keyboard navigat
   await userEvent.keyboard('{End}');
   expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Activity');
   expect(screen.getByRole('region', { name: 'Activity' })).toBeVisible();
-  await userEvent.keyboard('{Home}{ArrowLeft}');
+  await userEvent.keyboard('{Home}');
+  expect(chat).toHaveFocus();
+  await userEvent.keyboard('{ArrowLeft}');
   expect(screen.getByRole('tab', { name: 'Activity' })).toHaveFocus();
   await userEvent.click(overview);
   expect(screen.getByRole('region', { name: 'Status' })).toBeVisible();
@@ -326,6 +333,7 @@ test('a decision on a later step keeps the current focus and says other steps ar
   ]);
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  await selectTab('Overview');
   const status = await screen.findByRole('region', { name: 'Status' });
   expect(status).toHaveTextContent('Current focus: Browse books.');
   expect(status).toHaveTextContent('Other steps wait on decisions in Needs you.');

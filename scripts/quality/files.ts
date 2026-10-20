@@ -11,13 +11,15 @@ const ignored = new Set([
   'test-results',
   'playwright-report',
 ]);
+/** Nested checkouts of other branches, such as agent worktrees, are not this repository's files. */
+const ignoredPaths = new Set([path.join('.claude', 'worktrees')]);
 
 /** Enumerate handwritten repository files, including new files not yet staged in Git. */
 export async function repositoryFiles(root = '.'): Promise<string[]> {
   const files: string[] = [];
   for (const entry of await readdir(root, { withFileTypes: true })) {
-    if (ignored.has(entry.name) || entry.isSymbolicLink()) continue;
     const name = path.join(root, entry.name);
+    if (ignored.has(entry.name) || ignoredPaths.has(name) || entry.isSymbolicLink()) continue;
     if (entry.isDirectory()) files.push(...(await repositoryFiles(name)));
     else files.push(name.replaceAll(path.sep, '/'));
   }

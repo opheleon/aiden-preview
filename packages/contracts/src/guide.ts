@@ -13,6 +13,7 @@ export const helpLinks = {
 export const SetupStepIdSchema = z.enum([
   'understand',
   'confirm',
+  'code',
   'verify',
   'first-check',
   'extras',
@@ -31,6 +32,8 @@ export type VerifyMethod = z.infer<typeof VerifyMethodSchema>;
  */
 export const GuideWidgetSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('confirm-requirements') }).strict(),
+  /** What code is connected, with a way to continue without code. */
+  z.object({ type: z.literal('connect-code') }).strict(),
   z
     .object({ type: z.literal('verify-options'), recommended: VerifyMethodSchema.optional() })
     .strict(),
@@ -89,10 +92,66 @@ export const GuideActionSchema = z.discriminatedUnion('type', [
     .object({ type: z.literal('update-intent'), context: z.string().trim().min(1).max(20000) })
     .strict(),
   z.object({ type: z.literal('run-check') }).strict(),
+  /** Size the work again from the agreed requirements and the latest code check. */
+  z.object({ type: z.literal('re-estimate') }).strict(),
+  /**
+   * Copy repositories from one GitHub account into the project, read-only. An empty list means
+   * all of the account's active repositories, newest first, up to a cap.
+   */
+  z
+    .object({
+      type: z.literal('connect-repositories'),
+      owner: z
+        .string()
+        .trim()
+        .regex(/^[\w.-]+$/)
+        .max(100),
+      repositories: z
+        .array(
+          z
+            .string()
+            .trim()
+            .regex(/^[\w.-]+$/)
+            .max(100),
+        )
+        .max(30),
+    })
+    .strict(),
   z.object({ type: z.literal('skip-step'), step: SetupStepIdSchema }).strict(),
 ]);
 /** One setup change the Guide asked Aiden to make. */
 export type GuideAction = z.infer<typeof GuideActionSchema>;
+
+/**
+ * Up to five short, ordered steps that follow an answer, each naming the control to use.
+ * Example: ["Open Settings, then Model.", "Select Sign in with Claude."].
+ */
+export const GuideNextStepsSchema = z.array(z.string().trim().min(1).max(200)).max(5);
+
+/**
+ * A finished check saved into the conversation, so its outcome stays in the thread after later
+ * checks or scope changes replace the live results. One item per requirement or criterion.
+ * Example: { kind: 'app', runId: 'r1', items: [{ requirementId: 'REQ-1', label: 'Books list', status: 'passed' }] }.
+ */
+export const GuideCheckResultSchema = z
+  .object({
+    kind: z.enum(['app', 'code']),
+    runId: z.string().min(1).max(200),
+    items: z
+      .array(
+        z
+          .object({
+            requirementId: z.string().min(1).max(100),
+            label: z.string().trim().min(1).max(400),
+            status: z.enum(['passed', 'failed', 'unverified']),
+          })
+          .strict(),
+      )
+      .max(50),
+  })
+  .strict();
+/** One saved check result. */
+export type GuideCheckResult = z.infer<typeof GuideCheckResultSchema>;
 
 /**
  * One line in a project's Guide conversation. `event` lines are facts the app wrote, such as a
@@ -104,6 +163,8 @@ export const GuideMessageSchema = z
     from: z.enum(['you', 'aiden', 'event']),
     text: z.string().trim().min(1).max(4000),
     widgets: z.array(GuideWidgetSchema).max(4).optional(),
+    nextSteps: GuideNextStepsSchema.optional(),
+    result: GuideCheckResultSchema.optional(),
   })
   .strict();
 /** One Guide message. */
@@ -130,6 +191,8 @@ export const SetupStateSchema = z
     skipped: z.array(SetupStepIdSchema).default([]),
     /** The newest finished check the Guide has already announced in its thread. */
     announcedRunId: z.string().min(1).optional(),
+    /** When the person confirmed how Aiden checks the work, so connected code alone never skips it. */
+    checksConfirmedAt: z.string().datetime().optional(),
     /** Successful access checks, keyed by method and bound to the exact saved public target. */
     verifiedTargets: z.record(z.string()).optional(),
   })
@@ -190,7 +253,10 @@ export const methodNames: Record<VerifyMethod, string> = {
 /** Explain the understanding stage while questions or a scope rewrite are still pending. */
 function understandingDetail(facts: SetupFacts): string {
   if (facts.clarificationCount) return 'Answer the questions in this chat.';
-  if (facts.requirementsPending) return 'Updating the requirements with your answers.';
+  if (facts.requirementsPending)
+    return facts.baselineId
+      ? 'Updating the requirements with your answers.'
+      : 'Writing the requirements.';
   return facts.baselineId ? 'Requirements written.' : 'Reading what you sent.';
 }
 
@@ -205,6 +271,33 @@ function requirementsConfirmed(facts: SetupFacts): boolean {
   );
 }
 
+/** The one-line detail each setup step shows for the saved facts. */
+function stepDetails(
+  facts: SetupFacts,
+  methods: VerifyMethod[],
+  done: Record<SetupStepId, boolean>,
+): Record<SetupStepId, string> {
+  return {
+    understand: understandingDetail(facts),
+    confirm: done.confirm ? 'You confirmed the requirements.' : 'Check that Aiden understood you.',
+    code: facts.repositories
+      ? `${facts.repositories} ${facts.repositories === 1 ? 'repository' : 'repositories'} connected.`
+      : 'Tell Aiden which GitHub organization holds the code.',
+    verify:
+      methods.length && !done.verify
+        ? methods.every((m) => m === 'code')
+          ? 'Code checks are on. Choose any other checks, then confirm.'
+          : 'Check access to the selected verification methods.'
+        : methods.length
+          ? `Using ${methods.map((m) => methodNames[m]).join(', ')}.`
+          : 'Choose how Aiden checks the work.',
+    'first-check': facts.completedChecks
+      ? `${facts.completedChecks} ${facts.completedChecks === 1 ? 'check' : 'checks'} finished.`
+      : 'Run the first check.',
+    extras: facts.trackerLinked ? 'Ticket tracker linked.' : 'Optional: link a ticket tracker.',
+  };
+}
+
 /**
  * Derive setup progress from saved facts only, so setup resumes wherever the person left it, even
  * after changing something in Settings. Confirmation counts only for the current requirements.
@@ -215,36 +308,29 @@ export function setupProgress(facts: SetupFacts): SetupProgress {
   const methods = savedMethods(facts);
   const scopeReady = !facts.clarificationCount && !facts.requirementsPending;
   const confirmed = requirementsConfirmed(facts);
+  const ready =
+    methods.length > 0 &&
+    methods.every((method) => !facts.readyMethods || facts.readyMethods.includes(method));
+  // Connected code alone is not a testing decision: checks count once the person confirms them
+  // or saves another way to check, even after a code check has already run.
+  const chosen = !!facts.state.checksConfirmedAt || methods.some((method) => method !== 'code');
   const done: Record<SetupStepId, boolean> = {
     understand: !!facts.baselineId && scopeReady,
     confirm: confirmed,
-    verify:
-      methods.length > 0 &&
-      methods.every((method) => !facts.readyMethods || facts.readyMethods.includes(method)),
+    code: facts.repositories > 0,
+    verify: ready && chosen,
     'first-check':
       facts.completedChecks > 0 || (methods.length > 0 && methods.every((m) => m === 'manual')),
     extras: facts.trackerLinked,
   };
-  const details: Record<SetupStepId, string> = {
-    understand: understandingDetail(facts),
-    confirm: confirmed ? 'You confirmed the requirements.' : 'Check that Aiden understood you.',
-    verify:
-      methods.length && !done.verify
-        ? 'Check access to the selected verification methods.'
-        : methods.length
-          ? `Using ${methods.map((m) => methodNames[m]).join(', ')}.`
-          : 'Choose how Aiden checks the work.',
-    'first-check': facts.completedChecks
-      ? `${facts.completedChecks} ${facts.completedChecks === 1 ? 'check' : 'checks'} finished.`
-      : 'Run the first check.',
-    extras: facts.trackerLinked ? 'Ticket tracker linked.' : 'Optional: link a ticket tracker.',
-  };
+  const details = stepDetails(facts, methods, done);
   const labels: Record<SetupStepId, string> = {
     understand: 'Define goal',
     confirm: 'Review requirements',
+    code: 'Connect code',
     verify: 'Choose checks',
     'first-check': 'First check',
-    extras: 'Extras',
+    extras: 'Ticket tracker',
   };
   const order = SetupStepIdSchema.options;
   const required = order.filter((id) => id !== 'extras');

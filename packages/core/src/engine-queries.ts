@@ -1,4 +1,4 @@
-import { readdir } from 'node:fs/promises';
+import { readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 import {
@@ -22,13 +22,34 @@ import { readCalls } from './calls.js';
 import { lifecycleView } from './project-lifecycle.js';
 import { hash, json, optionalJson, type Store } from './storage.js';
 
-/** List saved project metadata; a new home returns no projects, while corruption remains an error. */
+/**
+ * When a project was created: its first run, which every handed-off project has, or else when its
+ * project file was first written. Projects store no creation date of their own.
+ */
+async function createdAt(store: Store, projectId: string): Promise<number> {
+  const first = (await runHistory(store, projectId)).at(-1);
+  if (first) return Date.parse(first.createdAt);
+  const file = await stat(path.join(store.project(projectId), 'project.json'));
+  return file.birthtimeMs || file.mtimeMs;
+}
+
+/**
+ * List saved project metadata newest first; a new home returns no projects, while corruption
+ * remains an error.
+ */
 export async function listProjects(store: Store): Promise<Project[]> {
   try {
     const ids = await readdir(path.join(store.root, 'projects'));
-    return (await Promise.all(ids.map((p) => readProject(store, p)))).filter(
-      (project): project is Project => project !== null,
+    const rows = await Promise.all(
+      ids.map(async (id) => {
+        const project = await readProject(store, id);
+        return project ? { project, created: await createdAt(store, id) } : null;
+      }),
     );
+    return rows
+      .filter((row): row is { project: Project; created: number } => row !== null)
+      .sort((a, b) => b.created - a.created)
+      .map((row) => row.project);
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return [];
     throw e;

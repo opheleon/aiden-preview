@@ -143,6 +143,7 @@ export function appFixture() {
       state: {
         baselineId: report.baselineId,
         requirementsConfirmedAt: report.generatedAt,
+        checksConfirmedAt: report.generatedAt,
         skipped: [],
       },
       repositories: 1,
@@ -268,6 +269,7 @@ export function appFixture() {
               api: !!p.update.api,
               phone: !!p.update.phone,
               manual: !!p.update.manual,
+              state: { ...setupFacts.state, checksConfirmedAt: report.generatedAt },
             };
           }
           return {
@@ -397,6 +399,18 @@ export function appFixture() {
             },
           };
           return guideView();
+        case 'connectCode':
+          project = {
+            ...project,
+            repositories: p.repositories.map((name: string) => ({
+              id: `repo-${name.replace(/\W/g, '-')}`,
+              path: `/synthetic/github/${name}`,
+              notes: '',
+              source: { kind: 'github', name, url: `https://github.com/${name}` },
+            })),
+          };
+          setupFacts = { ...setupFacts, repositories: project.repositories.length };
+          return { runId: null, repositories: project.repositories };
         case 'skipSetupStep':
           setupFacts = {
             ...setupFacts,
@@ -436,7 +450,6 @@ export function appFixture() {
     setUpdatePreferences: vi.fn().mockImplementation((value: unknown) => Promise.resolve(value)),
     onUpdateStatus: () => () => {},
     chooseProjectFolder: vi.fn().mockResolvedValue('/synthetic'),
-    chooseContext: vi.fn().mockResolvedValue('Imported fixture intent'),
     openExternal: vi.fn().mockResolvedValue(undefined),
     saveExport: vi.fn().mockResolvedValue(true),
     openVerificationReport: vi.fn().mockResolvedValue(undefined),

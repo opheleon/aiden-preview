@@ -40,6 +40,7 @@ void test('delivery plans round-trip with complete ownership, stable order, and 
     title: 'Calendar scheduling',
     requirements: product.requirements.map((r) => ({ ...r, edgeCases: [] })),
     repositories: [],
+    namedRepositories: [],
     calls: [],
     settledCalls: [],
   };
@@ -86,6 +87,7 @@ void test('new foundation plans need a test plan while stored baselines remain c
     calls: [],
     settledCalls: [],
     repositories: [],
+    namedRepositories: [],
   };
   assert.throws(() => parseUnderstanding(understanding, null), /requires a testPlan/);
   assert.equal(

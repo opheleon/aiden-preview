@@ -5,8 +5,11 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  experimentalIntegration,
+  NOTION_MCP_URL,
+  notionContext,
+  presetConnection,
   readOnlyLinear,
-  trackerConnection,
   trackerLabel,
   trackerUrl,
 } from '../packages/contracts/src/tracker-connections.js';
@@ -65,11 +68,10 @@ void test('preset reuse prefers a connected match and preserves custom accounts 
     await atomic(path.join(root, 'integrations', 'connections.json'), [connected, second, custom]);
     assert.equal((await manager.preset('linear')).id, first.id);
     assert.equal(
-      trackerConnection([first, { ...second, updatedAt: '2099-01-01T00:00:00.000Z' }], 'linear')
-        ?.id,
+      presetConnection([first, { ...second, updatedAt: '2099-01-01T00:00:00.000Z' }], 'linear')?.id,
       second.id,
     );
-    assert.equal(trackerConnection([custom], 'linear'), undefined);
+    assert.equal(presetConnection([custom], 'linear'), undefined);
     assert.equal(trackerLabel(connected), 'Linear · Connected');
     assert.equal(trackerLabel({ ...first, status: 'needs_review' }), 'Linear · Connected');
     assert.equal(
@@ -77,6 +79,26 @@ void test('preset reuse prefers a connected match and preserves custom accounts 
       'Linear · Finish sign-in',
     );
     assert.equal(trackerLabel(first), 'Linear · Reconnect required');
+  } finally {
+    await manager.dispose();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+void test('the Notion preset is a supported read-only context connection, never a tracker', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'aiden-preset-'));
+  const manager = new ConnectionManager(root, { keyring: false });
+  try {
+    const [notion, again] = await Promise.all([manager.preset('notion'), manager.preset('notion')]);
+    assert.equal(notion.id, again.id);
+    assert.equal(notion.name, 'Notion');
+    assert.equal(notion.provider, 'custom');
+    assert.equal(notion.url, NOTION_MCP_URL);
+    assert.equal(notion.auth, 'oauth');
+    assert.equal(notionContext(notion), true);
+    assert.equal(experimentalIntegration(notion), false);
+    assert.equal(presetConnection([notion], 'linear'), undefined);
+    assert.notEqual((await manager.preset('linear')).id, notion.id);
   } finally {
     await manager.dispose();
     await rm(root, { recursive: true, force: true });

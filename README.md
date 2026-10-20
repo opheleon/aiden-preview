@@ -2,21 +2,26 @@
 
 **Your first autonomous project manager.**
 
-Aiden Preview runs on your Mac with your Claude or ChatGPT subscription. Tell it what you're building, point it at your code, and it turns your intent into a delivery plan, checks progress, and brings you the decisions that need your attention.
+Aiden Preview runs on your Mac with your Claude or ChatGPT subscription. Tell it what you're building, or paste a Notion spec, and it writes the requirements, finds your code on GitHub, estimates the work, checks progress, and brings you the decisions that need a person.
 
-You set the intent, make the calls, and accept the outcome.
+You decide what done means, answer the questions only you can, and accept the result.
 
 **Preview · Apple Silicon macOS · Apache 2.0**
 
 [Download for macOS](https://github.com/opheleon/aiden-preview/releases/latest/download/Aiden-arm64.dmg) · [Getting started](docs/getting-started.md) · [Join our Slack](https://join.slack.com/t/aidenbyopheleon/shared_invite/zt-4apsg5d7p-FDO9ae0imxj~KgauP8lpsw)
 
-![Aiden project overview using synthetic fixture data](docs/screenshots/report-fixture.png)
+![The Aiden start screen with a goal typed in, ready to hand to Aiden](docs/screenshots/start-screen.png)
 
-_Example shown with synthetic project and update data._
+Everything starts from one box: describe the goal, or paste a Notion page link. Setup happens in the project's chat.
+
+![The setup chat: after the requirements are confirmed, Aiden copies the named GitHub repositories read-only and asks how to check the work](docs/screenshots/setup-chat.png)
+
+_A demo project on the opheleon-demo calendar repositories._
 
 ## What Aiden does
 
-- **Defines done.** Turns a brief, notes, or a sentence into requirements and ordered delivery steps.
+- **Defines done.** Turns a sentence, a spec, or a linked Notion page (and the pages it links to) into requirements and ordered delivery steps.
+- **Reads your code.** Finds the repositories on GitHub, keeps a read-only copy for each project, explores the code, and estimates the remaining work. Without code, it plans the slices but gives no estimate.
 - **Follows the work.** Checks pushed code on your chosen branch and shows progress, gaps, and evidence.
 - **Keeps decisions visible.** Surfaces blockers and questions in **Needs you**, with estimates when enough evidence is available.
 - **Keeps tickets connected.** Optionally publishes the delivery plan to Linear and keeps it in sync while preserving human edits.
@@ -26,7 +31,7 @@ Aiden monitors projects while the app is open. Code assessments, app checks, and
 
 ## Install
 
-[Download the latest Apple Silicon macOS DMG](https://github.com/opheleon/aiden-preview/releases/latest/download/Aiden-arm64.dmg), open it, and drag Aiden into Applications. Older versions and checksums are on [GitHub Releases](https://github.com/opheleon/aiden-preview/releases). You'll need Git and a supported provider runtime. Windows, Linux, and Intel Macs are outside the current preview scope.
+[Download the latest Apple Silicon macOS DMG](https://github.com/opheleon/aiden-preview/releases/latest/download/Aiden-arm64.dmg), open it, and drag Aiden into Applications. Older versions and checksums are on [GitHub Releases](https://github.com/opheleon/aiden-preview/releases). You'll need Git, a supported provider runtime, and for private repositories the [GitHub CLI](https://cli.github.com) signed in (`gh auth login`). Windows, Linux, and Intel Macs are outside the current preview scope.
 
 To verify a download, get `SHA256SUMS.txt` from the same release and run these commands, replacing the example DMG filename:
 
@@ -39,16 +44,16 @@ Check, download, and restart from the update control at the bottom of the sideba
 
 ## Quick start
 
-1. Open **Settings → Model**, choose Claude or Codex, and follow the installation and sign-in steps. Codex needs its CLI installed separately; the Codex desktop app alone is not enough.
-2. Create a project, describe what you're building, and select its code folder.
-3. Choose **Hand it to Aiden**. It writes the requirements, plans delivery, and runs the first check.
-4. Review **Overview**, answer questions in **Needs you**, and refine **Scope** as you learn. Connect Linear when you want shared tickets.
+1. Choose Claude or Codex on the start screen. It shows whether the model is connected; **Connect** opens the sign-in steps (also in **Settings → Model**). Claude needs Claude Code and a paid Claude plan; Codex needs its CLI installed separately, since the Codex desktop app alone is not enough. Cursor is not supported.
+2. Describe what you're building, or paste a Notion page link. To read Notion pages, connect Notion in **Settings → Integrations**; connecting approves only Notion's fetch and search tools. Name the repositories (such as `acme/web and acme/api`) if you know them.
+3. Choose **Hand it to Aiden**. The project opens on its **Chat** tab. Aiden asks any open questions, plays back the requirements for you to confirm, then connects your code: the repositories you named, or it asks which GitHub organization and which repositories to use. Then it asks how to check the work.
+4. Review **Overview**, answer questions in **Needs you**, and refine **Scope** as you learn. Connect Linear in **Settings → Integrations** when you want shared tickets.
 
 Your subscription limits or API charges apply; Aiden includes no model credits. Open **Help / Getting started** in the app or read the [getting-started guide](docs/getting-started.md) for more.
 
 ## Privacy
 
-Projects and reports are stored locally in `~/.aiden` (or `AIDEN_HOME`). Selected context and code evidence are sent to your chosen model provider, so inference is not offline. Aiden does not collect usage metrics or upload diagnostics. See the [security policy](.github/SECURITY.md) and [trust boundaries](docs/architecture.md#trust-boundaries).
+Projects, reports, and each project's read-only repository copies are stored locally in `~/.aiden` (or `AIDEN_HOME`). Aiden never pushes to them. Selected context and code evidence are sent to your chosen model provider, so inference is not offline. Aiden does not collect usage metrics or upload diagnostics. See the [security policy](.github/SECURITY.md) and [trust boundaries](docs/architecture.md#trust-boundaries).
 
 ## Development
 

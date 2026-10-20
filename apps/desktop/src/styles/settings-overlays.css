@@ -18,6 +18,10 @@
 }
 
 .tool-review small {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--muted);
 }
 
@@ -170,11 +174,11 @@
 
 @media (width <= 1100px) {
   .sidebar {
-    width: 210px;
+    width: 240px;
   }
 
   main {
-    margin-left: 210px;
+    margin-left: 240px;
   }
 
   .content {
@@ -322,4 +326,12 @@
 .schedule-fields > label {
   flex: 1;
   min-width: 140px;
+}
+
+/* Long tool lists keep their save button in reach. */
+.tool-review > .primary {
+  position: sticky;
+  bottom: 12px;
+  margin-top: 12px;
+  box-shadow: 0 6px 18px rgb(23 21 43 / 12%);
 }

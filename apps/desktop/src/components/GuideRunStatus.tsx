@@ -9,9 +9,12 @@ import { GuideCheckResults } from './GuideCheckResults';
 export function GuideRunStatus({
   workspace,
   visible,
+  saved,
 }: {
   workspace: Workspace;
   visible: boolean;
+  /** Run IDs whose results the thread already holds, so they are not repeated here. */
+  saved: ReadonlySet<string>;
 }): JSX.Element | null {
   if (!visible) return null;
   const ids = workspace.activeRuns.length
@@ -63,7 +66,7 @@ export function GuideRunStatus({
           {runTitle(latest, false)}. {latest.error || 'You can ask Aiden to try again.'}
         </p>
       )}
-      <GuideCheckResults workspace={workspace} activeIds={ids} />
+      <GuideCheckResults workspace={workspace} activeIds={ids} saved={saved} />
     </section>
   );
 }

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, test } from 'vitest';
 
 import { appFixture } from './app-fixture';
+import { selectTab } from './project-tabs';
 
 const f = appFixture();
 const { default: App } = await import('../../apps/desktop/src/App');
@@ -36,6 +37,7 @@ test('a fresh install with no projects shows no Projects label in the header', a
 test('opening a project keeps the header label away, and header navigation still switches areas', async () => {
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  await selectTab('Overview');
   await screen.findByRole('region', { name: 'Project connections' });
   expectNoAreaLabel();
 

@@ -2,6 +2,7 @@ import { ArrowUp } from 'lucide-react';
 import { type JSX, useState } from 'react';
 
 import type { ChatMessage } from '../../../../packages/contracts/src/index';
+import { ChatSteps } from './ChatSteps';
 
 /**
  * The conversation about one run: your questions on the right, Aiden's answers in its own voice.
@@ -33,6 +34,7 @@ export function RunChat({
         ) : (
           <div key={`${m.at}-aiden`} className="chat-aiden">
             <p>{m.text}</p>
+            <ChatSteps steps={m.nextSteps} />
             {m.source === 'log' && <small>From the run log, written when Aiden acted.</small>}
           </div>
         ),

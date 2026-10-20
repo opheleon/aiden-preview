@@ -79,25 +79,6 @@ test('project loading restores what Aiden knows without starting work, then vali
   );
 });
 
-test('repository rescans retain notes and cancelling folder selection leaves inputs intact', async () => {
-  const f = desktop();
-  const { result } = renderHook(() => useWorkspace());
-  act(() =>
-    result.current.setProject({
-      ...project,
-      rootPath: '/synthetic',
-      repositories: [{ ...project.repositories[0]!, notes: 'Reviewed branch notes' }],
-    }),
-  );
-  await act(() => result.current.scanProjectFolder());
-  expect(result.current.project.repositories[0]?.notes).toBe('Reviewed branch notes');
-  f.api.chooseProjectFolder.mockResolvedValue(null);
-  const previous = result.current.project;
-  await act(() => result.current.scanProjectFolder(true));
-  expect(result.current.project).toBe(previous);
-  expect(result.current.scanning).toBe(false);
-});
-
 test('worker progress, activity, cancellation, and background outcomes update only their intended state', async () => {
   const f = desktop();
   const { result } = renderHook(() => useWorkspace());

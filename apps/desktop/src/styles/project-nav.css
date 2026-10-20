@@ -1,0 +1,134 @@
+/* One line per project: the name fades at the edge, and a "…" menu appears on hover. */
+.project-nav .project-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border-radius: 7px;
+}
+
+.project-row:hover,
+.project-row:has(:focus-visible),
+.project-row.selected {
+  background: color-mix(in srgb, var(--paper2) 55%, transparent);
+}
+
+.project-nav .project-link {
+  flex: 1;
+  justify-content: flex-start;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  color: var(--muted);
+  background: transparent;
+}
+
+.project-row.selected .project-link {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.project-nav .project-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: clip;
+  white-space: nowrap;
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+
+/* While the "…" shows, the name finishes fading before it reaches the dots. */
+.project-row:hover .project-name,
+.project-row:has([aria-expanded='true'], :focus-visible) .project-name {
+  mask-image: linear-gradient(to right, #000 calc(100% - 60px), transparent calc(100% - 30px));
+}
+
+.project-nav .project-dot {
+  flex-shrink: 0;
+}
+
+.project-nav .project-row-trigger {
+  position: absolute;
+  right: 4px;
+  opacity: 0;
+}
+
+/* Only the dots, and only while the row is hovered, keyboard-focused, or its menu is open. */
+.project-row:hover .project-row-trigger,
+.project-row-trigger:focus-visible,
+.project-row-trigger[aria-expanded='true'] {
+  opacity: 1;
+}
+
+.project-row-trigger {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.project-row-trigger:hover,
+.project-row-trigger[aria-expanded='true'] {
+  color: var(--ink);
+}
+
+.project-more {
+  justify-content: flex-start;
+  height: 30px;
+  padding: 0 8px 0 24px;
+  color: var(--muted);
+  background: transparent;
+}
+
+/* A project's actions, drawn above the window under its "…" button. */
+.project-menu {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  min-width: 210px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 0 12px 36px rgb(23 21 43 / 14%);
+}
+
+.project-menu [role='menuitem'] {
+  justify-content: flex-start;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: left;
+}
+
+.project-menu [role='menuitem']:is(:hover, :focus-visible):not(:disabled) {
+  background: var(--paper2);
+}
+
+.project-menu [role='menuitem']:disabled {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.project-menu .project-menu-danger {
+  color: #b42318;
+}
+
+.project-menu hr {
+  width: 100%;
+  margin: 5px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}

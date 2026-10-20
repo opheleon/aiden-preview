@@ -1,23 +1,28 @@
 import { RotateCcw } from 'lucide-react';
-import { type JSX, useEffect, useRef, useState } from 'react';
+import { type JSX, type RefObject, useEffect, useRef } from 'react';
 
 import {
   distinctGuideWidgets,
   type GuideMessage,
+  type GuideWidget,
   type SetupProgress,
+  type SetupStepId,
 } from '../../../../packages/contracts/src/guide';
+import { ChatSteps } from '../components/ChatSteps';
 import { GuideClarification } from '../components/GuideClarification';
 import { GuideComposer } from '../components/GuideComposer';
+import { GuideResultEntry, guideResultId } from '../components/GuideResultEntry';
 import { GuideRunStatus } from '../components/GuideRunStatus';
 import { GuideThinking } from '../components/GuideThinking';
 import { GuideWidgetCard } from '../components/GuideWidgets';
 import { ProjectChatAction } from '../components/ProjectChatAction';
+import { ProviderNotice } from '../components/ProviderNotice';
 import { SetupChecklist } from '../components/SetupChecklist';
 import type { Guide } from '../hooks/useGuide';
 import type { Workspace } from '../hooks/useWorkspace';
 import { contextualGuideMessage, type ProjectChatEntry } from '../renderer/project-chat-entry';
 
-/** Point back to the Guide from the Overview tab while setup is unfinished. */
+/** Point back to the Chat tab from the Overview tab while setup is unfinished. */
 export function SetupBanner({
   setup,
   onOpen,
@@ -33,7 +38,7 @@ export function SetupBanner({
         <b>Finish setup:</b> {next?.detail ?? 'A few steps are left.'}
       </span>
       <button className="start-blocker-action" onClick={() => onOpen()}>
-        Open the Guide
+        Go to Chat
       </button>
     </div>
   );
@@ -68,10 +73,23 @@ function ThreadStatus({ guide, waiting }: { guide: Guide; waiting: boolean }): J
 }
 
 /** One line of the thread: your messages, the Guide's replies, and facts the app recorded. */
-function Line({ message }: { message: GuideMessage }): JSX.Element {
+function Line({
+  message,
+  workspace,
+}: {
+  message: GuideMessage;
+  workspace: Workspace;
+}): JSX.Element {
   if (message.from === 'you') return <p className="chat-you">{message.text}</p>;
+  if (message.from === 'event' && message.result)
+    return <GuideResultEntry text={message.text} result={message.result} workspace={workspace} />;
   if (message.from === 'event') return <p className="guide-event">{message.text}</p>;
-  return <p className="chat-aiden guide-reply">{message.text}</p>;
+  return (
+    <>
+      <p className="chat-aiden guide-reply">{message.text}</p>
+      <ChatSteps steps={message.nextSteps} />
+    </>
+  );
 }
 
 /** Derive the current conversational state without treating old cards as active setup. */
@@ -86,6 +104,25 @@ function conversationState(guide: Guide) {
     waiting: !guide.thinking && !guide.asking && lastPerson?.from === 'you',
     widgets: distinctGuideWidgets(messages[lastReply]?.widgets ?? []),
   };
+}
+
+/**
+ * The cards under the newest reply. The confirm, code, and checks steps always show their own
+ * card, whatever the reply attached, so setup never stalls on a reply that forgot it.
+ */
+function stepWidgets(
+  next: SetupStepId | null | undefined,
+  attached: GuideWidget[],
+  busy: boolean,
+): GuideWidget[] {
+  if (next === 'confirm') return busy ? [] : [{ type: 'confirm-requirements' }];
+  if (next === 'code') return [{ type: 'connect-code' }];
+  /** A card that sets up how the work is checked, as opposed to a link or the run button. */
+  const setupCard = (widget: GuideWidget) =>
+    widget.type !== 'run-check' && widget.type !== 'link' && widget.type !== 'confirm-requirements';
+  if (next === 'verify' && !attached.some(setupCard))
+    return [{ type: 'verify-options' }, ...attached.filter((w) => w.type === 'link')];
+  return attached;
 }
 
 /** Show just the current question or next action beneath the conversation. */
@@ -108,13 +145,12 @@ function CurrentGuideControls({
         <GuideClarification guide={guide} busy={workspace.busy} />
       </div>
     );
-  if (awaitingReply || state.waiting || workspace.busy) return null;
-  const widgets =
-    guide.view?.setup.next === 'confirm'
-      ? workspace.busy
-        ? []
-        : [{ type: 'confirm-requirements' as const }]
-      : state.widgets;
+  if (awaitingReply || state.waiting) return null;
+  // While Aiden reads the code, setup keeps going: only cards that start or confirm work wait.
+  const widgets = stepWidgets(guide.view?.setup.next, state.widgets, workspace.busy).filter(
+    (widget) =>
+      !workspace.busy || (widget.type !== 'run-check' && widget.type !== 'confirm-requirements'),
+  );
   return (
     <>
       {widgets.map((widget) => (
@@ -139,7 +175,10 @@ export function GuideChat({
   workspace,
   guide,
   visible,
+  chosen = false,
   entry,
+  draft,
+  setDraft,
   onClearEntry,
   onHelp,
 }: {
@@ -147,46 +186,51 @@ export function GuideChat({
   guide: Guide;
   /** The chat is on screen; only then does the Guide play back the requirements. */
   visible: boolean;
+  /** The person opened the chat themselves, so a checked project may play back too. */
+  chosen?: boolean;
   entry: ProjectChatEntry | null;
+  /** The unsent message, owned above the page so it survives leaving the project. */
+  draft: string;
+  setDraft: (text: string) => void;
   onClearEntry: () => void;
   onHelp: () => void;
 }): JSX.Element {
-  const [draft, setDraft] = useState('');
   const input = useRef<HTMLTextAreaElement>(null);
   const thread = useRef<HTMLDivElement>(null);
   const following = useRef(true);
   const latestReply = useRef<HTMLDivElement>(null);
   const requestedAction = useRef<HTMLDivElement>(null);
   const { ready, playback } = guide;
+  // A checked project opens on Chat without spending a playback turn unless the person chose it.
+  const checked = workspace.runs.some(
+    (run) => (run.kind === 'report' || run.kind === 'verify') && run.status === 'completed',
+  );
+  const autoPlayback = chosen || !checked;
   useEffect(() => {
-    if (visible && ready && (!entry || entry.type === 'run')) playback();
-  }, [visible, ready, playback, entry]);
+    if (visible && ready && autoPlayback && passive(entry)) playback();
+  }, [visible, ready, autoPlayback, playback, entry]);
   const { view, thinking, asking } = guide;
   const missingRequirement = requirementMissing(entry, workspace);
   const { messages, lastReply, waiting } = conversationState(guide);
+  const saved = new Set(messages.flatMap((m) => (m.result ? [m.result.runId] : [])));
   useEffect(() => {
     if (entry) following.current = true;
   }, [entry]);
+  useResultFocus({ threadRef: thread, followingRef: following, visible, entry, onClearEntry });
   useEffect(() => {
     const element = thread.current;
-    if (!visible || !element || !following.current) return;
+    if (!visible || !element || !following.current || entry?.type === 'result') return;
     if (entry && requestedAction.current) {
       const target =
         requestedAction.current.querySelector('[data-guide-entry-target] input[type="url"]') ??
         requestedAction.current;
-      element.scrollTop =
-        target.getBoundingClientRect().top -
-        element.getBoundingClientRect().top +
-        element.scrollTop;
+      scrollToTarget(element, target);
       return;
     }
     const reply = latestReply.current;
-    element.scrollTop =
-      !thinking && !workspace.busy && reply && reply.clientHeight > element.clientHeight
-        ? reply.getBoundingClientRect().top -
-          element.getBoundingClientRect().top +
-          element.scrollTop
-        : element.scrollHeight;
+    if (!thinking && !workspace.busy && reply && reply.clientHeight > element.clientHeight)
+      scrollToTarget(element, reply);
+    else element.scrollTop = element.scrollHeight;
   }, [
     visible,
     messages.length,
@@ -204,6 +248,7 @@ export function GuideChat({
   }
   return (
     <div className="guide-tab">
+      <ProviderNotice workspace={workspace} />
       {view && <SetupChecklist setup={view.setup} />}
       <div
         className="guide-thread"
@@ -229,10 +274,10 @@ export function GuideChat({
             key={`${m.at}-${index}`}
             ref={index === lastReply ? latestReply : undefined}
           >
-            <Line message={m} />
+            <Line message={m} workspace={workspace} />
           </div>
         ))}
-        {(!entry || entry.type === 'run') && (
+        {passive(entry) && (
           <CurrentGuideControls
             workspace={workspace}
             guide={guide}
@@ -241,7 +286,7 @@ export function GuideChat({
           />
         )}
         <ThreadStatus guide={guide} waiting={waiting} />
-        <GuideRunStatus workspace={workspace} visible={visible} />
+        <GuideRunStatus workspace={workspace} visible={visible} saved={saved} />
         {entry && (
           <div ref={requestedAction}>
             <ProjectChatAction
@@ -273,6 +318,47 @@ export function GuideChat({
       />
     </div>
   );
+}
+
+/** Scroll the thread so the target's top edge sits at the top of the visible thread. */
+function scrollToTarget(thread: HTMLElement, target: Element): void {
+  thread.scrollTop =
+    target.getBoundingClientRect().top - thread.getBoundingClientRect().top + thread.scrollTop;
+}
+
+/**
+ * Bring a saved check result into view and focus when another page asks for it, then stop
+ * following new messages so the result stays on screen.
+ */
+function useResultFocus({
+  threadRef,
+  followingRef,
+  visible,
+  entry,
+  onClearEntry,
+}: {
+  threadRef: RefObject<HTMLDivElement | null>;
+  followingRef: RefObject<boolean>;
+  visible: boolean;
+  entry: ProjectChatEntry | null;
+  onClearEntry: () => void;
+}): void {
+  useEffect(() => {
+    const element = threadRef.current;
+    if (!visible || !element || entry?.type !== 'result') return;
+    const target = element.querySelector<HTMLElement>(`#${guideResultId(entry.runId)}`);
+    if (target) {
+      followingRef.current = false;
+      scrollToTarget(element, target);
+      target.focus({ preventScroll: true });
+    }
+    onClearEntry();
+  }, [threadRef, followingRef, visible, entry, onClearEntry]);
+}
+
+/** An entry that asks for no focused action, so the usual setup controls and playback apply. */
+function passive(entry: ProjectChatEntry | null): boolean {
+  return !entry || entry.type === 'run' || entry.type === 'result';
 }
 
 /** Disable edits when a selected requirement has been removed from the current scope. */

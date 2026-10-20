@@ -7,7 +7,11 @@ import type {
   WorkerResult,
 } from '../../../../packages/contracts/src/api.js';
 import type { McpConnection, McpTool } from '../../../../packages/contracts/src/index';
-import { experimentalIntegration } from '../../../../packages/contracts/src/tracker-connections';
+import {
+  experimentalIntegration,
+  notionContext,
+  notionReadTools,
+} from '../../../../packages/contracts/src/tracker-connections';
 import { CredentialStorageNote } from '../components/CredentialStorageNote';
 
 interface IntegrationConnectionCardProps {
@@ -19,6 +23,19 @@ interface IntegrationConnectionCardProps {
   integrationTools: Record<string, McpTool[]>;
   refresh: () => Promise<void>;
   setNotice: React.Dispatch<React.SetStateAction<string>>;
+}
+
+/**
+ * Tick the read tools Aiden needs before the first review of a Notion connection, so approving is
+ * one Save. Nothing is approved until the person saves, and later reviews keep their choices.
+ * Example: a fresh Notion review shows notion-fetch and notion-search ticked.
+ */
+function withSuggestedApprovals(connection: McpConnection, rows: McpTool[]): McpTool[] {
+  if (!notionContext(connection) || connection.approvedTools.length) return rows;
+  const suggested = new Set<string>(notionReadTools);
+  return rows.map((tool) =>
+    tool.readOnly && suggested.has(tool.name) ? { ...tool, approved: true } : tool,
+  );
 }
 
 /** Review a hosted connection and explicitly approve its available tools. */
@@ -77,7 +94,10 @@ export function IntegrationConnectionCard(
               const rows = await call('integrationTools', {
                 connectionId: connection.id,
               });
-              setIntegrationTools({ ...integrationTools, [connection.id]: rows });
+              setIntegrationTools({
+                ...integrationTools,
+                [connection.id]: withSuggestedApprovals(connection, rows),
+              });
               setIntegrations(await call('integrations'));
             })
           }
@@ -117,7 +137,9 @@ export function IntegrationConnectionCard(
               />
               <label htmlFor={`tool-${connection.id}-${tool.name}`}>
                 <strong>{tool.name}</strong>
-                <small>{tool.description || tool.reason}</small>
+                <small title={tool.description || tool.reason}>
+                  {tool.description || tool.reason}
+                </small>
               </label>
             </div>
           ))}

@@ -10,6 +10,7 @@ import {
   type Report,
   type RequirementEstimate,
   type RunManifest,
+  type Snapshot,
 } from '../../contracts/src/index.js';
 import { durationSummary, selectComparisons, SIZE_POINTS } from '../../estimation/src/index.js';
 import type { UnclassifiedHistory } from './history-normalization.js';
@@ -20,11 +21,12 @@ import type { WorkflowContext } from './workflow-context.js';
 export async function originalEstimates(
   stage: ModelStage,
   baseline: Baseline,
+  snapshots: Snapshot[] = [],
 ): Promise<Complexity[]> {
   const complexity = await stage(
     'estimate-original',
     ComplexityOutputSchema,
-    { baseline: baseline.product },
+    { baseline: baseline.product, snapshots },
     (value) => {
       const result = ComplexityOutputSchema.parse(value);
       const expected = baseline.product.requirements.map((r) => r.id).sort();
@@ -77,7 +79,37 @@ export async function historicalEstimates(
 
   return history;
 }
-/** Estimate remaining work only when an accepted report establishes the current coverage. */
+/**
+ * Remaining work for requirements the code check found entirely missing: the whole requirement,
+ * as originally sized, so no second model pass is spent on code that does not exist yet.
+ * Example: REQ-2 missing and sized M (3 points) gives remaining M (3 points).
+ */
+function missingRemaining(report: Report, complexity: Complexity[]): RemainingEstimate[] {
+  return complexity.flatMap((original) => {
+    const assessment = report.assessments.find((a) => a.requirementId === original.requirementId);
+    if (assessment?.status !== 'missing') return [];
+    return [
+      {
+        requirementId: original.requirementId,
+        estimable: true,
+        comparisonMatches: [],
+        workType: original.workType,
+        scopeShape: original.scopeShape,
+        size: original.size,
+        points: original.points,
+        reasoning: `Nothing is built yet, so all of it remains. ${original.reasoning}`,
+        workItems: original.workItems,
+        unknowns: [],
+      },
+    ];
+  });
+}
+
+/**
+ * Estimate remaining work only when an accepted report establishes the current coverage.
+ * Requirements the report found missing reuse their original size; only partly built or uncertain
+ * ones go to the remaining-work estimator, and none do when nothing is built.
+ */
 export async function remainingEstimates(
   stage: ModelStage,
   baseline: Baseline,
@@ -85,56 +117,63 @@ export async function remainingEstimates(
   context: Pick<WorkflowContext, 'emit'>,
   run: RunManifest,
   history: HistoryIssue[] = [],
+  complexity: Complexity[] = [],
 ): Promise<Map<string, RemainingEstimate>> {
-  let remaining = new Map<string, RemainingEstimate>();
-  if (report) {
-    context.emit({
-      type: 'progress',
-      runId: run.id,
-      projectId: run.projectId,
-      stage: 'estimate',
-      message: 'Estimating the work that remains in the accepted assessment…',
-    });
-    const result = await stage(
-      'estimate-remaining',
-      RemainingOutputSchema,
-      {
-        baseline: baseline.product,
-        report,
-        history: history
-          .filter(
-            (issue) => issue.startedAt && issue.completedAt && issue.observedCalendarDays !== null,
-          )
-          .sort((a, b) => b.completedAt!.localeCompare(a.completedAt!))
-          .map(({ id, title, description, size, points, workType, scopeShape, reasoning }) => ({
-            id,
-            title,
-            description,
-            size,
-            points,
-            workType,
-            scopeShape,
-            reasoning,
-          })),
+  if (!report) return new Map();
+  const settled = missingRemaining(report, complexity);
+  const open = baseline.product.requirements.filter(
+    (r) => !settled.some((row) => row.requirementId === r.id),
+  );
+  const remaining = new Map(settled.map((row) => [row.requirementId, row]));
+  if (!open.length) return remaining;
+  context.emit({
+    type: 'progress',
+    runId: run.id,
+    projectId: run.projectId,
+    stage: 'estimate',
+    message: 'Estimating the work that remains in the accepted assessment…',
+  });
+  const ids = new Set(open.map((r) => r.id));
+  const result = await stage(
+    'estimate-remaining',
+    RemainingOutputSchema,
+    {
+      baseline: { ...baseline.product, requirements: open },
+      report: {
+        ...report,
+        assessments: report.assessments.filter((a) => ids.has(a.requirementId)),
       },
-      (value) => {
-        const parsed = RemainingOutputSchema.parse(value);
-        const expected = baseline.product.requirements.map((r) => r.id).sort();
-        if (
-          JSON.stringify(parsed.requirements.map((r) => r.requirementId).sort()) !==
-          JSON.stringify(expected)
+      history: history
+        .filter(
+          (issue) => issue.startedAt && issue.completedAt && issue.observedCalendarDays !== null,
         )
-          throw new Error('Estimate remaining work for every reviewed requirement once.');
-        for (const row of parsed.requirements) {
-          validateRemaining(row, report);
-          validateMatches(row, history);
-        }
-        return parsed;
-      },
-    );
-    remaining = new Map(result.requirements.map((row) => [row.requirementId, row]));
-  }
-
+        .sort((a, b) => b.completedAt!.localeCompare(a.completedAt!))
+        .map(({ id, title, description, size, points, workType, scopeShape, reasoning }) => ({
+          id,
+          title,
+          description,
+          size,
+          points,
+          workType,
+          scopeShape,
+          reasoning,
+        })),
+    },
+    (value) => {
+      const parsed = RemainingOutputSchema.parse(value);
+      if (
+        JSON.stringify(parsed.requirements.map((r) => r.requirementId).sort()) !==
+        JSON.stringify([...ids].sort())
+      )
+        throw new Error('Estimate remaining work for every reviewed requirement once.');
+      for (const row of parsed.requirements) {
+        validateRemaining(row, report);
+        validateMatches(row, history);
+      }
+      return parsed;
+    },
+  );
+  for (const row of result.requirements) remaining.set(row.requirementId, row);
   return remaining;
 }
 /** Reject unjustified zero-work or complete-coverage claims and enforce rubric consistency. */

@@ -144,7 +144,11 @@ export class WorkerClient extends EventEmitter {
     return new Promise((resolve, reject) => {
       if (this.closed) return reject(new Error('Worker is closed.'));
       const id = ++this.seq;
-      const timeout = method === 'waitForRun' ? Math.max(this.timeout, 31 * 60_000) : this.timeout;
+      // Waiting on a run and cloning a large repository can both take many minutes.
+      const timeout =
+        method === 'waitForRun' || method === 'connectCode'
+          ? Math.max(this.timeout, 31 * 60_000)
+          : this.timeout;
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(

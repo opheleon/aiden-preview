@@ -184,10 +184,11 @@ footer {
 }
 
 .sidebar-bottom .sidebar-section {
-  margin-bottom: 14px;
-  border-top: 1px solid var(--border);
-  border-radius: 0;
-  padding-top: 14px;
+  gap: 8px;
+  height: 32px;
+  margin: 0;
+  padding: 0 8px;
+  font-size: 13px;
 }
 
 .settings-view,
@@ -238,6 +239,17 @@ footer {
 
 .integration-hero p {
   color: var(--body);
+}
+
+/* Both connect buttons share one size and never wrap. */
+.integration-hero .button-row {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+.integration-hero .integration-connect {
+  min-width: 152px;
+  white-space: nowrap;
 }
 
 .connection-row {

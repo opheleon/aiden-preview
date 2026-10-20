@@ -60,39 +60,6 @@ async function load(state: WorkspaceState, call: Call, id: string): Promise<void
   });
 }
 
-/** Find repositories in a folder, keeping notes on ones already listed and ignoring a replaced project. */
-async function scanProjectFolder(
-  state: WorkspaceState,
-  call: Call,
-  api: DesktopBridge | undefined,
-  choose = false,
-): Promise<void> {
-  const projectId = state.project.id;
-  await action(state, async () => {
-    state.setScanning(true);
-    try {
-      const folder = choose ? await api?.chooseProjectFolder() : state.project.rootPath;
-      if (!folder) return;
-      const found = await call('discoverRepositories', { rootPath: folder });
-      state.setProject((current) =>
-        current.id !== projectId
-          ? current
-          : {
-              ...current,
-              rootPath: found.rootPath,
-              discoveryWarnings: found.warnings,
-              repositories: found.repositories.map(
-                (repo) =>
-                  current.repositories.find((existing) => existing.path === repo.path) ?? repo,
-              ),
-            },
-      );
-    } finally {
-      state.setScanning(false);
-    }
-  });
-}
-
 /**
  * Hand the project to Aiden: it writes what done means, commits it without a review step, and
  * starts looking. Also used after changing the folder, which changes what Aiden looks at.
@@ -174,7 +141,6 @@ async function confirm(state: WorkspaceState, call: Call, key: string): Promise<
 export interface WorkspaceOperations {
   action: (fn: () => Promise<void>) => Promise<void>;
   load: (id: string) => Promise<void>;
-  scanProjectFolder: (choose?: boolean) => Promise<void>;
   start: () => Promise<void>;
   lookNow: () => Promise<void>;
   answerCall: (callId: string, answer: string) => Promise<void>;
@@ -182,15 +148,10 @@ export interface WorkspaceOperations {
   confirm: (key: string) => Promise<void>;
 }
 /** Bind the current render's state to user actions without performing side effects during render. */
-export function workspaceOperations(
-  state: WorkspaceState,
-  call: Call,
-  api: DesktopBridge | undefined,
-): WorkspaceOperations {
+export function workspaceOperations(state: WorkspaceState, call: Call): WorkspaceOperations {
   return {
     action: (fn) => action(state, fn),
     load: (id) => load(state, call, id),
-    scanProjectFolder: (choose) => scanProjectFolder(state, call, api, choose),
     start: () => start(state, call),
     lookNow: () => lookNow(state, call),
     answerCall: (callId, answer) => answerCall(state, call, callId, answer),

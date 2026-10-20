@@ -16,7 +16,15 @@ For a deliberate developer reset, quit Aiden, back up the current data folder, a
 
 ## Aiden cannot start a check
 
-Open Settings → Model and check the selected runtime, provider sign-in, model, and effort. Complete provider installation or authentication there. Keep the billing mode you chose; do not substitute an API key for subscription access merely to make a check run. Aiden has no separate account login to repair.
+Open Settings → Model and check the selected runtime, provider sign-in, model, and effort. Complete provider installation or authentication there. For Claude, **Sign in with Claude** opens Claude Code's own sign-in in Terminal; finish it in the browser and Aiden rechecks the connection. Outside macOS, run `claude auth login --claudeai` in a terminal, then select Check connection. Keep the billing mode you chose; do not substitute an API key for subscription access merely to make a check run. Aiden has no separate account login to repair.
+
+## Aiden cannot reach your GitHub code
+
+Aiden copies repositories with your existing Git credentials, or your GitHub CLI sign-in when Git alone cannot reach them. For private repositories and for listing your organizations, install the [GitHub CLI](https://cli.github.com) and run `gh auth login` in a terminal, then ask the Guide again. If the chat says a copy failed, check the repository name; you can also edit the list in Project settings. The copies live in the project's own folder under AIDEN_HOME and are read-only.
+
+## Aiden did not read your Notion page
+
+Connect Notion in Settings → Integrations; connecting approves Notion's fetch and search tools, the only ones Aiden uses. An older connection with no approved tools shows **Allow reading Notion pages** on the start screen when you paste a link. Aiden reads the page when it writes the requirements; if it could not, the chat raises a question saying so, and the requirements come from your text alone.
 
 ## Linear needs attention
 

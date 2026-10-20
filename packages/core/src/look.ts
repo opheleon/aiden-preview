@@ -231,7 +231,8 @@ export async function prepareAndLook(
         );
       else if (project.repositories.length || (await hasAppCheck(engine, project.id)))
         await startLook(engine, project.id, reason, device, verifySurfaces);
-      else return sizeWithoutCode(engine, project.id);
+      // Without code there is nothing to size from, so the work is estimated once code connects.
+      else return false;
       return true;
     },
     'Aiden updated the requirements, but could not start a check.',
@@ -266,25 +267,11 @@ async function lookWithoutCode(
     started.runId,
     async () => {
       await syncTickets(engine, projectId);
-      return sizeWithoutCode(engine, projectId);
+      return false;
     },
-    'The app check finished, but remaining-work sizing could not start.',
+    'The app check finished, but ticket syncing could not start.',
   );
   return started;
-}
-
-/**
- * Size the remaining work from the requirements alone when no code check can run. Returns whether
- * sizing started, which then ends the chain itself; open decisions or no delivery plan skip it.
- */
-async function sizeWithoutCode(engine: Engine, projectId: string): Promise<boolean> {
-  const { baseline } = await engine.state(projectId);
-  if (!baseline?.product.deliveryPlan) return false;
-  const blockers = await blockedRequirements(engine.store, projectId, baseline.product);
-  if ([...blockers.values()].some((calls) => calls.length)) return false;
-  const estimate = await engine.estimate(projectId);
-  afterRun(engine, projectId, estimate.runId, endsChain, 'Remaining-work sizing did not finish.');
-  return true;
 }
 
 /** Read the saved project definition. */

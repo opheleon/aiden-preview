@@ -1,4 +1,4 @@
-import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { _electron as electron, expect } from '@playwright/test';
@@ -97,46 +97,11 @@ try {
     .getByLabel('What are you building?')
     .fill('Users can list books. Users can create books.');
   const handOff = page.getByRole('button', { name: /Hand it to Aiden/ });
-  // The intent alone is enough to start; the project folder is optional.
+  // The intent alone is enough to start; code folders come later in the setup chat.
   await expect(handOff).toBeEnabled();
-  await app.evaluate(({ dialog }, repo) => {
-    dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [repo] });
-  }, f.root);
-  const rootName = path.basename(await realpath(f.root));
-  await page
-    .getByRole('button', { name: 'Add the project folder (optional)', exact: true })
-    .click();
-  await expect(page.getByRole('button', { name: `${rootName} · 2 repositories` })).toBeVisible();
-  await expect(handOff).toBeEnabled();
-  // Empty roots say code can be connected later; they never block the start.
-  const emptyFolder = path.join(f.root, 'empty-project');
-  await mkdir(emptyFolder);
-  await app.evaluate(({ dialog }, folder) => {
-    dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [folder] });
-  }, emptyFolder);
-  await page.getByRole('button', { name: `${rootName} · 2 repositories` }).click();
-  await expect(page.getByText(/No Git repository was found in empty-project/)).toBeVisible();
-  await expect(handOff).toBeEnabled();
-  await app.evaluate(({ dialog }, folder) => {
-    dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [folder] });
-  }, f.root);
-  await page.getByRole('button', { name: /empty-project/ }).click();
-  await expect(page.getByRole('button', { name: /· 2 repositories/ })).toBeVisible();
-  // Cancelled selection keeps the existing root and repositories.
-  await app.evaluate(({ dialog }) => {
-    dialog.showOpenDialog = () => Promise.resolve({ canceled: true, filePaths: [] });
-  });
-  await page.getByRole('button', { name: /· 2 repositories/ }).click();
-  await expect(page.getByRole('button', { name: /· 2 repositories/ })).toBeEnabled();
-  const contextFile = path.join(f.root, 'context.md');
-  await writeFile(contextFile, 'Users can export books.');
-  await app.evaluate(({ dialog }, file) => {
-    dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [file] });
-  }, contextFile);
-  await page.getByRole('button', { name: 'Import a file' }).click();
-  await expect(page.getByLabel('What are you building?')).toHaveValue(
-    /Users can list books\. Users can create books\.\n\nUsers can export books\./,
-  );
+  for (const name of ['Import a file', 'Add the project folder (optional)'])
+    if (await page.getByRole('button', { name }).count())
+      throw new Error(`${name} should not be on the start screen.`);
   await page.screenshot({ path: 'test-results/desktop-smoke/intent-fixture.png', fullPage: true });
   // Provider sign-in lives in settings; the unsaved project keeps its intent meanwhile.
   await page.getByRole('button', { name: 'Settings', exact: true }).first().click();
@@ -144,19 +109,22 @@ try {
   await page.getByRole('button', { name: 'Claude', exact: true }).click();
   await expect(page.getByLabel('Authentication', { exact: true })).toHaveValue('subscription');
   await expect(page.getByTestId('claude-connection')).toContainText('Sign in to Claude Code');
-  await expect(page.getByTestId('claude-connection').locator('code')).toHaveText(
-    'claude auth login --claudeai',
-  );
+  await expect(
+    page.getByTestId('claude-connection').getByRole('button', { name: 'Sign in with Claude' }),
+  ).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Sign in with Codex' })).toHaveCount(0);
   await setClaudeFixture(true);
   await page.getByRole('button', { name: 'Check connection' }).click();
   await expect(page.getByTestId('claude-connection')).toContainText('sign-in detected');
-  await expect(page.getByTestId('claude-connection').locator('code')).toHaveCount(0);
+  await expect(
+    page.getByTestId('claude-connection').getByRole('button', { name: 'Sign in with Claude' }),
+  ).toHaveCount(0);
   await setClaudeFixture(false);
   await page.getByRole('button', { name: 'Check connection' }).click();
   await expect(page.getByTestId('claude-connection')).toContainText('Sign in to Claude Code');
   await page.getByRole('button', { name: 'Codex', exact: true }).click();
-  await page.getByRole('button', { name: 'A book project' }).click();
+  await page.getByRole('button', { name: 'A book project', exact: true }).click();
+  await page.getByRole('tab', { name: 'Overview', exact: true }).click();
   await page.getByRole('region', { name: 'Project connections' }).waitFor();
   await page.getByRole('tab', { name: 'Activity', exact: true }).click();
   const log = page.getByRole('region', { name: 'Activity' });
@@ -183,7 +151,7 @@ try {
   await app.evaluate(({ dialog }, target) => {
     dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath: target });
   }, exportFile);
-  await page.getByLabel('More').click();
+  await page.getByLabel('Actions for A book project').click();
   await page.getByRole('menuitem', { name: 'Export Markdown' }).click();
   await page.getByText('Markdown report exported.').waitFor();
   if (!(await readFile(exportFile, 'utf8')).includes('FIXTURE REPORT'))
@@ -192,7 +160,7 @@ try {
   await app.evaluate(({ dialog }, target) => {
     dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath: target });
   }, jsonFile);
-  await page.getByLabel('More').click();
+  await page.getByLabel('Actions for A book project').click();
   await page.getByRole('menuitem', { name: 'Export JSON' }).click();
   await page.getByText('JSON report exported.').waitFor();
   if (ReportSchema.parse(JSON.parse(await readFile(jsonFile, 'utf8'))).id !== run.runId)
@@ -246,7 +214,8 @@ try {
   await expect(page.getByLabel('Download updates automatically')).toBeChecked();
   await page.getByRole('button', { name: 'Integrations', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Connect Linear' })).toBeVisible();
-  await page.getByRole('button', { name: 'A book project' }).click();
+  await page.getByRole('button', { name: 'A book project', exact: true }).click();
+  await page.getByRole('tab', { name: 'Overview', exact: true }).click();
   await page.getByRole('region', { name: 'Project connections' }).waitFor();
   if (errors.length) throw new Error(errors.join('\n'));
   console.log(
