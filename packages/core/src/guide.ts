@@ -63,6 +63,7 @@ const ReplySchema = z
           .object({
             type: z.enum([
               'confirm-requirements',
+              'connect-code',
               'verify-options',
               'choose-folder',
               'web-check',
@@ -91,6 +92,7 @@ const ReplySchema = z
               'set-manual',
               'update-intent',
               'run-check',
+              're-estimate',
               'skip-step',
             ]),
             url: z.string().nullable(),

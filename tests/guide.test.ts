@@ -47,23 +47,40 @@ void test('setup progress is derived from saved facts and resumes at the first u
     requirementsConfirmedAt: '2026-10-17T09:00:00.000Z',
     skipped: [],
   };
-  assert.equal(setupProgress(facts({ state: confirmed })).next, 'verify');
+  // Without code, the code step comes next; skipping it moves on to choosing checks.
+  assert.equal(setupProgress(facts({ state: confirmed })).next, 'code');
+  assert.equal(setupProgress(facts({ state: confirmed, repositories: 2 })).next, 'verify');
+  const noCode = { ...confirmed, skipped: ['code' as const] };
+  assert.equal(setupProgress(facts({ state: noCode })).next, 'verify');
+  // Connected code alone is not a testing decision, until the person confirms the checks.
+  assert.equal(
+    setupProgress(
+      facts({
+        state: { ...confirmed, checksConfirmedAt: confirmed.requirementsConfirmedAt },
+        repositories: 1,
+      }),
+    ).next,
+    'first-check',
+  );
   // A requirement rewrite makes a new baseline, which re-opens confirmation.
   assert.equal(
     setupProgress(facts({ baselineId: 'baseline-2', state: confirmed })).next,
     'confirm',
   );
   // A URL saved in Settings completes the verification step without the chat.
-  const web = setupProgress(facts({ state: confirmed, url: 'http://localhost:3000' }));
+  const web = setupProgress(facts({ state: noCode, url: 'http://localhost:3000' }));
   assert.equal(web.next, 'first-check');
   assert.equal(web.steps.find((s) => s.id === 'verify')?.detail, 'Using web check.');
   const later = setupProgress(
-    facts({ state: { ...confirmed, skipped: ['first-check'] }, url: 'http://localhost:3000' }),
+    facts({
+      state: { ...confirmed, skipped: ['code', 'first-check'] },
+      url: 'http://localhost:3000',
+    }),
   );
   assert.equal(later.complete, true);
   assert.equal(later.steps.find((s) => s.id === 'first-check')?.status, 'skipped');
   // Checking by hand needs no automatic first check; optional extras never block completion.
-  assert.equal(setupProgress(facts({ state: confirmed, manual: true })).complete, true);
+  assert.equal(setupProgress(facts({ state: noCode, manual: true })).complete, true);
 });
 
 /** An engine over the fixture repositories, or over none when `withCode` is false. */
@@ -187,7 +204,9 @@ void test('the Guide plays back with the project runtime, applies stated setup, 
         ['event', 'Web check saved for http://localhost:5173/.'],
       ],
     );
-    assert.equal(after.setup.next, 'first-check');
+    assert.equal(after.setup.next, 'code');
+    await skipSetupStep(e, project.id, 'code');
+    assert.equal((await openGuide(e, project.id)).setup.next, 'first-check');
     await skipSetupStep(e, project.id, 'first-check');
     assert.equal((await openGuide(e, project.id)).setup.complete, true);
     await assert.rejects(skipSetupStep(e, project.id, 'verify'), /needed before Aiden/);
@@ -309,6 +328,7 @@ void test('an overview-only refresh preserves confirmed setup, including after r
     const started = await e.prepare(project, { autoAccept: true });
     await e.wait(started.runId);
     await confirmRequirements(e, project.id);
+    await skipSetupStep(e, project.id, 'code');
     await saveVerificationSettings(e, project.id, { manual: true });
     const original = (await e.state(project.id)).baseline!;
     const confirmed = await readSetupState(store, project.id);

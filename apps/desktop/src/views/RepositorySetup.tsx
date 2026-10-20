@@ -1,14 +1,9 @@
-import {
-  AlertTriangle,
-  Check,
-  FolderGit2,
-  FolderKanban,
-  RefreshCw,
-  ShieldCheck,
-} from 'lucide-react';
+import { AlertTriangle, Check, FolderGit2, RefreshCw, ShieldCheck } from 'lucide-react';
 import React from 'react';
 
 import type { Project } from '../../../../packages/contracts/src/index';
+import { ProjectFolders } from '../components/ProjectFolders';
+import { projectFolders } from '../hooks/project-folders';
 
 interface RepositorySetupProps {
   project: Project;
@@ -16,11 +11,14 @@ interface RepositorySetupProps {
   busy: boolean;
   scanning: boolean;
   scanProjectFolder: (choose?: boolean) => Promise<void>;
+  addProjectFolder: () => Promise<void>;
+  removeProjectFolder: (folder: string) => void;
 }
 
 /** Review discovered repositories and branch notes before preparing requirements. */
 export function RepositorySetup(props: RepositorySetupProps): React.JSX.Element {
   const { project, setProject, busy, scanning, scanProjectFolder } = props;
+  const connected = projectFolders(project).length > 0;
   return (
     <section className="card">
       <div className="card-heading">
@@ -29,7 +27,7 @@ export function RepositorySetup(props: RepositorySetupProps): React.JSX.Element 
         </div>
         <div>
           <h2>Project workspace</h2>
-          <p>Choose one folder. Aiden finds the Git repositories inside it.</p>
+          <p>Add one or more folders. Aiden finds the Git repositories inside each.</p>
         </div>
       </div>
       <label>
@@ -41,49 +39,32 @@ export function RepositorySetup(props: RepositorySetupProps): React.JSX.Element 
         />
       </label>
       <div className="label-row">
-        <span>Project folder</span>
-        <span>One folder for this project</span>
+        <span>Code folders</span>
       </div>
-      {project.rootPath && (
-        <div className="repo project-root" data-testid="project-root">
-          <div className="repo-heading">
-            <FolderKanban size={19} />
-            <div>
-              <strong>{project.rootPath.split(/[\\/]/).at(-1) || project.rootPath}</strong>
-              <small title={project.rootPath}>{project.rootPath}</small>
-            </div>
-          </div>
-        </div>
-      )}
-      {!project.rootPath && project.repositories.length > 0 && (
+      {!connected && project.repositories.length > 0 && (
         <p className="inline-note">
-          This saved project uses individually selected repositories. Choose their parent folder to
-          use one project folder, or continue with the saved selection.
+          This saved project uses individually selected repositories. Add their parent folders to
+          manage them here, or continue with the saved selection.
         </p>
       )}
-      <button
-        className="add-repo"
-        disabled={busy || scanning}
-        onClick={() => void scanProjectFolder(true)}
-      >
-        <FolderKanban size={17} />
-        {scanning
-          ? 'Finding repositories…'
-          : project.rootPath
-            ? 'Change project folder'
-            : 'Choose project folder'}
-      </button>
-      {(project.rootPath || project.repositories.length > 0) && (
+      <ProjectFolders
+        project={project}
+        busy={busy}
+        scanning={scanning}
+        onAdd={() => void props.addProjectFolder()}
+        onRemove={props.removeProjectFolder}
+      />
+      {(connected || project.repositories.length > 0) && (
         <>
           <div className="label-row">
             <span>Repositories included · {project.repositories.length}</span>
-            {project.rootPath && (
+            {connected && (
               <button
                 className="text-button"
                 disabled={busy || scanning}
                 onClick={() => void scanProjectFolder()}
               >
-                <RefreshCw size={13} /> Rescan folder
+                <RefreshCw size={13} /> Rescan folders
               </button>
             )}
           </div>

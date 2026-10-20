@@ -15,6 +15,11 @@ beforeEach(() => {
 });
 
 /** Open the synthetic project as a fresh one: no confirmed requirements and no finished check. */
+/** Pass the Connect code step without code, as a person without the code on this computer. */
+async function skipCode() {
+  await userEvent.click(await screen.findByRole('button', { name: "I don't have the code here" }));
+}
+
 async function openFreshProject() {
   f.setSetupPending();
   f.clearRuns();
@@ -31,7 +36,7 @@ test('a new project opens on the Guide, plays back the requirements, and sets up
   expect(await screen.findByText(/Synthetic playback of the requirements/)).toBeVisible();
   const checklist = screen.getByRole('region', { name: 'Project setup' });
   // Setup is one compact line; the steps and their explanations open on demand.
-  expect(within(checklist).getByText(/Step 2 of 4 · Review requirements/)).toBeVisible();
+  expect(within(checklist).getByText(/Step 2 of 5 · Review requirements/)).toBeVisible();
   expect(within(checklist).queryByRole('list', { name: 'Setup' })).toBeNull();
   await userEvent.type(within(dialog).getByLabelText('Message the Guide'), 'Keep this draft');
   const requestsBeforeHelp = f.request.mock.calls.length;
@@ -50,8 +55,9 @@ test('a new project opens on the Guide, plays back the requirements, and sets up
   expect(f.request).toHaveBeenCalledWith('askGuide', { projectId: f.project().id, kickoff: true });
   expect(within(screen.getByRole('tabpanel', { name: 'Chat' })).getByText('REQ-1')).toBeVisible();
   await userEvent.click(screen.getByRole('button', { name: 'Looks right' }));
+  await skipCode();
   expect(f.request).toHaveBeenCalledWith('confirmRequirements', { projectId: f.project().id });
-  expect(await screen.findByText(/how should Aiden check the work/)).toBeVisible();
+  expect((await screen.findAllByText(/how should Aiden check the work/)).at(-1)).toBeVisible();
   const methods = screen.getByRole('group', { name: 'How should Aiden check the work?' });
   expect(within(methods).queryByText('Recommended')).not.toBeInTheDocument();
   expect(within(methods).queryByRole('checkbox', { name: /iPhone/ })).not.toBeInTheDocument();
@@ -87,7 +93,7 @@ test('a new project opens on the Guide, plays back the requirements, and sets up
     projectId: f.project().id,
     text: 'I checked access and confirmed these verification methods: Connect the code, Web app.',
   });
-  expect(await screen.findByText('Step 4 of 4 · First check')).toBeVisible();
+  expect(await screen.findByText('Step 5 of 5 · First check')).toBeVisible();
 });
 
 test('a typed message round-trips, and an unanswered one can be asked again', async () => {
@@ -107,6 +113,7 @@ test('a typed message round-trips, and an unanswered one can be asked again', as
 test('choosing to check by hand saves manual verification', async () => {
   await openFreshProject();
   await userEvent.click(await screen.findByRole('button', { name: 'Looks right' }));
+  await skipCode();
   const methods = await screen.findByRole('group', { name: 'How should Aiden check the work?' });
   await userEvent.click(within(methods).getByRole('checkbox', { name: /check it myself/ }));
   expect(screen.queryByRole('button', { name: 'Check access' })).toBeNull();
@@ -200,6 +207,7 @@ test('Enter while a reply is pending preserves the draft and does not submit twi
 test('multiple selections require a fresh successful access check after any edit, and failures cannot confirm', async () => {
   await openFreshProject();
   await userEvent.click(await screen.findByRole('button', { name: 'Looks right' }));
+  await skipCode();
   const methods = await screen.findByRole('group', { name: 'How should Aiden check the work?' });
   await userEvent.click(within(methods).getByRole('checkbox', { name: /Web app/ }));
   await userEvent.click(within(methods).getByRole('checkbox', { name: /^API/ }));
@@ -243,6 +251,7 @@ test('manual-only setup confirms directly without a meaningless connection check
   f.project().repositories = [];
   await openFreshProject();
   await userEvent.click(await screen.findByRole('button', { name: 'Looks right' }));
+  await skipCode();
   await userEvent.click(await screen.findByRole('checkbox', { name: /check it myself/ }));
   expect(screen.queryByRole('button', { name: 'Check access' })).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'Confirm setup' }));
@@ -252,6 +261,7 @@ test('manual-only setup confirms directly without a meaningless connection check
 test('local code confirms directly and adding or removing a web check updates the access requirement', async () => {
   await openFreshProject();
   await userEvent.click(await screen.findByRole('button', { name: 'Looks right' }));
+  await skipCode();
   const methods = await screen.findByRole('group', { name: 'How should Aiden check the work?' });
   expect(screen.queryByRole('button', { name: 'Check access' })).toBeNull();
   expect(screen.getByRole('button', { name: 'Confirm setup' })).toBeEnabled();
@@ -275,6 +285,7 @@ test('local code confirms directly and adding or removing a web check updates th
 test('private login and key fields go directly to the worker, and editing a secret invalidates the access check', async () => {
   await openFreshProject();
   await userEvent.click(await screen.findByRole('button', { name: 'Looks right' }));
+  await skipCode();
   await userEvent.click(await screen.findByRole('checkbox', { name: 'Web app' }));
   await userEvent.type(
     screen.getByLabelText('Where does the app run?'),
@@ -424,7 +435,7 @@ test('finished checks do not complete setup and switching tabs preserves the dra
   const status = await within(chat).findByRole('status', { name: 'Setup status' });
   expect(status).toHaveTextContent('Setup not complete');
   expect(within(chat).queryByText('Check complete')).toBeNull();
-  expect(within(chat).getByText('Step 2 of 4 · Review requirements')).toBeVisible();
+  expect(within(chat).getByText('Step 2 of 5 · Review requirements')).toBeVisible();
   await userEvent.type(within(chat).getByLabelText('Message the Guide'), 'Keep this question');
   await selectTab('Scope');
   expect(chat).not.toBeVisible();

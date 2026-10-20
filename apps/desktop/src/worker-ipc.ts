@@ -64,6 +64,7 @@ const methods = new Set([
   'integrationDisconnect',
   'integrationRemove',
   'updateSources',
+  'connectCode',
   'estimate',
   'estimation',
   'estimateOverrides',

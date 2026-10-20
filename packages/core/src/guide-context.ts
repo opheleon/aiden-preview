@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 
+import type { EstimationSnapshot } from '../../contracts/src/estimation.js';
 import {
   helpLinks,
   type SetupFacts,
@@ -191,6 +192,7 @@ export async function guideInput(
       name: project.name,
       intent: project.context.slice(0, 6000),
       folder: project.rootPath ?? null,
+      folders: [project.rootPath, ...(project.additionalRootPaths ?? [])].filter(Boolean),
       repositories: project.repositories.map((r) => ({ id: r.id, notes: r.notes })),
       runtime: { provider: project.runtime.provider, auth: project.runtime.auth },
     },
@@ -209,6 +211,7 @@ export async function guideInput(
     nextSetupStep: setup.next,
     recentRuns: runs.slice(0, recentRuns).map(runSummary),
     latestCodeCheck: await latestReport(engine, project.id),
+    estimate: estimateFacts(await engine.getEstimate(project.id).catch(() => null)),
     openCalls: calls
       .filter((c) => c.status === 'open')
       .slice(0, 10)
@@ -228,5 +231,27 @@ export async function guideInput(
       settings:
         'Settings > Projects holds the folder, verification, ticket, and schedule settings.',
     },
+  };
+}
+
+/**
+ * What the Guide can say about effort: the total and remaining points and any forecast finish,
+ * only from an estimate based on a code check. Null without one, so no estimate is ever quoted
+ * from the requirements alone.
+ */
+function estimateFacts(snapshot: EstimationSnapshot | null) {
+  if (!snapshot?.reportId) return null;
+  return {
+    generatedAt: snapshot.generatedAt,
+    totalPoints: snapshot.requirements.reduce((sum, r) => sum + r.points, 0),
+    remainingPoints: snapshot.forecast.remainingPoints,
+    remainingWorkingDays: snapshot.forecast.remainingWorkingDays,
+    forecastFinish: snapshot.forecast.forecastFinish,
+    requirements: snapshot.requirements.map((r) => ({
+      id: r.requirementId,
+      size: r.original,
+      points: r.points,
+      remainingPoints: r.remainingPoints,
+    })),
   };
 }

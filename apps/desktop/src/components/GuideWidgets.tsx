@@ -4,6 +4,7 @@ import type { JSX } from 'react';
 import { type GuideWidget, helpLinks } from '../../../../packages/contracts/src/guide';
 import type { Guide } from '../hooks/useGuide';
 import type { Workspace } from '../hooks/useWorkspace';
+import { GuideCodeSetup } from './GuideCodeSetup';
 import { GuideVerificationSetup } from './GuideVerificationSetup';
 const api = window.aiden;
 
@@ -68,6 +69,8 @@ export function GuideWidgetCard(props: CardProps & { widget: GuideWidget }): JSX
   switch (widget.type) {
     case 'confirm-requirements':
       return <ConfirmRequirements {...props} />;
+    case 'connect-code':
+      return <GuideCodeSetup workspace={props.workspace} guide={props.guide} />;
     case 'verify-options':
       return <GuideVerificationSetup {...props} />;
     case 'choose-folder':

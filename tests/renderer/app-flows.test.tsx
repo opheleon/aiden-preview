@@ -425,7 +425,7 @@ test('project settings hold the folder, the app URL, and context connections', a
   await menu('Project settings');
   expect(await screen.findByRole('region', { name: 'Project verification' })).toBeVisible();
   await userEvent.type(screen.getByLabelText('Branch notes for frontend'), ' reviewed');
-  await userEvent.click(screen.getByRole('button', { name: 'Rescan folder' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Rescan folders' }));
   expect(screen.getByLabelText('Branch notes for frontend')).toHaveValue('main reviewed');
   await userEvent.click(screen.getByRole('button', { name: 'Save and run check' }));
   expect(f.request).toHaveBeenCalledWith('prepare', {

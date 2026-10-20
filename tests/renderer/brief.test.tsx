@@ -188,7 +188,7 @@ test('app-only Overview keeps verification progress and explains unavailable eff
   expect(progress).toHaveAttribute('value', '1');
   expect(progress).toHaveAttribute('max', '2');
   expect(screen.getByText('1 of 2 checks passed')).toBeVisible();
-  expect(screen.getByText(/Connect a code repository to estimate remaining work/)).toBeVisible();
+  expect(screen.getByText(/Connect your code to estimate the remaining work/)).toBeVisible();
   expect(screen.getByText(/No target agreed yet/)).toBeVisible();
 });
 

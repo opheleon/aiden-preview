@@ -58,6 +58,8 @@ export const ProjectSchema = z
     name: z.string().min(1),
     context: z.string().min(1),
     rootPath: z.string().min(1).optional(),
+    /** More folders the person added after the first; repositories may sit in any of them. */
+    additionalRootPaths: z.array(z.string().min(1)).max(20).optional(),
     discoveryWarnings: z.array(z.string()).optional(),
     repositories: z.array(
       z

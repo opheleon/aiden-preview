@@ -40,15 +40,17 @@ async function projectRoot(input: string): Promise<string> {
   }
 }
 
-// Keep the selected folder as the boundary even for saved projects and direct worker requests.
-/** Revalidate saved repository roots and uniqueness against the user-selected folder before worker execution. */
+// Keep the selected folders as the boundary even for saved projects and direct worker requests.
+/** Revalidate saved repositories and uniqueness against the user-selected folders before worker execution. */
 export async function validateProjectRepositories(project: Project): Promise<Project> {
   const rootPath = project.rootPath ? await projectRoot(project.rootPath) : undefined;
+  const additional = await Promise.all((project.additionalRootPaths ?? []).map(projectRoot));
+  const roots = rootPath ? [rootPath, ...additional] : additional;
   const repositories = [];
   for (const repo of project.repositories) {
     const location = await realpath(repo.path);
-    if (rootPath && !isInsideRoot(rootPath, location))
-      throw new Error('All repositories must be inside the selected project folder.');
+    if (roots.length && !roots.some((root) => isInsideRoot(root, location)))
+      throw new Error('All repositories must be inside the selected project folders.');
     repositories.push(await validateRepository({ ...repo, path: location }));
   }
   if (
@@ -56,7 +58,12 @@ export async function validateProjectRepositories(project: Project): Promise<Pro
     new Set(repositories.map((r) => r.path)).size !== repositories.length
   )
     throw new Error('Repository IDs and folders must be unique.');
-  return { ...project, ...(rootPath ? { rootPath } : {}), repositories };
+  return {
+    ...project,
+    ...(rootPath ? { rootPath } : {}),
+    ...(additional.length ? { additionalRootPaths: additional } : {}),
+    repositories,
+  };
 }
 
 /** Scan within explicit folder, depth, and count bounds; skip symlinks and report incomplete discovery. */

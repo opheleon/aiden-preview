@@ -4,7 +4,9 @@ import { type JSX, type RefObject, useEffect, useRef } from 'react';
 import {
   distinctGuideWidgets,
   type GuideMessage,
+  type GuideWidget,
   type SetupProgress,
+  type SetupStepId,
 } from '../../../../packages/contracts/src/guide';
 import { ChatSteps } from '../components/ChatSteps';
 import { GuideClarification } from '../components/GuideClarification';
@@ -104,6 +106,25 @@ function conversationState(guide: Guide) {
   };
 }
 
+/**
+ * The cards under the newest reply. The confirm, code, and checks steps always show their own
+ * card, whatever the reply attached, so setup never stalls on a reply that forgot it.
+ */
+function stepWidgets(
+  next: SetupStepId | null | undefined,
+  attached: GuideWidget[],
+  busy: boolean,
+): GuideWidget[] {
+  if (next === 'confirm') return busy ? [] : [{ type: 'confirm-requirements' }];
+  if (next === 'code') return [{ type: 'connect-code' }];
+  /** A card that sets up how the work is checked, as opposed to a link or the run button. */
+  const setupCard = (widget: GuideWidget) =>
+    widget.type !== 'run-check' && widget.type !== 'link' && widget.type !== 'confirm-requirements';
+  if (next === 'verify' && !attached.some(setupCard))
+    return [{ type: 'verify-options' }, ...attached.filter((w) => w.type === 'link')];
+  return attached;
+}
+
 /** Show just the current question or next action beneath the conversation. */
 function CurrentGuideControls({
   workspace,
@@ -125,12 +146,7 @@ function CurrentGuideControls({
       </div>
     );
   if (awaitingReply || state.waiting || workspace.busy) return null;
-  const widgets =
-    guide.view?.setup.next === 'confirm'
-      ? workspace.busy
-        ? []
-        : [{ type: 'confirm-requirements' as const }]
-      : state.widgets;
+  const widgets = stepWidgets(guide.view?.setup.next, state.widgets, workspace.busy);
   return (
     <>
       {widgets.map((widget) => (

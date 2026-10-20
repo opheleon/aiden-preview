@@ -14,7 +14,7 @@ Linear is optional. Connect it in Settings → Integrations whenever you want Ai
 
 Start from a customer call, a brief, or a sentence. Select the plus button beside Projects, tell Aiden what you’re building, and select Hand it to Aiden. Adding the project folder is optional; you can connect your code later.
 
-The project opens on its Chat tab, with the setup checklist at the top. The Guide plays back the requirements Aiden understood, takes your corrections, and asks how to check the work: connect the code, a web app, an API, an iPhone app, or checking it yourself. See [Project Guide](guide.md).
+The project opens on its Chat tab, with the setup checklist at the top. The Guide plays back the requirements Aiden understood and takes your corrections. Next it asks you to connect your code folders, one or more, so it can estimate the work; without code it suggests delivery slices but gives no estimate. Then it asks how to check the work: a web app, an API, or checking it yourself, alongside code checks. See [Project Guide](guide.md).
 
 Aiden writes down what done means in plain language, checks the work, and plans usable steps toward the outcome. The project takes its name from what you’re building. Each step should produce something you can test; a foundation step needs a plan for checking it before other work builds on it.
 

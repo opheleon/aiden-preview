@@ -295,14 +295,18 @@ function MethodFields({
       <div className="guide-method-fields">
         <p>
           {workspace.project.repositories.length
-            ? `Found ${workspace.project.repositories.length} ${workspace.project.repositories.length === 1 ? 'repository' : 'repositories'}.`
+            ? `Code checks run on ${workspace.project.repositories.length} connected ${workspace.project.repositories.length === 1 ? 'repository' : 'repositories'}.`
             : 'Choose the folder containing your code. Aiden will check for Git repositories.'}
         </p>
         <button
           disabled={workspace.scanning || workspace.busy}
-          onClick={() => void workspace.scanProjectFolder(true)}
+          onClick={() => void workspace.addProjectFolder()}
         >
-          {workspace.scanning ? 'Checking the folder…' : 'Choose the folder'}
+          {workspace.scanning
+            ? 'Checking the folder…'
+            : workspace.project.repositories.length
+              ? 'Add another folder'
+              : 'Choose the folder'}
         </button>
       </div>
     );

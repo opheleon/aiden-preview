@@ -31,24 +31,21 @@ export function ProjectProgress({
       job={job}
     />
   ) : (
-    <AppProgress
-      product={product}
-      check={check}
-      hasCode={workspace.project.repositories.length > 0}
-    />
+    <AppProgress workspace={workspace} product={product} check={check} />
   );
 }
 
-/** Keep app-only progress visible while explaining why code-based estimates are unavailable. */
+/** Keep app-only progress visible while explaining that estimates need the code. */
 function AppProgress({
+  workspace,
   product,
   check,
-  hasCode,
 }: {
+  workspace: Workspace;
   product: Product;
   check: Check | null;
-  hasCode: boolean;
 }): JSX.Element {
+  const hasCode = workspace.project.repositories.length > 0;
   const total = check?.result.criteria.length ?? 0;
   const passed =
     check?.result.criteria.filter((criterion) => criterion.verdict === 'pass').length ?? 0;
@@ -75,8 +72,8 @@ function AppProgress({
       <p>
         <strong>Remaining effort:</strong>{' '}
         {hasCode
-          ? 'Available after the first code assessment.'
-          : 'Connect a code repository to estimate remaining work.'}
+          ? 'A code-based estimate is available after the first code check.'
+          : 'Connect your code to estimate the remaining work.'}
       </p>
       <p>
         <strong>Agreed timing:</strong>{' '}

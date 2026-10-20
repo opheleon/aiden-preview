@@ -143,6 +143,7 @@ export function appFixture() {
       state: {
         baselineId: report.baselineId,
         requirementsConfirmedAt: report.generatedAt,
+        checksConfirmedAt: report.generatedAt,
         skipped: [],
       },
       repositories: 1,
@@ -268,6 +269,7 @@ export function appFixture() {
               api: !!p.update.api,
               phone: !!p.update.phone,
               manual: !!p.update.manual,
+              state: { ...setupFacts.state, checksConfirmedAt: report.generatedAt },
             };
           }
           return {

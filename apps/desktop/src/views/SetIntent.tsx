@@ -2,7 +2,9 @@ import { ArrowRight, CircleAlert, FileText, FolderKanban, Info } from 'lucide-re
 import { type JSX, useRef } from 'react';
 
 import brandMark from '../assets/brand-mark.svg';
+import { folderName } from '../components/ProjectFolders';
 import RuntimeSettings from '../components/RuntimeSettings';
+import { projectFolders } from '../hooks/project-folders';
 import type { Workspace } from '../hooks/useWorkspace';
 import { providerName, runtimeReady } from '../renderer/runtime-readiness';
 const api = window.aiden;
@@ -60,7 +62,8 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
           <button
             className="text-button"
             disabled={scanning}
-            onClick={() => void scanProjectFolder(true)}
+            title={folder ? 'Add another code folder' : undefined}
+            onClick={() => void workspace.addProjectFolder()}
           >
             <FolderKanban size={14} />
             {scanning
@@ -169,7 +172,7 @@ function startState(workspace: Workspace): {
   blocker: StartBlockerInfo | undefined;
 } {
   const { project, scanning } = workspace;
-  const folder = project.rootPath?.split(/[\\/]/).at(-1) || project.rootPath;
+  const folder = projectFolders(project).map(folderName).join(', ') || undefined;
   const repos = project.repositories.length;
   const connected = runtimeReady(workspace.diagnostics, project.runtime);
   const disconnected = connected === false ? providerName(project.runtime.provider) : undefined;

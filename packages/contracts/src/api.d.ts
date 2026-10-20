@@ -240,6 +240,12 @@ export type WorkerAPI = {
   integrationDisconnect: { params: { connectionId: string }; result: McpConnection };
   integrationRemove: { params: { connectionId: string }; result: { removed: boolean } };
   updateSources: { params: ProjectRef & { sources: ProjectSources }; result: null };
+  connectCode: {
+    params: ProjectRef & {
+      code: Pick<Project, 'rootPath' | 'additionalRootPaths' | 'repositories'>;
+    };
+    result: { runId: string | null };
+  };
   estimate: {
     params: ProjectRef & { reportId?: string; refreshHistory?: boolean };
     result: { runId: string };

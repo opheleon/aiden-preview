@@ -90,6 +90,10 @@ test('intent-only setup opens on the Chat tab, saves web settings, and keeps the
     await page.screenshot({ path: info.outputPath('01-setup-chat.png') });
     await reply('verify-options', 'Synthetic verification choice. How should I check the work?');
     await chat.getByRole('button', { name: 'Looks right' }).click();
+    // Without a code folder, the next step recommends connecting code; this journey continues without it.
+    await expect(chat.getByRole('region', { name: 'Connect your code' })).toBeVisible();
+    await page.screenshot({ path: info.outputPath('02-connect-code.png') });
+    await chat.getByRole('button', { name: "I don't have the code here" }).click();
     await page.screenshot({ path: info.outputPath('02-checklist.png') });
     await chat.getByRole('checkbox', { name: /Web app/ }).click();
     await chat.getByLabel('Where does the app run?').fill(`${url}/unavailable`);
@@ -126,7 +130,7 @@ test('intent-only setup opens on the Chat tab, saves web settings, and keeps the
       dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [folder] });
     }, fixture.root);
     await chat.getByRole('button', { name: 'Choose the folder', exact: true }).click();
-    await expect(chat.getByText(/Found 2 repositories/)).toBeVisible();
+    await expect(chat.getByText(/Code checks run on 2 connected repositories/)).toBeVisible();
     await reply(
       'confirm-requirements',
       'Synthetic reply: code connected, review the updated requirements.',

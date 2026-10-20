@@ -186,6 +186,23 @@ function functionMethods(engine: Engine) {
         .strict(),
       (p) => saveMonitoredBranch(engine.store, p.projectId, p.repositoryId, p.monitoredBranch),
     ),
+    connectCode: operation(
+      project.extend({
+        code: ProjectSchema.pick({
+          rootPath: true,
+          additionalRootPaths: true,
+          repositories: true,
+        }),
+      }),
+      async (p) => {
+        await engine.updateCode(p.projectId, p.code);
+        const { baseline } = await engine.state(p.projectId);
+        // With agreed requirements, read the newly connected code now; sizing follows the check.
+        return baseline && p.code.repositories.length
+          ? startLook(engine, p.projectId, 'you')
+          : { runId: null };
+      },
+    ),
     look: operation(
       project.extend({
         reason: z.enum(['commit', 'morning', 'ticket']).optional(),

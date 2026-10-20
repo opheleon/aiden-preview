@@ -11,10 +11,11 @@ A subdued **Thinking** indicator appears while the initial requirements and subs
 The top of the Guide shows the setup steps. Each step's state comes from what the project has saved, not from the conversation. You can close the app, change something in Settings, and come back; the Guide picks up at the first unfinished step.
 
 1. **Define goal.** Aiden writes the requirements from what you sent.
-2. **Review requirements.** The Guide plays them back, with any assumptions, and says what Aiden will do next. Select **Looks right**, or type a correction such as "REQ-3 should be admin only". Aiden rewrites the requirements and plays back what changed. A later change to the requirements opens this step again.
-3. **Choose checks.** Pick one or more: connect the code (a folder with a Git repository), a web app, an API, or **I'll check it myself**. Use the checkbox list to select any combination and fill in its fields. **Check access** tests the selected web/API addresses and their configured private sign-in or API key. iPhone setup is currently hidden; its implementation is retained. **Confirm setup** becomes available only after all selected targets pass; editing a target requires a new check. A failed check preserves the previous settings. Successful access is separate from passing requirements.
-4. **First check.** Run it now, or select **Later**. Checking by hand needs no automatic first check.
-5. **Ticket tracker,** such as linking a ticket tracker. These never block setup.
+2. **Review requirements.** The Guide plays them back, with any assumptions, and says what Aiden will do next. Select **Looks right**, or type a correction such as "REQ-3 should be admin only". Aiden rewrites the requirements and plays back what changed. A later change to the requirements opens this step again. If no code is connected yet, Aiden recommends connecting it next.
+3. **Connect code.** Add one or more folders with your code, such as a web app and an API, then select **Use these folders**. Aiden keeps the agreed requirements, reads the code, and estimates the work. Without the code, select **I don't have the code here**: Aiden gives its best guess at the delivery slices but no estimate, because it estimates only from the code. Connect the code later and ask Aiden to re-estimate.
+4. **Choose checks.** Code checks run on connected code automatically. Add any of a web app, an API, or **I'll check it myself**, then confirm. Use the checkbox list to select any combination and fill in its fields. **Check access** tests the selected web/API addresses and their configured private sign-in or API key. iPhone setup is currently hidden; its implementation is retained. **Confirm setup** becomes available only after all selected targets pass; editing a target requires a new check. A failed check preserves the previous settings. Successful access is separate from passing requirements.
+5. **First check.** Run it now, or select **Later**. Checking by hand needs no automatic first check.
+6. **Ticket tracker** (optional). Aiden offers it once the required steps are done; it never blocks setup.
 
 When a step is unfinished on a project that has already been checked, the Overview tab also shows a **Finish setup** banner with **Go to Chat**.
 
@@ -23,6 +24,7 @@ While Aiden prepares a reply, a moving highlight sweeps across **Thinking**. It 
 ## What the Guide can do
 
 - Answer questions from the project's saved record: where things stand, what needs you, when the last check ran and what it covered, why a requirement is marked as it is, and what each setting does.
+- Re-estimate the work when you ask, from the agreed requirements and the latest code check.
 - Make setup changes you state in the conversation, such as saving a web address you typed, switching to manual checking, starting a check, or applying a correction to the requirements. Each change appears as a line in the conversation, and you can revisit it from Project connections.
 - Point you to Help / Getting started, or to the Slack community for anything it cannot fix.
 

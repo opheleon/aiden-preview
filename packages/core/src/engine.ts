@@ -135,6 +135,30 @@ export class Engine {
       await release();
     }
   }
+  /**
+   * Save the project's code folders and repositories without rewriting its requirements, after
+   * checking every repository is a committed Git repository inside one of the chosen folders.
+   */
+  async updateCode(
+    projectId: string,
+    code: Pick<Project, 'rootPath' | 'additionalRootPaths' | 'repositories'>,
+  ): Promise<Project> {
+    const release = await this.lock(projectId);
+    try {
+      const file = path.join(this.store.project(projectId), 'project.json');
+      const saved = ProjectSchema.parse(await json(file));
+      const updated: Project = { ...saved, repositories: code.repositories };
+      delete updated.rootPath;
+      delete updated.additionalRootPaths;
+      if (code.rootPath) updated.rootPath = code.rootPath;
+      if (code.additionalRootPaths?.length) updated.additionalRootPaths = code.additionalRootPaths;
+      const next = await validateProjectRepositories(ProjectSchema.parse(updated));
+      await atomic(file, next);
+      return next;
+    } finally {
+      await release();
+    }
+  }
   /** Update project-scoped source consent; changing history clears comparisons and historical overrides. */
   async updateSources(projectId: string, sources: ProjectSources): Promise<void> {
     const release = await this.lock(projectId);

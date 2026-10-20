@@ -411,3 +411,42 @@
   font-size: 13px;
   line-height: 1.5;
 }
+
+/* Code folders connected to a project, each removable, with Add a folder below. */
+.project-folders {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.project-folder-list {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-folder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.project-folder-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.project-folder-text small {
+  overflow: hidden;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

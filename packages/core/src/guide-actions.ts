@@ -8,7 +8,7 @@ import { editIntent, startLook } from './look.js';
 import { readAppUrl, saveVerificationSettings } from './verification-settings.js';
 
 /** Steps a person may put off; the requirements and a verification method are always needed. */
-const skippable = new Set<SetupStepId>(['first-check', 'extras']);
+const skippable = new Set<SetupStepId>(['code', 'first-check', 'extras']);
 
 /** Record that the person confirmed the requirements Aiden currently holds. */
 export async function confirmRequirements(engine: Engine, projectId: string): Promise<void> {
@@ -75,10 +75,22 @@ async function applyOne(
       await requireGuideScope(engine, projectId);
       await startLook(engine, projectId, 'you');
       return 'Check started.';
+    case 're-estimate':
+      return reestimate(engine, projectId);
     case 'skip-step':
       await skipSetupStep(engine, projectId, action.step);
       return `Setup step skipped: ${action.step}.`;
   }
+}
+
+/** Size the work again from the code; without connected code there is nothing to estimate from. */
+async function reestimate(engine: Engine, projectId: string): Promise<string> {
+  await requireGuideScope(engine, projectId);
+  const { project } = await engine.state(projectId);
+  if (!project?.repositories.length)
+    throw new Error('Connect the code first; Aiden estimates only from the code.');
+  await engine.estimate(projectId);
+  return 'Re-estimating the work.';
 }
 
 /**
