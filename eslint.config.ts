@@ -18,6 +18,7 @@ export default ts.config(
       'coverage/**',
       'playwright-report/**',
       'test-results/**',
+      '.claude/worktrees/**',
     ],
   },
   js.configs.recommended,

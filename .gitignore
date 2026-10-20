@@ -9,3 +9,5 @@ test-results/
 playwright-report/
 coverage/
 .pnpm-store/
+# Agent worktrees are separate checkouts of other branches.
+.claude/worktrees/
