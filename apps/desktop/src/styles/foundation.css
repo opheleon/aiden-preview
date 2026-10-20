@@ -301,7 +301,7 @@ nav {
 }
 
 .project-row:hover,
-.project-row:focus-within,
+.project-row:has(:focus-visible),
 .project-row.selected {
   background: color-mix(in srgb, var(--paper2) 55%, transparent);
 }
@@ -340,8 +340,9 @@ nav {
   opacity: 0;
 }
 
+/* Only the dots, and only while the row is hovered, keyboard-focused, or its menu is open. */
 .project-row:hover .project-row-trigger,
-.project-row:focus-within .project-row-trigger,
+.project-row-trigger:focus-visible,
 .project-row-trigger[aria-expanded='true'] {
   opacity: 1;
 }
@@ -443,7 +444,6 @@ nav button {
 .project-row-trigger:hover,
 .project-row-trigger[aria-expanded='true'] {
   color: var(--ink);
-  background: color-mix(in srgb, var(--paper2) 80%, transparent);
 }
 
 .project-more {
