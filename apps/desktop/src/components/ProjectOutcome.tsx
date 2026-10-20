@@ -2,7 +2,7 @@ import { type JSX, useEffect, useRef, useState } from 'react';
 
 import type { Workspace } from '../hooks/useWorkspace';
 
-/** Record an explicit acceptance or closure with a note and a clear explanation of its effect. */
+/** Record an explicit acceptance with a note, or a closure with an optional note, and explain its effect. */
 export function OutcomeDialog({
   workspace,
   mode,
@@ -75,9 +75,9 @@ export function OutcomeDialog({
             : 'Closing a project does not mark its outcome as accepted or its requirements as verified.'}
         </p>
         <label>
-          {mode === 'accept' ? 'Acceptance note' : 'Closing note'}
+          {mode === 'accept' ? 'Acceptance note' : 'Closing note (optional)'}
           <textarea
-            required
+            required={mode === 'accept'}
             maxLength={2000}
             value={note}
             onChange={(event) => setNote(event.target.value)}
@@ -110,7 +110,7 @@ export function OutcomeDialog({
           <button type="button" disabled={saving} onClick={dismiss}>
             Cancel
           </button>
-          <button className="primary" disabled={saving || !note.trim()}>
+          <button className="primary" disabled={saving || (mode === 'accept' && !note.trim())}>
             {saving ? 'Saving…' : title}
           </button>
         </div>
@@ -165,7 +165,7 @@ function DecisionHistory({
             <strong>{historyLabel(entry.action)}</strong>
             {' · '}
             <time dateTime={entry.at}>{new Date(entry.at).toLocaleString()}</time>
-            <p>{entry.note}</p>
+            {entry.note && <p>{entry.note}</p>}
           </li>
         ))}
       </ol>

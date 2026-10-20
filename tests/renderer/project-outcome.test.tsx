@@ -68,7 +68,10 @@ test('closing is independent of acceptance, cancel returns focus, and reopen is 
   expect(close).toHaveFocus();
   expect(f.call).not.toHaveBeenCalled();
   await userEvent.click(close);
-  await userEvent.type(screen.getByLabelText('Closing note'), 'Cancelled this initiative.');
+  await userEvent.type(
+    screen.getByLabelText('Closing note (optional)'),
+    'Cancelled this initiative.',
+  );
   await userEvent.click(
     within(screen.getByRole('dialog')).getByRole('button', { name: 'Close project' }),
   );
@@ -132,12 +135,12 @@ test('failed credential cleanup leaves closing retryable and retaining credentia
   render(<ProjectOutcome workspace={f} />);
   await userEvent.click(screen.getByRole('button', { name: 'Close project' }));
   expect(screen.getByLabelText('Forget saved test credentials')).toBeChecked();
-  await userEvent.type(screen.getByLabelText('Closing note'), 'Paused for later.');
+  await userEvent.type(screen.getByLabelText('Closing note (optional)'), 'Paused for later.');
   const submit = within(screen.getByRole('dialog')).getByRole('button', { name: 'Close project' });
   await userEvent.click(submit);
   expect(await screen.findByRole('alert')).toHaveTextContent('Unlock secure storage');
   expect(screen.getByRole('dialog')).toBeVisible();
-  expect(screen.getByLabelText('Closing note')).toHaveValue('Paused for later.');
+  expect(screen.getByLabelText('Closing note (optional)')).toHaveValue('Paused for later.');
   expect(screen.getByLabelText('Forget saved test credentials')).toBeChecked();
   await userEvent.click(screen.getByLabelText('Forget saved test credentials'));
   await userEvent.click(submit);

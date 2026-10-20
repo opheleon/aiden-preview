@@ -71,7 +71,7 @@ export type WorkerAPI = {
   acceptOutcome: { params: ProjectRef & { note: string; evidenceKey: string }; result: Project };
   /** Pause project monitoring while retaining evidence and external tracker state. */
   closeProject: {
-    params: ProjectRef & { note: string; forgetCredentials?: boolean };
+    params: ProjectRef & { note?: string; forgetCredentials?: boolean };
     result: Project;
   };
   /** Resume monitoring for a closed project. */

@@ -32,7 +32,9 @@ test('acceptance preserves progress; closing persists across restart and reopeni
     await page.getByRole('button', { name: 'Close project', exact: true }).click();
     await expect(page.getByLabel('Forget saved test credentials')).toBeChecked();
     await page.screenshot({ path: info.outputPath('close-project-options.png') });
-    await page.getByLabel('Closing note').fill('Delivery finished for this synthetic fixture.');
+    await page
+      .getByLabel('Closing note (optional)')
+      .fill('Delivery finished for this synthetic fixture.');
     await page
       .getByRole('dialog')
       .getByRole('button', { name: 'Close project', exact: true })

@@ -52,6 +52,6 @@ If a tracker needs attention, reconnect the existing connection in Settings → 
 
 ## Close and reopen a project
 
-Use **Close project** from the project menu, add a closing note, and confirm when you want Aiden to stop following the project. You can also close an unfinished or cancelled initiative without accepting its outcome. Closing pauses automatic code checks, delivery monitoring, and ticket syncing. It preserves reports, requirements, decisions, and external tracker statuses. Active work must finish or be stopped before closing.
+Use **Close project** from the project menu, optionally add a closing note, and confirm when you want Aiden to stop following the project. You can also close an unfinished or cancelled initiative without accepting its outcome. Closing pauses automatic code checks, delivery monitoring, and ticket syncing. It preserves reports, requirements, decisions, and external tracker statuses. Active work must finish or be stopped before closing.
 
 Find the project under **Closed projects** in the sidebar. Open it to read its history, then choose **Reopen project** to resume monitoring with its existing settings. The next scheduled check can run while Aiden is open. Closing and reopening never automatically merge code or change a Linear project's status.

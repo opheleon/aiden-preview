@@ -7,6 +7,8 @@ import { decideProject, requireOpenProject } from './project-lifecycle.js';
 
 const project = z.object({ projectId: id }).strict();
 const note = z.string().trim().min(1).max(2000);
+/** Closing needs no explanation; an empty note is saved as none. */
+const closingNote = z.string().trim().max(2000).default('');
 /** Validate project decisions at the trusted worker boundary. */
 export function lifecycleMethods(
   engine: Engine,
@@ -26,7 +28,9 @@ export function lifecycleMethods(
       });
     },
     closeProject: (input: unknown) => {
-      const p = project.extend({ note, forgetCredentials: z.boolean().optional() }).parse(input);
+      const p = project
+        .extend({ note: closingNote, forgetCredentials: z.boolean().optional() })
+        .parse(input);
       return decideProject(engine, p.projectId, {
         action: 'closed',
         note: p.note,
