@@ -145,8 +145,12 @@ function CurrentGuideControls({
         <GuideClarification guide={guide} busy={workspace.busy} />
       </div>
     );
-  if (awaitingReply || state.waiting || workspace.busy) return null;
-  const widgets = stepWidgets(guide.view?.setup.next, state.widgets, workspace.busy);
+  if (awaitingReply || state.waiting) return null;
+  // While Aiden reads the code, setup keeps going: only cards that start or confirm work wait.
+  const widgets = stepWidgets(guide.view?.setup.next, state.widgets, workspace.busy).filter(
+    (widget) =>
+      !workspace.busy || (widget.type !== 'run-check' && widget.type !== 'confirm-requirements'),
+  );
   return (
     <>
       {widgets.map((widget) => (

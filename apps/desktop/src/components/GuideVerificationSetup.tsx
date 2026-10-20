@@ -14,7 +14,7 @@ import { VerificationAuthFields } from './VerificationAuthFields';
 import { VerificationCredentialStorage } from './VerificationCredentialStorage';
 
 const methods: { id: VerifyMethod; label: string; detail: string }[] = [
-  { id: 'code', label: 'Connect the code', detail: 'Check the code in a project folder' },
+  { id: 'code', label: 'Code checks', detail: 'Check the code in the connected repositories' },
   { id: 'web', label: 'Web app', detail: 'Use the app in a browser' },
   { id: 'api', label: 'API', detail: 'Check your endpoints' },
   { id: 'phone', label: 'iPhone app', detail: 'Open and control the installed app' },
@@ -123,7 +123,7 @@ function useVerificationSetup(props: SetupProps) {
       if (!Object.values(selected).some(Boolean))
         throw new Error('Choose at least one way to check the work.');
       if (code && !workspace.project.repositories.length)
-        throw new Error('Connect a GitHub repository first, or uncheck Connect the code.');
+        throw new Error('Connect a GitHub repository first, or uncheck Code checks.');
       const update = { ...verificationUpdate(draft), manual };
       const result = await workspace.call('configureGuideVerification', {
         projectId,
@@ -296,10 +296,9 @@ function MethodFields({
         <p>
           {workspace.project.repositories.length
             ? `Code checks run on ${workspace.project.repositories.length} connected ${workspace.project.repositories.length === 1 ? 'repository' : 'repositories'}.`
-            : 'Connect the GitHub repositories first. Aiden keeps a read-only copy of each.'}
+            : 'Tell Aiden in this chat which GitHub organization holds the code.'}
         </p>
         <button
-          disabled={workspace.busy}
           onClick={() => {
             workspace.setSettingsTab('project');
             workspace.setArea('settings');
@@ -377,7 +376,7 @@ function VerificationActions({
       )}
       <button
         className="primary"
-        disabled={unavailable || (!props.singleStep && !setup.ready) || workspace.busy}
+        disabled={unavailable || (!props.singleStep && !setup.ready)}
         onClick={() => void setup.check(true)}
       >
         {props.singleStep ? saveLabel(setup.needsAccess, setup.pending) : 'Confirm setup'}

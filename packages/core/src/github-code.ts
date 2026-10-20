@@ -2,7 +2,11 @@ import path from 'node:path';
 
 import type { Project } from '../../contracts/src/index.js';
 import { publicError } from '../../runtimes/src/index.js';
-import { parseGithubRepository, syncGithubRepository } from '../../tools/src/github.js';
+import {
+  type GithubRepository,
+  parseGithubRepository,
+  syncGithubRepository,
+} from '../../tools/src/github.js';
 import {
   listGithubRepositories,
   maxConnectedRepositories,
@@ -17,6 +21,39 @@ export function projectCodeFolder(engine: Engine, projectId: string): string {
 }
 
 /**
+ * Read GitHub links into distinct repositories, ignoring case; any link that is not GitHub fails.
+ * Example: ["acme/web", "https://github.com/ACME/web"] gives one acme/web.
+ */
+function githubRepositories(links: string[]): GithubRepository[] {
+  const wanted = links.map((link) => {
+    const parsed = parseGithubRepository(link);
+    if (!parsed) throw new Error(`${link.trim()} is not a GitHub repository link.`);
+    return parsed;
+  });
+  return wanted.filter(
+    (repo, index) =>
+      wanted.findIndex(
+        (other) =>
+          other.owner.toLowerCase() === repo.owner.toLowerCase() &&
+          other.name.toLowerCase() === repo.name.toLowerCase(),
+      ) === index,
+  );
+}
+
+/** Keep the notes and monitored branch a repository had when it was connected before. */
+function carryOver(
+  synced: Project['repositories'][number],
+  saved: Project['repositories'],
+): Project['repositories'][number] {
+  const previous = saved.find((existing) => existing.id === synced.id);
+  return {
+    ...synced,
+    notes: previous?.notes ?? '',
+    ...(previous?.monitoredBranch ? { monitoredBranch: previous.monitoredBranch } : {}),
+  };
+}
+
+/**
  * Connect a project's code by GitHub links: clone each repository into the project's own folder
  * the first time, so projects never share or disturb each other's copies, fetch it afterwards, and save them as the project's repositories without rewriting its requirements.
  * Notes and monitored branches carry over for repositories that were already connected. With
@@ -27,31 +64,14 @@ export async function connectGithubCode(
   engine: Engine,
   projectId: string,
   links: string[],
-  options: { keep?: boolean } = {},
+  options: { keep?: boolean; check?: boolean } = {},
 ): Promise<{ runId: string | null; repositories: Project['repositories'] }> {
-  const wanted = links.map((link) => {
-    const parsed = parseGithubRepository(link);
-    if (!parsed) throw new Error(`${link.trim()} is not a GitHub repository link.`);
-    return parsed;
-  });
-  const unique = wanted.filter(
-    (repo, index) =>
-      wanted.findIndex(
-        (other) =>
-          other.owner.toLowerCase() === repo.owner.toLowerCase() &&
-          other.name.toLowerCase() === repo.name.toLowerCase(),
-      ) === index,
-  );
+  const unique = githubRepositories(links);
   const saved = (await engine.state(projectId)).project;
   const repositories: Project['repositories'] = [];
   for (const repo of unique) {
     const synced = await syncGithubRepository(projectCodeFolder(engine, projectId), repo);
-    const previous = saved?.repositories.find((existing) => existing.id === synced.id);
-    repositories.push({
-      ...synced,
-      notes: previous?.notes ?? '',
-      ...(previous?.monitoredBranch ? { monitoredBranch: previous.monitoredBranch } : {}),
-    });
+    repositories.push(carryOver(synced, saved?.repositories ?? []));
   }
   // Adding from the chat keeps what was already connected; Project settings saves the exact list.
   const kept = options.keep
@@ -59,7 +79,10 @@ export async function connectGithubCode(
     : [];
   await engine.updateCode(projectId, [...kept, ...repositories]);
   const { baseline } = await engine.state(projectId);
-  const look = baseline && repositories.length ? await startLook(engine, projectId, 'you') : null;
+  const look =
+    options.check !== false && baseline && repositories.length
+      ? await startLook(engine, projectId, 'you')
+      : null;
   return { runId: look?.runId ?? null, repositories: [...kept, ...repositories] };
 }
 
@@ -105,17 +128,23 @@ export function startGithubConnect(
     ? names.map((name) => `${owner}/${name}`).join(', ')
     : `the active repositories in ${owner}`;
   void (async () => {
-    let event: string;
     try {
       const { links, capped } = await chooseRepositories(owner, names);
-      const result = await connectGithubCode(engine, projectId, links, { keep: true });
-      event = `Connected ${links.join(', ')} from GitHub.${capped ? ` That is the ${maxConnectedRepositories} most recently pushed; name others to add them.` : ''}${result.runId ? ' Aiden is reading the code.' : ''}`;
+      await connectGithubCode(engine, projectId, links, { keep: true, check: false });
+      const { baseline } = await engine.state(projectId);
+      const event = `Connected ${links.join(', ')} from GitHub.${capped ? ` That is the ${maxConnectedRepositories} most recently pushed; name others to add them.` : ''}${baseline ? ' Aiden is reading the code.' : ''}`;
+      // Record the event before the check starts, so the chat shows it when it follows the run.
+      await recordGuideEvent(engine, projectId, event).catch(() => {});
+      if (baseline) await startLook(engine, projectId, 'you');
     } catch (error) {
-      event = `Could not connect ${what}: ${publicError(error)}`;
+      await recordGuideEvent(
+        engine,
+        projectId,
+        `Could not connect ${what}: ${publicError(error)}`,
+      ).catch(() => {});
     } finally {
       connecting.delete(projectId);
     }
-    await recordGuideEvent(engine, projectId, event).catch(() => {});
   })();
   return `Copying ${what} from GitHub. A large repository can take a few minutes.`;
 }

@@ -91,7 +91,15 @@ export async function executeEstimate(
     const complexity = await originalEstimates(modelStage, baseline, report?.snapshots ?? []);
     const collected = await collectEstimationHistory(context, run, signal, dir);
     const history = await historicalEstimates(modelStage, collected.rows);
-    const remaining = await remainingEstimates(modelStage, baseline, report, context, run, history);
+    const remaining = await remainingEstimates(
+      modelStage,
+      baseline,
+      report,
+      context,
+      run,
+      history,
+      complexity,
+    );
     const overrides =
       (await optionalJson<EstimateOverrides>(
         path.join(context.store.project(run.projectId), 'estimate-overrides.json'),

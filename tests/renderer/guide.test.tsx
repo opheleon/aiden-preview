@@ -91,7 +91,7 @@ test('a new project opens on the Guide, plays back the requirements, and sets up
   );
   expect(f.request).toHaveBeenCalledWith('askGuide', {
     projectId: f.project().id,
-    text: 'I checked access and confirmed these verification methods: Connect the code, Web app.',
+    text: 'I checked access and confirmed these verification methods: Code checks, Web app.',
   });
   expect(await screen.findByText('Step 5 of 5 · First check')).toBeVisible();
 });
@@ -278,7 +278,7 @@ test('local code confirms directly and adding or removing a web check updates th
   ).toHaveLength(0);
   expect(f.request).toHaveBeenCalledWith('askGuide', {
     projectId: f.project().id,
-    text: 'I confirmed these verification methods: Connect the code.',
+    text: 'I confirmed these verification methods: Code checks.',
   });
 });
 

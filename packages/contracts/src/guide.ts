@@ -253,7 +253,10 @@ export const methodNames: Record<VerifyMethod, string> = {
 /** Explain the understanding stage while questions or a scope rewrite are still pending. */
 function understandingDetail(facts: SetupFacts): string {
   if (facts.clarificationCount) return 'Answer the questions in this chat.';
-  if (facts.requirementsPending) return 'Updating the requirements with your answers.';
+  if (facts.requirementsPending)
+    return facts.baselineId
+      ? 'Updating the requirements with your answers.'
+      : 'Writing the requirements.';
   return facts.baselineId ? 'Requirements written.' : 'Reading what you sent.';
 }
 
@@ -279,7 +282,7 @@ function stepDetails(
     confirm: done.confirm ? 'You confirmed the requirements.' : 'Check that Aiden understood you.',
     code: facts.repositories
       ? `${facts.repositories} ${facts.repositories === 1 ? 'repository' : 'repositories'} connected.`
-      : 'Paste your GitHub repositories so Aiden can estimate the work.',
+      : 'Tell Aiden which GitHub organization holds the code.',
     verify:
       methods.length && !done.verify
         ? methods.every((m) => m === 'code')
