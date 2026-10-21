@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add a [Windows setup guide](docs/windows-setup.md) written for first-time users: install the unsigned x64 installer, connect a ChatGPT or Claude subscription from PowerShell, and sign in to GitHub. Link it from the README, getting started, and troubleshooting.
+
 ## 1.2.5
 
 - Make Chat the first project tab and the one each project opens on, replacing the chat overlay. Sidebar and Settings entries return to it, and drafts survive tab and page changes.
