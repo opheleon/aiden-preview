@@ -123,6 +123,12 @@ void test('stage corrects only invalid output and resumes a validated checkpoint
     });
     assert.equal(f.calls(), 3);
     assert.equal(checkpoints, 1);
+    const rejected = await json<Record<string, unknown>>(
+      path.join(f.root, 'rejected', 'understand-2.json'),
+    );
+    assert.equal(rejected.attempt, 2);
+    assert.deepEqual(rejected.output, { accepted: false }, 'rejected answers stay for diagnosis');
+    assert.match(String(rejected.problem), /accepted/);
     assert.equal(f.run.runtimeModel, 'fixture-model');
     assert.ok(f.events.some((event) => event.message === 'Synthetic progress'));
     await stage('understand', schema, {}, (value) => schema.parse(value));

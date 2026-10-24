@@ -2,7 +2,7 @@ import { z } from 'zod/v3';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
 import { DeliveryPlanSchema, validateDeliveryPlan } from './delivery-plan.js';
-import { edgeCaseId, requirementId } from './ids.js';
+import { edgeCaseId, requireExactIds, requirementId } from './ids.js';
 import { ProjectSourcesSchema } from './integrations.js';
 import { ProjectLifecycleViewSchema } from './project-lifecycle.js';
 import { RuntimeSchema } from './runtime.js';
@@ -334,9 +334,11 @@ export function validateFindings(
   reads: ReadReceipt[],
 ): Findings {
   const f = FindingsSchema.parse(value);
-  const expected = product.requirements.map((r) => r.id).sort();
-  if (JSON.stringify(f.assessments.map((a) => a.requirementId).sort()) !== JSON.stringify(expected))
-    throw new Error('Assess exactly every reviewed requirement once.');
+  requireExactIds(
+    'Assess exactly every reviewed requirement once.',
+    product.requirements.map((r) => r.id),
+    f.assessments.map((a) => a.requirementId),
+  );
   for (const a of f.assessments) {
     if ((a.status === 'implemented' || a.status === 'partial' || a.deviation) && !a.evidence.length)
       throw new Error(`${a.requirementId}: supported and contradictory claims require evidence.`);
