@@ -1,0 +1,40 @@
+/* Renderer stylesheet entry. The handwritten styles sit in the legacy layer so Tailwind utilities,
+   which shadcn/ui components are built from, override them without specificity fights. Preflight is
+   left out: foundation.css already sets the base element styles. Within legacy, the original
+   cascade holds: shared foundations first, product overrides last. */
+
+@layer theme, legacy, utilities;
+
+@import 'tailwindcss/theme.css' layer(theme);
+@import './style.css' layer(legacy);
+@import './product-workspace.css' layer(legacy);
+@import 'tailwindcss/utilities.css' layer(utilities) source('./');
+@import 'tw-animate-css';
+
+/* shadcn/ui theme roles mapped to the Opheleon tokens in styles/foundation.css. Tailwind's own
+   --font-sans, --font-serif, and --font-mono already resolve to the foundation fonts, because the
+   foundation declarations outrank the theme layer. */
+@theme inline {
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --color-card: var(--card);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--card);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--ink);
+  --color-primary-foreground: var(--card);
+  --color-secondary: var(--paper2);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--paper2);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--paper2);
+  --color-accent-foreground: var(--ink);
+  --color-destructive: var(--danger);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--brand);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}

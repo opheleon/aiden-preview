@@ -96,7 +96,6 @@
 
 /* The requirement pop-up: status first, then everything Aiden knows. */
 .requirement-sheet {
-  width: min(720px, 100%);
   display: grid;
   gap: 16px;
 }
@@ -115,10 +114,6 @@
 
 .requirement-sheet .delivery-ticket {
   margin-top: 0;
-}
-
-.plan-modal {
-  width: min(820px, 100%);
 }
 
 .ticket-alerts {
@@ -195,11 +190,6 @@
   position: relative;
 }
 
-.linear-team-picker > button {
-  text-align: left;
-  justify-content: space-between;
-}
-
 .linear-team-options {
   display: grid;
   gap: 8px;
@@ -207,24 +197,6 @@
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: var(--color-background);
-}
-
-.linear-team-options [role='listbox'] {
-  display: grid;
-  gap: 4px;
-  max-height: 240px;
-  overflow-y: auto;
-}
-
-.linear-team-options [role='option'] {
-  justify-content: flex-start;
-  min-height: 36px;
-  padding: 8px 12px;
-  text-align: left;
-}
-
-.linear-team-options [aria-selected='true'] {
-  background: var(--color-paper2);
 }
 
 /* How Aiden knows a requirement's status, readable without hovering the chip. */

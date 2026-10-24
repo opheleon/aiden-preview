@@ -17,6 +17,7 @@
   --tint: #ece9fb;
   --border: oklch(87.31336% 0.0155413 90.24831deg);
   --card: #fff;
+  --danger: #a63d46;
   --radius: 12px;
   --color-background: var(--paper);
   --color-foreground: var(--ink);
@@ -31,7 +32,7 @@
   --color-tint: var(--tint);
   --color-body: var(--body);
   --color-paper2: var(--paper2);
-  --color-destructive: #a63d46;
+  --color-destructive: var(--danger);
 
   font-family: var(--font-sans);
   color: var(--ink);

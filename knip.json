@@ -45,5 +45,6 @@
     }
   },
   "ignoreBinaries": ["appium"],
+  "ignoreDependencies": ["tailwindcss", "tw-animate-css"],
   "ignoreExportsUsedInFile": true
 }

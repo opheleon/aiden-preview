@@ -66,7 +66,8 @@ test('an existing plan can connect later, publish, and resync its linked tickets
     expect(tracker.linear.calls).not.toContain('teams');
     await page.getByRole('combobox', { name: 'Linear team' }).click();
     await expect(page.getByRole('option', { name: 'Books', exact: true })).toBeVisible();
-    await page.screenshot({ path: info.outputPath('linear-team-picker.png'), fullPage: true });
+    // Viewport only: a full-page capture resizes the window, which closes an open select list.
+    await page.screenshot({ path: info.outputPath('linear-team-picker.png') });
     await page.getByRole('option', { name: 'Books', exact: true }).click();
     await expect(page.getByText('New Linear project: A book project')).toBeVisible();
     await page.getByRole('checkbox', { name: /Automatically create/ }).check();

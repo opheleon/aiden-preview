@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Pop-ups (a requirement's full story, Adjust plan, Tickets, check evidence, and code evidence) now use shadcn/ui's dialog in Aiden's colors: they fade and zoom in, keep keyboard focus inside until closed, and have a Close button in the top-right corner. A project's … menu now uses shadcn/ui's dropdown menu: arrow keys and typing a letter move between actions, and it stays inside the window near any edge. The Linear team picker uses shadcn/ui's select, with a check mark beside the chosen team; it still loads teams only when opened and shows loading, a failure with Retry teams, or no teams under the field. This adds Tailwind CSS to the desktop app for shadcn/ui components.
+
 ## 1.2.5
 
 - Make Chat the first project tab and the one each project opens on, replacing the chat overlay. Sidebar and Settings entries return to it, and drafts survive tab and page changes.

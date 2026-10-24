@@ -48,7 +48,14 @@ test('one project setting grants automatic tickets in the selected destination',
   await userEvent.selectOptions(screen.getByRole('combobox', { name: 'MCP connection' }), 'linear');
   expect(f.call.mock.calls.some(([method]) => method === 'linearTeams')).toBe(false);
   await userEvent.click(screen.getByRole('combobox', { name: 'Linear team' }));
-  await userEvent.click(await screen.findByRole('option', { name: 'Books' }));
+  // jsdom puts every event at 0,0, and Radix Select ignores a release that has not moved away
+  // from the press that opened it, so move onto the option the way a real pointer would.
+  const books = await screen.findByRole('option', { name: 'Books' });
+  const below = { clientX: 40, clientY: 80, pageX: 40, pageY: 80 };
+  await userEvent.pointer([
+    { target: books, coords: below },
+    { keys: '[MouseLeft]', target: books, coords: below },
+  ]);
   expect(screen.getByText('New Linear project: Deliver books')).toBeVisible();
   expect(screen.queryByRole('textbox', { name: /Linear project/ })).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole('checkbox', { name: /Automatically create/ }));

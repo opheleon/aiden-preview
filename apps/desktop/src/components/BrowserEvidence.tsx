@@ -1,5 +1,4 @@
-import { X } from 'lucide-react';
-import { type JSX, useEffect, useRef, useState } from 'react';
+import { type JSX, useRef, useState } from 'react';
 
 import type {
   CriterionResult,
@@ -8,6 +7,7 @@ import type {
 import type { DesktopBridge } from '../bridge';
 import { useVerificationMedia } from '../hooks/useVerificationMedia';
 import { browserLabel } from '../renderer/requirement-status';
+import { Modal } from './Modal';
 
 const verdictWords: Record<VerificationAttempt['verdict'], string> = {
   pass: 'Passed',
@@ -52,84 +52,69 @@ export function BrowserEvidence({
   const [error, setError] = useState('');
   const attempt =
     criterion.attempts.find((item) => item.attempt === selected) ?? criterion.attempts[0];
-  useEffect(() => {
-    /** Close on Escape like the other Aiden dialogs' Close button. */
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const kind = criterion.method === 'api' ? 'API check' : 'Browser check';
   return (
-    <div className="modal-overlay">
-      <section
-        className="modal browser-evidence card"
-        role="dialog"
-        aria-modal="true"
-        aria-label={criterion.method === 'api' ? 'API check' : 'Browser check'}
+    <Modal
+      label={kind}
+      closeLabel={criterion.method === 'api' ? 'Close API check' : 'Close browser check'}
+      className="browser-evidence w-[880px]"
+      eyebrow={
+        <>
+          {criterion.requirementId}
+          {criterion.edgeCaseId ? ` edge case ${criterion.edgeCaseId}` : ''} · {kind}
+        </>
+      }
+      title={criterion.criterion}
+      onClose={onClose}
+    >
+      <span
+        className={`project-status-badge project-status-badge--${verdictTones[criterion.verdict]}`}
       >
-        <div className="card-heading">
-          <div>
-            <p className="eyebrow">
-              {criterion.requirementId}
-              {criterion.edgeCaseId ? ` edge case ${criterion.edgeCaseId}` : ''} ·{' '}
-              {criterion.method === 'api' ? 'API check' : 'Browser check'}
-            </p>
-            <h2>{criterion.criterion}</h2>
-          </div>
-          <button className="icon-button" aria-label="Close browser check" onClick={onClose}>
-            <X size={20} />
-          </button>
+        {browserLabel(criterion)}
+      </span>
+      {criterion.attempts.length > 1 && (
+        <div className="browser-evidence-attempts" role="group" aria-label="Attempts">
+          {criterion.attempts.map((item) => (
+            <button
+              key={item.attempt}
+              aria-pressed={item.attempt === attempt?.attempt}
+              onClick={() => setSelected(item.attempt)}
+            >
+              Attempt {item.attempt} · {verdictWords[item.verdict]}
+              {item.attempt === criterion.decisiveAttempt ? ' (decided the result)' : ''}
+            </button>
+          ))}
         </div>
-        <span
-          className={`project-status-badge project-status-badge--${verdictTones[criterion.verdict]}`}
+      )}
+      {attempt ? (
+        <AttemptEvidence
+          key={attempt.attempt}
+          api={api}
+          projectId={projectId}
+          runId={runId}
+          attempt={attempt}
+          method={criterion.method ?? 'app'}
+        />
+      ) : (
+        <p>{criterion.explanation}</p>
+      )}
+      {error && <p role="alert">{error}</p>}
+      <div className="product-actions browser-evidence-actions">
+        <button
+          className="secondary"
+          onClick={() =>
+            void api
+              ?.openVerificationReport({ projectId, runId })
+              .catch(() => setError('Could not open the full report.'))
+          }
         >
-          {browserLabel(criterion)}
-        </span>
-        {criterion.attempts.length > 1 && (
-          <div className="browser-evidence-attempts" role="group" aria-label="Attempts">
-            {criterion.attempts.map((item) => (
-              <button
-                key={item.attempt}
-                aria-pressed={item.attempt === attempt?.attempt}
-                onClick={() => setSelected(item.attempt)}
-              >
-                Attempt {item.attempt} · {verdictWords[item.verdict]}
-                {item.attempt === criterion.decisiveAttempt ? ' (decided the result)' : ''}
-              </button>
-            ))}
-          </div>
-        )}
-        {attempt ? (
-          <AttemptEvidence
-            key={attempt.attempt}
-            api={api}
-            projectId={projectId}
-            runId={runId}
-            attempt={attempt}
-            method={criterion.method ?? 'app'}
-          />
-        ) : (
-          <p>{criterion.explanation}</p>
-        )}
-        {error && <p role="alert">{error}</p>}
-        <div className="product-actions browser-evidence-actions">
-          <button
-            className="secondary"
-            onClick={() =>
-              void api
-                ?.openVerificationReport({ projectId, runId })
-                .catch(() => setError('Could not open the full report.'))
-            }
-          >
-            Open full report
-          </button>
-          <button className="primary" onClick={onClose}>
-            Close
-          </button>
-        </div>
-      </section>
-    </div>
+          Open full report
+        </button>
+        <button className="primary" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    </Modal>
   );
 }
 

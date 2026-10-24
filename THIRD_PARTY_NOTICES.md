@@ -2,14 +2,16 @@
 
 Aiden's original source is Apache-2.0. Dependencies, fonts, provider binaries, and service access retain their own terms. Exact dependency versions and integrity hashes are recorded in `pnpm-lock.yaml`.
 
-| Component                                                                               | License / terms                                                                           |
-| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| React, React DOM, Electron, electron-updater, MCP TypeScript SDK, Zod, @napi-rs/keyring | MIT; retain the installed copyright and license notices                                   |
-| Lucide React, zod-to-json-schema                                                        | ISC; retain the installed notices                                                         |
-| Instrument Sans, Instrument Serif, JetBrains Mono                                       | SIL Open Font License 1.1; retain the font licenses and reserved-name restrictions        |
-| Claude Agent SDK and bundled Claude executable                                          | Anthropic commercial terms; preserve the unmodified binary and applicable notices         |
-| Chromium and other components bundled with Electron                                     | Retain Electron's LICENSE and LICENSES.chromium.html from the actual runtime distribution |
-| Playwright, bundled Chromium headless shell, and video encoder                          | Apache-2.0 for Playwright; retain the browser build's bundled license notices             |
+| Component                                                                                                       | License / terms                                                                           |
+| --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| React, React DOM, Electron, electron-updater, MCP TypeScript SDK, Zod, @napi-rs/keyring                         | MIT; retain the installed copyright and license notices                                   |
+| Radix UI Dialog, Dropdown Menu, and Select, clsx, tailwind-merge, Tailwind CSS generated styles, tw-animate-css | MIT; retain the installed copyright and license notices                                   |
+| shadcn/ui component source adapted in `apps/desktop/src/components/ui`                                          | MIT, Copyright (c) 2023 shadcn; keep the attribution comment in each adapted file         |
+| Lucide React, zod-to-json-schema                                                                                | ISC; retain the installed notices                                                         |
+| Instrument Sans, Instrument Serif, JetBrains Mono                                                               | SIL Open Font License 1.1; retain the font licenses and reserved-name restrictions        |
+| Claude Agent SDK and bundled Claude executable                                                                  | Anthropic commercial terms; preserve the unmodified binary and applicable notices         |
+| Chromium and other components bundled with Electron                                                             | Retain Electron's LICENSE and LICENSES.chromium.html from the actual runtime distribution |
+| Playwright, bundled Chromium headless shell, and video encoder                                                  | Apache-2.0 for Playwright; retain the browser build's bundled license notices             |
 
 The installed Claude Agent SDK is governed by [Anthropic's terms](https://code.claude.com/docs/en/legal-and-compliance#can-customers-offer-claude-code-in-their-products). These describe running the unmodified Claude Code binary in third-party products with each user authenticating through Anthropic's own flow and paying for their own usage. Aiden uses the official SDK and the user's local Claude Code sign-in. Packaging must preserve the binary and its authentication methods; Aiden must not collect subscription tokens or resell usage.
 
