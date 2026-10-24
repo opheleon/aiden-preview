@@ -1,0 +1,131 @@
+{
+  "account": {
+    "id": "00000000-0000-4000-8000-000000000002",
+    "name": "Opheleon",
+    "createdAt": "2026-10-20T15:00:00.000Z"
+  },
+  "members": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "email": "alice@example.com",
+      "name": "ALICE",
+      "avatar": null,
+      "role": "owner",
+      "isAdmin": true
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "email": "bob@example.com",
+      "name": "BOB",
+      "avatar": null,
+      "role": "member",
+      "isAdmin": false
+    }
+  ],
+  "projects": [
+    {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "name": "Invoice payments",
+      "revision": 2,
+      "status": "active"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "00000000-0000-4000-8000-000000000006",
+      "accountId": "00000000-0000-4000-8000-000000000002",
+      "projectId": "00000000-0000-4000-8000-000000000005",
+      "actor": "agent",
+      "kind": "write-requirements",
+      "title": "Write requirements",
+      "instructions": "Turn the goal into requirements.",
+      "requirementIds": [],
+      "requires": {
+        "tools": [],
+        "connections": [],
+        "runtime": {
+          "provider": "claude",
+          "auth": "subscription"
+        },
+        "pinnedUserId": null,
+        "pinnedDeviceId": "alice-mac"
+      },
+      "status": "blocked",
+      "blockedBy": "00000000-0000-4000-8000-000000000007",
+      "assigneeUserId": null,
+      "leasedDeviceId": "alice-mac",
+      "leaseExpiresAt": null,
+      "attempts": 1,
+      "execution": {
+        "attemptId": "00000000-0000-4000-8000-000000000006:1",
+        "location": "local",
+        "startedAt": "2026-10-20T15:00:00.000Z",
+        "deadlineAt": "2026-10-20T15:45:00.000Z",
+        "activityAt": "2026-10-20T15:00:00.000Z",
+        "activitySequence": 1,
+        "reportedAt": null,
+        "phase": "blocked",
+        "limits": {
+          "idleMs": 600000,
+          "toolMs": 1800000,
+          "absoluteMs": 2700000
+        },
+        "checkpoint": null
+      },
+      "result": null,
+      "resume": null,
+      "queuedAt": "2026-10-20T15:00:00.000Z",
+      "updatedAt": "2026-10-20T15:00:00.000Z",
+      "waiting": null,
+      "progress": "Reading the spec"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000007",
+      "accountId": "00000000-0000-4000-8000-000000000002",
+      "projectId": "00000000-0000-4000-8000-000000000005",
+      "actor": "human",
+      "kind": "answer",
+      "title": "Which currency?",
+      "instructions": "Should invoices support EUR?",
+      "requirementIds": [],
+      "requires": {
+        "tools": [],
+        "connections": [],
+        "runtime": null,
+        "pinnedUserId": null,
+        "pinnedDeviceId": null
+      },
+      "status": "queued",
+      "blockedBy": null,
+      "assigneeUserId": "00000000-0000-4000-8000-000000000001",
+      "leasedDeviceId": null,
+      "leaseExpiresAt": null,
+      "attempts": 0,
+      "execution": null,
+      "result": null,
+      "resume": null,
+      "queuedAt": "2026-10-20T15:00:00.000Z",
+      "updatedAt": "2026-10-20T15:00:00.000Z",
+      "waiting": null,
+      "progress": null
+    }
+  ],
+  "devices": [
+    {
+      "deviceId": "bob-mac",
+      "name": "Bob MacBook",
+      "owner": "bob@example.com",
+      "lastSeenAt": "2026-10-20T15:00:00.000Z",
+      "busy": false,
+      "pickupEnabled": false
+    },
+    {
+      "deviceId": "alice-mac",
+      "name": "Alice MacBook",
+      "owner": "alice@example.com",
+      "lastSeenAt": "2026-10-20T15:00:00.000Z",
+      "busy": true,
+      "pickupEnabled": true
+    }
+  ]
+}

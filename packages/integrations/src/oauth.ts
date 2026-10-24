@@ -25,7 +25,7 @@ export class StoredOAuthProvider implements OAuthClientProvider {
   get clientMetadata(): OAuthClientMetadata {
     return {
       client_name: 'Aiden Desktop',
-      client_uri: 'https://opheleon.com',
+      client_uri: 'https://opheleon.ai',
       redirect_uris: [this.redirectUrl],
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],

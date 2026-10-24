@@ -21,6 +21,7 @@ import { TicketSettingsSchema, TicketToolsSchema } from '../../contracts/src/tic
 import { VerificationUpdateSchema } from '../../contracts/src/verification.js';
 import { Runtimes } from '../../runtimes/src/index.js';
 import { discoverRepositories } from '../../tools/src/discovery.js';
+import { accountMethods } from './accounts/methods.js';
 import { readActivity, readRunLog } from './activity.js';
 import { askWhy, explainEntry, readChat } from './ask-why.js';
 import { betaSettings, reconcileDelivery, saveBetaSettings } from './beta-delivery.js';
@@ -71,6 +72,7 @@ export function createMethods(
   runtimes: RuntimeControls,
 ): Record<WorkerMethod, (params: unknown) => unknown> {
   return guardLifecycleMethods(engine, {
+    ...accountMethods(engine, runtimes),
     ...deviceMethods(engine),
     ...guideMethods(engine),
     discoverRepositories: operation(z.object({ rootPath: z.string().min(1) }).strict(), (p) =>

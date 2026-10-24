@@ -461,6 +461,25 @@
   background: #eaf1f5;
 }
 
+.chip--aiden {
+  color: var(--color-body);
+  background: var(--color-paper2);
+}
+
+.task-status {
+  color: var(--color-muted-foreground);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.task-status--in-progress {
+  color: var(--color-brand-dark);
+}
+
+.task-status--failed {
+  color: var(--color-destructive);
+}
+
 .chip--pm {
   color: var(--color-brand-dark);
   background: var(--color-tint);
@@ -471,4 +490,8 @@
   display: block;
   color: var(--color-muted-foreground);
   font-size: 12px;
+}
+
+.task-status--stopped {
+  color: var(--color-muted-foreground);
 }

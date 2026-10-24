@@ -71,6 +71,20 @@ async function start(state: WorkspaceState, call: Call): Promise<void> {
         'Tell Aiden what you are building. Paste or type anything that describes it.',
       );
     const project = { ...state.project, name: scopeName(state.project.context) };
+    const saved = state.projects.some((p) => p.id === project.id);
+    // Only a project that does not exist yet goes to the team; a saved project (for example after
+    // its code changed) rewrites its own requirements and must never be copied into a new one.
+    if (state.accountScope && !saved) {
+      // The team's queue decides which member's machine writes the requirements.
+      const created = await call('accountCreateProject', {
+        accountId: state.accountScope,
+        project,
+      });
+      state.setProjects(await call('projects'));
+      if (created) await load(state, call, created.id);
+      state.setLive('Your team will write the requirements on the best available machine.');
+      return;
+    }
     state.setBusy(true);
     state.setLive('Planning features and their requirements…');
     // Verification is set up in the Guide after the start, not on the start screen.

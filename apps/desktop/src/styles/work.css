@@ -1,0 +1,289 @@
+/* My work and Agents: calm, contained cards of one-line rows that open in place. */
+.work-view {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 740px;
+  padding-top: 52px;
+}
+
+.work-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.work-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.work-header h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.work-lede {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.work-refresh {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--faint);
+}
+
+.work-refresh:hover {
+  background: var(--paper2);
+  color: var(--ink);
+}
+
+.work-card {
+  overflow: hidden;
+  border: 1px solid #e8e5dd;
+  border-radius: 16px;
+  background: var(--card);
+}
+
+.work-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.work-card-head svg {
+  color: var(--brand);
+}
+
+.work-count {
+  font-weight: 500;
+  color: var(--faint);
+}
+
+.work-empty {
+  margin: 0;
+  padding: 2px 20px 18px;
+  font-size: 14px;
+  color: var(--faint);
+}
+
+.work-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 0;
+  padding: 14px 20px;
+  border: 0;
+  border-top: 1px solid #f0eee8;
+  border-radius: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.work-item:hover,
+.work-item[aria-expanded='true'] {
+  background: #fbfaf7;
+}
+
+.work-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.work-title {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* An open row shows its whole title. */
+.work-item[aria-expanded='true'] .work-title {
+  white-space: normal;
+}
+
+.work-sub,
+.work-meta {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.work-meta {
+  flex: none;
+  white-space: nowrap;
+}
+
+.work-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.work-dot--brand {
+  background: var(--brand);
+}
+
+.work-dot--live {
+  background: #22a06b;
+}
+
+.work-dot--warn {
+  background: #e08a4b;
+}
+
+.work-dot--quiet {
+  background: #cfcbc1;
+}
+
+.work-avatar {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #f1efea;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--body);
+}
+
+.work-avatar .work-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--card);
+}
+
+.work-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 20px 20px 42px;
+  background: #fbfaf7;
+}
+
+.work-note {
+  display: -webkit-box;
+  max-width: 600px;
+  margin: 0;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--muted);
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+
+.work-actions,
+.work-answer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.work-answer input {
+  flex: 1;
+  min-width: 200px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid #e1ded6;
+  border-radius: 999px;
+  background: var(--card);
+  font: inherit;
+  font-size: 14px;
+}
+
+.work-solid,
+.work-soft {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.work-solid {
+  border: 0;
+  background: var(--ink);
+  color: #fff;
+}
+
+.work-solid:hover {
+  background: var(--ink-hover);
+}
+
+.work-soft {
+  border: 1px solid #e1ded6;
+  background: var(--card);
+  color: var(--ink);
+}
+
+.work-solid:disabled,
+.work-soft:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.work-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+}
+
+.work-facts div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.work-facts strong {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* An agent row leads with a 30px avatar, so its detail lines up with the text. */
+.work-row:has(.work-avatar) .work-detail {
+  padding-left: 64px;
+}

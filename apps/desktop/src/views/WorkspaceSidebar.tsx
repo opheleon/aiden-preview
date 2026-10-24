@@ -1,4 +1,4 @@
-import { BookOpen, ExternalLink, MessageCircle, Plus, Settings2 } from 'lucide-react';
+import { BookOpen, ExternalLink, MessageCircle, Plus, Settings2, Users } from 'lucide-react';
 import { type JSX, useState } from 'react';
 
 import { helpLinks } from '../../../../packages/contracts/src/guide';
@@ -66,6 +66,13 @@ export function WorkspaceSidebar({
         )}
       </nav>
       <div className="sidebar-bottom">
+        <button
+          className={area === 'account' ? 'sidebar-section selected' : 'sidebar-section'}
+          onClick={() => setArea('account')}
+        >
+          <Users size={17} />
+          <span>Teams</span>
+        </button>
         <button className="sidebar-section" data-guide-trigger onClick={onGettingStarted}>
           <BookOpen size={17} />
           <span>Help / Getting started</span>

@@ -1,0 +1,29 @@
+{
+  "id": "00000000-0000-4000-8000-000000000007",
+  "accountId": "00000000-0000-4000-8000-000000000002",
+  "projectId": "00000000-0000-4000-8000-000000000005",
+  "actor": "human",
+  "kind": "answer",
+  "title": "Which currency?",
+  "instructions": "Should invoices support EUR?",
+  "requirementIds": [],
+  "requires": {
+    "tools": [],
+    "connections": [],
+    "runtime": null,
+    "pinnedUserId": null,
+    "pinnedDeviceId": null
+  },
+  "status": "done",
+  "blockedBy": null,
+  "assigneeUserId": "00000000-0000-4000-8000-000000000001",
+  "leasedDeviceId": null,
+  "leaseExpiresAt": null,
+  "attempts": 0,
+  "execution": null,
+  "result": "USD only for now",
+  "resume": null,
+  "queuedAt": "2026-10-20T15:00:00.000Z",
+  "updatedAt": "2026-10-20T15:00:00.000Z",
+  "progress": null
+}

@@ -1,0 +1,15 @@
+{
+  "user": {
+    "id": "00000000-0000-4000-8000-000000000004",
+    "email": "bob@example.com",
+    "name": "BOB",
+    "avatar": null,
+    "slack": null
+  },
+  "accounts": [
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "name": "Opheleon"
+    }
+  ]
+}

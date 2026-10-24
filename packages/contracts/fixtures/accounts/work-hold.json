@@ -1,0 +1,10 @@
+{
+  "decision": {
+    "type": "hold",
+    "code": "pickup_off",
+    "reason": "Picking up team work is off",
+    "pollAfterSeconds": 300
+  },
+  "task": null,
+  "project": null
+}

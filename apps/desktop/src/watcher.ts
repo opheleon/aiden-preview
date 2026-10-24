@@ -99,6 +99,8 @@ export class ProjectWatcher {
       for (const project of await this.options.worker.request('projects')) {
         if (this.closed) return;
         if (project.lifecycle?.status === 'closed') continue;
+        // An account's server starts work on its projects; this machine picks it up from there.
+        if (project.account) continue;
         // A project with no connected code has nothing to watch; its checks start from the Guide.
         if (!project.repositories.length) continue;
         await this.options.worker.request('reconcileDelivery', { projectId: project.id });

@@ -1,9 +1,11 @@
+import type { ExecutionActivity, ExecutionLimits } from '../../contracts/src/accounts-execution.js';
 import type { RuntimeConfig } from '../../contracts/src/index.js';
 
 /** One isolated provider turn; cancellation must interrupt execution without retrying paid work. */
 export type RuntimeRequest = {
   /** External Claude Code owns tools and its coding loop when explicitly dispatched. */
-  coding?: { sessionId: string };
+  /** A coding session; `directories` are further worktrees it may also work in. */
+  coding?: { sessionId: string; directories?: string[]; limits?: ExecutionLimits };
   config: RuntimeConfig;
   prompt: string;
   schema: Record<string, unknown>;
@@ -12,6 +14,8 @@ export type RuntimeRequest = {
   tools: { url: string; token: string; names?: readonly string[]; toolCount?: number };
   signal: AbortSignal;
   progress: (message: string) => void;
+  /** Observed provider activity, excluding calls to the status MCP. */
+  activity?: (activity: ExecutionActivity) => void;
 };
 /** Provider-independent structured execution contract used by the workflow engine. */
 export interface AgentRuntime {

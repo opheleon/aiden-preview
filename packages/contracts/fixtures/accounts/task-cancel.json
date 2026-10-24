@@ -1,0 +1,49 @@
+{
+  "id": "00000000-0000-4000-8000-000000000009",
+  "accountId": "00000000-0000-4000-8000-000000000002",
+  "projectId": "00000000-0000-4000-8000-000000000005",
+  "actor": "agent",
+  "kind": "check-code",
+  "title": "Write requirements",
+  "instructions": "Turn the goal into requirements.",
+  "requirementIds": [],
+  "requires": {
+    "tools": [],
+    "connections": [],
+    "runtime": {
+      "provider": "claude",
+      "auth": "subscription"
+    },
+    "pinnedUserId": null,
+    "pinnedDeviceId": null
+  },
+  "status": "cancelled",
+  "blockedBy": null,
+  "assigneeUserId": null,
+  "leasedDeviceId": null,
+  "leaseExpiresAt": null,
+  "attempts": 1,
+  "execution": {
+    "attemptId": "00000000-0000-4000-8000-000000000009:1",
+    "location": "local",
+    "startedAt": "2026-10-20T15:00:00.000Z",
+    "deadlineAt": "2026-10-20T15:45:00.000Z",
+    "activityAt": "2026-10-20T15:00:00.000Z",
+    "activitySequence": 0,
+    "reportedAt": null,
+    "phase": "running",
+    "limits": {
+      "idleMs": 600000,
+      "toolMs": 1800000,
+      "absoluteMs": 2700000
+    },
+    "checkpoint": null
+  },
+  "result": {
+    "error": "Claude usage limit reached"
+  },
+  "resume": null,
+  "queuedAt": "2026-10-20T15:00:00.000Z",
+  "updatedAt": "2026-10-20T15:00:00.000Z",
+  "progress": null
+}

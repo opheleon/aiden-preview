@@ -1,0 +1,130 @@
+.account-view {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  max-width: 820px;
+}
+
+.account-intro {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  justify-items: start;
+  padding: 28px;
+}
+
+.account-intro h1,
+.account-header h1 {
+  margin: 0;
+}
+
+.account-board {
+  display: grid;
+  gap: 16px;
+}
+
+.account-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.account-list {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.account-task {
+  display: grid;
+  gap: 6px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.account-task:first-child {
+  border-top: 0;
+}
+
+.account-task p {
+  margin: 4px 0 0;
+  color: var(--body);
+}
+
+.account-muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.account-row input {
+  flex: 1;
+}
+
+.account-form {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.account-code {
+  display: grid;
+  gap: 4px;
+}
+
+.account-code strong {
+  font-size: 28px;
+  letter-spacing: 0.08em;
+}
+
+.account-machine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.account-machine p {
+  margin: 4px 0 0;
+}
+
+.account-toggle,
+.account-cap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--body);
+  white-space: nowrap;
+}
+
+.account-invite,
+.account-refresh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-row-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Long task text (a PR description) stays three lines; Open project shows the rest. */
+.account-task .task-summary {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

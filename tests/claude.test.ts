@@ -395,7 +395,22 @@ void test('external coding dispatch uses Claude Code tools and its permission mo
   assert.equal(options.permissionMode, 'auto');
   assert.equal(options.effort, 'high');
   assert.equal(options.model, 'opus');
-  assert.deepEqual(options.mcpServers, {});
+  assert.deepEqual(Object.keys(options.mcpServers!), ['aiden_status']);
+  assert.ok(options.disallowedTools?.includes('AskUserQuestion'));
+  assert.equal(
+    (
+      await options.canUseTool!(
+        'Bash',
+        {},
+        {
+          signal: new AbortController().signal,
+          toolUseID: 'test',
+          requestId: 'permission-fixture',
+        },
+      )
+    )?.behavior,
+    'deny',
+  );
   assert.equal(options.env?.GIT_CONFIG_VALUE_0, '/dev/null');
   assert.equal(result.model, 'claude-opus-5-5');
   assert.equal(sdk.state().submitted, 1);

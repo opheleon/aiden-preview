@@ -5,6 +5,7 @@ import type { CriterionResult } from '../../../../packages/contracts/src/index';
 import type { ActionItem, Risk } from '../renderer/action-items';
 import { DecisionAnswer } from './DecisionAnswer';
 import { Watch } from './RequirementRow';
+import { TaskChip, TaskStatusTag } from './TaskTags';
 
 /** Items shown before "Show all". */
 const shownAtFirst = 6;
@@ -24,8 +25,9 @@ function Item({ item, handlers }: { item: ActionItem; handlers: ItemHandlers }):
   return (
     <li className="action-item">
       <p className="action-head">
-        <span className={`chip chip--${item.role.toLowerCase()}`}>{item.role}</span>
+        <TaskChip who={item.role} />
         <strong>{item.action}</strong>
+        <TaskStatusTag status="todo" />
       </p>
       <p className="row-sub">{item.why}</p>
       {item.call && item.requirementId && handlers.onOpen && (

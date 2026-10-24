@@ -1,3 +1,4 @@
+import type { AccountState, AccountSummary, AccountTask } from './accounts-api.js';
 import type { BetaSettings, CodingJob } from './delivery-jobs.js';
 import type {
   DeviceRun,
@@ -44,6 +45,16 @@ export type RuntimeDiagnostic = {
   apiKey: boolean;
   version?: string;
   message?: string;
+  /** Subscription plan usage, read only for Teams polls. */
+  usage?: PlanUsage;
+};
+/** Plan usage as fractions from 0 to 1; null when unknown. */
+export type PlanUsage = {
+  /** Timestamp of the actual provider observation, preserved through caches. */
+  readAt?: string;
+  fiveHourUtil: number | null;
+  weeklyUtil: number | null;
+  resetsAt: string | null;
 };
 /** Account-advertised model option; the default flag comes from the provider rather than a hardcoded alias. */
 export type RuntimeModel = {
@@ -56,9 +67,69 @@ export type RuntimeModel = {
   supportedEfforts?: RuntimeConfig['effort'][];
 };
 type ProjectRef = { projectId: string };
+/** Teams sign-in, the person's teams, and this machine's work strip; never includes the session token. */
+export type AccountStatus = {
+  /** Current global profile, refreshed from the same API used by web settings. */
+  profile?: { name: string | null; avatar: string | null };
+  /** Trusted Accounts origin used for web settings links. */
+  settingsUrl?: string;
+  signedIn: boolean;
+  email: string | null;
+  userId: string | null;
+  accounts: { id: string; name: string }[];
+  /** Why the account could not be read just now, when it could not. */
+  message: string | null;
+  deviceName: string;
+  pickupEnabled: boolean;
+  usageCapPct: number;
+  /** A browser sign-in is waiting for the person. */
+  signingIn: boolean;
+  running: { taskId: string; title: string; projectId: string; startedAt: string } | null;
+  last: { type: 'assign' | 'hold'; reason: string; at: string } | null;
+};
 type RunRef = ProjectRef & { runId: string };
 /** Allowlisted desktop and CLI operations with stable request/result contracts across the worker boundary. */
 export type WorkerAPI = {
+  accountStatus: { params: Record<string, never>; result: AccountStatus };
+  /**
+   * Start Teams sign-in in the system browser (Auth0, authorization code with PKCE). Returns the
+   * URL Electron main opens; the loopback redirect finishes sign-in in the background.
+   */
+  accountSignIn: { params: Record<string, never>; result: { authUrl: string } };
+  accountSignOut: { params: Record<string, never>; result: null };
+  accountCreate: { params: { name: string }; result: AccountSummary };
+  /** Join with a pasted invite link or code. */
+  accountJoin: { params: { invite: string }; result: AccountSummary };
+  accountInvite: {
+    params: { accountId: string };
+    result: { code: string; link: string; expiresAt: string };
+  };
+  /** An owner grants or revokes team admin access for a member. */
+  accountSetAdmin: {
+    params: { accountId: string; userId: string; isAdmin: boolean };
+    result: { isAdmin: boolean };
+  };
+  /** The account's work view; also brings this machine's copies of its projects up to date. */
+  accountState: { params: { accountId: string }; result: AccountState };
+  accountTakeTask: { params: { taskId: string }; result: AccountTask };
+  accountFinishTask: { params: { taskId: string; answer?: string }; result: AccountTask };
+  accountSetPickup: {
+    params: { pickupEnabled?: boolean; usageCapPct?: number };
+    result: AccountStatus;
+  };
+  /** Create a project in an account; its first task is writing requirements on whichever machine the account picks. */
+  accountCreateProject: { params: { accountId: string; project: Project }; result: Project | null };
+  /** Stop a team task that has not finished; a machine running it stops at its next heartbeat. */
+  accountCancelTask: { params: { taskId: string }; result: AccountTask };
+  /** Queue a stopped or failed Aiden task again, as a new task with the same work. */
+  accountRetryTask: { params: { taskId: string }; result: AccountTask };
+  /** Put the person's next setup step on the team queue and close setup tasks that are done. */
+  accountSyncSetup: { params: { projectId: string }; result: null };
+  /** Ask the account what this machine should do next (Electron main calls this on a timer). */
+  accountPoll: {
+    params: { idleSeconds: number; onBattery: boolean; busy: boolean };
+    result: { pollAfterSeconds: number };
+  };
   phoneSetup: { params: Record<string, never>; result: PhoneReadiness };
   savePhoneSetup: { params: PhoneSetup; result: PhoneSetup };
   phoneApps: { params: { udid: string }; result: PhoneApp[] };

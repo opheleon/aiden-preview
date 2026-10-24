@@ -98,6 +98,14 @@ export const ProjectSchema = z
     sources: ProjectSourcesSchema.optional(),
     /** Worker-derived lifecycle; trusted decisions live in a separate file. */
     lifecycle: ProjectLifecycleViewSchema.optional(),
+    /**
+     * Set when the project belongs to a Teams account. The account's server is then the only
+     * thing that starts work on it; this machine's watcher leaves it alone.
+     */
+    account: z
+      .object({ accountId: z.string().min(1).max(64), revision: z.number().int().min(1) })
+      .strict()
+      .optional(),
   })
   .strict();
 export const SnapshotSchema = z

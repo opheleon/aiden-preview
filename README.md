@@ -8,7 +8,7 @@ You decide what done means, answer the questions only you can, and accept the re
 
 **Preview · Apple Silicon macOS · Apache 2.0**
 
-[Download for macOS](https://github.com/opheleon/aiden-preview/releases/latest/download/Aiden-arm64.dmg) · [Getting started](docs/getting-started.md) · [Join our Slack](https://join.slack.com/t/aidenbyopheleon/shared_invite/zt-4apsg5d7p-FDO9ae0imxj~KgauP8lpsw)
+[Download for macOS](https://github.com/opheleon/aiden-preview/releases/latest/download/Aiden-arm64.dmg) · [Windows setup](docs/windows-setup.md) · [Getting started](docs/getting-started.md) · [Join our Slack](https://join.slack.com/t/aidenbyopheleon/shared_invite/zt-4apsg5d7p-FDO9ae0imxj~KgauP8lpsw)
 
 ![The Aiden start screen with a goal typed in, ready to hand to Aiden](docs/screenshots/start-screen.png)
 
@@ -31,7 +31,9 @@ Aiden monitors projects while the app is open. Code assessments, app checks, and
 
 ## Install
 
-[Download the latest Apple Silicon macOS DMG](https://github.com/opheleon/aiden-preview/releases/latest/download/Aiden-arm64.dmg), open it, and drag Aiden into Applications. Older versions and checksums are on [GitHub Releases](https://github.com/opheleon/aiden-preview/releases). You'll need Git, a supported provider runtime, and for private repositories the [GitHub CLI](https://cli.github.com) signed in (`gh auth login`). Windows, Linux, and Intel Macs are outside the current preview scope.
+[Download the latest Apple Silicon macOS DMG](https://github.com/opheleon/aiden-preview/releases/latest/download/Aiden-arm64.dmg), open it, and drag Aiden into Applications. Older versions and checksums are on [GitHub Releases](https://github.com/opheleon/aiden-preview/releases). You'll need Git, a supported provider runtime, and for private repositories the [GitHub CLI](https://cli.github.com) signed in (`gh auth login`).
+
+An early, unsigned Windows x64 installer (`Aiden-VERSION-x64.exe`) is on the same release page. Follow the [Windows setup guide](docs/windows-setup.md) to install it and connect your subscription and GitHub from PowerShell. Linux and Intel Macs are outside the current preview scope.
 
 To verify a download, get `SHA256SUMS.txt` from the same release and run these commands, replacing the example DMG filename:
 

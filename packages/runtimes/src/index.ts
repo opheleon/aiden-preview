@@ -9,11 +9,12 @@ import { z } from 'zod/v3';
 
 import type { RuntimeDiagnostic, RuntimeModel } from '../../contracts/src/api.js';
 import type { RuntimeConfig } from '../../contracts/src/index.js';
-import { claudeDiagnostics, claudeModels, runClaude } from './claude.js';
+import { claudeDiagnostics, claudeModels, claudeUsage, runClaude } from './claude.js';
 import { openClaudeSignIn } from './claude-login.js';
 import { loadCodexModels, runCodex } from './codex.js';
 import { accountSchema, loginSchema } from './codex-schemas.js';
 import { cleanEnvironment } from './environment.js';
+import { codexPlanUsage, unknownUsage } from './plan-usage.js';
 import { RpcClient } from './rpc.js';
 import type { AgentRuntime, RuntimeRequest, RuntimeResult } from './types.js';
 
@@ -82,8 +83,11 @@ export class Runtimes implements AgentRuntime {
       signal?.removeEventListener('abort', stop);
     }
   }
-  /** Inspect provider availability and account state without sending prompts or running tools. */
-  async diagnostics(): Promise<RuntimeDiagnostic[]> {
+  /**
+   * Inspect provider availability and account state without sending prompts or running tools.
+   * Teams polls also ask for subscription plan usage, which is null whenever it cannot be read.
+   */
+  async diagnostics(options: { usage?: boolean } = {}): Promise<RuntimeDiagnostic[]> {
     const codex: RuntimeDiagnostic = {
       provider: 'codex',
       installed: false,
@@ -104,6 +108,11 @@ export class Runtimes implements AgentRuntime {
         codex.subscription = a.account?.type === 'chatgpt';
         codex.ready = codex.subscription || codex.apiKey;
         if (!codex.subscription) codex.message = 'Sign in with Codex, then check connection.';
+        if (options.usage && codex.subscription)
+          codex.usage = await c.request('account/rateLimits/read', {}, 15000).then(
+            (value) => ({ ...codexPlanUsage(value), readAt: new Date().toISOString() }),
+            () => unknownUsage,
+          );
       } finally {
         c.close();
       }
@@ -112,7 +121,9 @@ export class Runtimes implements AgentRuntime {
         ? 'Codex is installed but its connection check failed. Check your connection, then retry.'
         : 'Install the Codex CLI, then restart Aiden and check connection. The Codex desktop app alone is not sufficient.';
     }
-    return [codex, await claudeDiagnostics(this.home, this.key('claude'), claudeVersion)];
+    const claude = await claudeDiagnostics(this.home, this.key('claude'), claudeVersion);
+    if (options.usage && claude.subscription) claude.usage = await claudeUsage(this.home);
+    return [codex, claude];
   }
 
   /** Start subscription login and expire its process after ten minutes; never change billing mode. */
