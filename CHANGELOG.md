@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix sizing failing with "could not size the remaining work" when the latest check found some requirements missing and others partly built. The remaining-work estimator now sees only the partly built requirements, and a rejected answer is told exactly which requirement IDs were missing or unexpected. Rejected answers are saved in the run folder for diagnosis.
+
 - Add a [Windows setup guide](docs/windows-setup.md) written for first-time users: install the unsigned x64 installer, connect a ChatGPT or Claude subscription from PowerShell, and sign in to GitHub. Link it from the README, getting started, and troubleshooting.
 
 ## 1.2.5

@@ -106,6 +106,12 @@ export function createModelStage(options: ModelStageOptions): ModelStage {
         parsed = validate(result.value);
       } catch (error) {
         feedback = publicError(error);
+        // Provider threads can be ephemeral, so keep each rejected answer beside the run's checkpoints.
+        await atomic(
+          path.join(dir, 'rejected', `${name}-${attempt + 1}.json`),
+          { stage: name, attempt: attempt + 1, problem: feedback, output: result.value },
+          signal,
+        );
         context.emit({
           type: 'progress',
           runId: run.id,
