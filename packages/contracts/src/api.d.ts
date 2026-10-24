@@ -1,4 +1,4 @@
-import type { AccountState, AccountSummary, AccountTask } from './accounts-api.js';
+import type { AccountState, AccountTask } from './accounts-api.js';
 import type { BetaSettings, CodingJob } from './delivery-jobs.js';
 import type {
   DeviceRun,
@@ -97,18 +97,6 @@ export type WorkerAPI = {
    */
   accountSignIn: { params: Record<string, never>; result: { authUrl: string } };
   accountSignOut: { params: Record<string, never>; result: null };
-  accountCreate: { params: { name: string }; result: AccountSummary };
-  /** Join with a pasted invite link or code. */
-  accountJoin: { params: { invite: string }; result: AccountSummary };
-  accountInvite: {
-    params: { accountId: string };
-    result: { code: string; link: string; expiresAt: string };
-  };
-  /** An owner grants or revokes team admin access for a member. */
-  accountSetAdmin: {
-    params: { accountId: string; userId: string; isAdmin: boolean };
-    result: { isAdmin: boolean };
-  };
   /** The account's work view; also brings this machine's copies of its projects up to date. */
   accountState: { params: { accountId: string }; result: AccountState };
   accountTakeTask: { params: { taskId: string }; result: AccountTask };

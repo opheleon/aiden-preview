@@ -68,15 +68,20 @@ test('signed out, one button opens the browser; while it waits the screen says s
   expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
 });
 
-test('signed in without a team, it offers create or join', async () => {
-  const f = fixture(status({ accounts: [] }));
-  render(<AccountWork workspace={f.workspace} />);
-  await userEvent.type(
-    await screen.findByLabelText('Join with an invite link'),
-    'opheleon://join?code=abc',
-  );
-  await userEvent.click(screen.getByRole('button', { name: 'Join' }));
-  expect(f.call).toHaveBeenCalledWith('accountJoin', { invite: 'opheleon://join?code=abc' });
+test('signed in without a team, it sends the person to the Teams dashboard to create or join', async () => {
+  const openExternal = vi.fn(async () => {});
+  const original = window.aiden;
+  window.aiden = { ...original, openExternal } as NonNullable<typeof window.aiden>;
+  try {
+    const f = fixture(status({ accounts: [], settingsUrl: 'https://teams.example.com' }));
+    render(<AccountWork workspace={f.workspace} />);
+    await userEvent.click(await screen.findByRole('button', { name: /Open the Teams dashboard/ }));
+    expect(openExternal).toHaveBeenCalledWith('https://teams.example.com');
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  } finally {
+    if (original) window.aiden = original;
+    else delete window.aiden;
+  }
 });
 
 test('My work puts Aiden’s question in its own card and answers it in place', async () => {
@@ -134,17 +139,13 @@ test('Teams settings show the team, its machines, and this machine', async () =>
   expect(f.call).toHaveBeenCalledWith('accountSetPickup', { pickupEnabled: false });
 });
 
-test('the team owner can grant admin access to another member', async () => {
+test('the team owner sees members but manages invites and admins in the dashboard', async () => {
   const f = fixture(status({ userId: state.members[0]!.id, email: 'alice@example.com' }));
   render(<AccountWork workspace={f.workspace} />);
   const members = await screen.findByRole('region', { name: 'Members' });
   expect(within(members).getByText('BOB')).toBeInTheDocument();
-  await userEvent.click(within(members).getByRole('button', { name: 'Make admin' }));
-  expect(f.call).toHaveBeenCalledWith('accountSetAdmin', {
-    accountId: state.account.id,
-    userId: state.members[1]!.id,
-    isAdmin: true,
-  });
+  expect(within(members).queryByRole('button')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Invite someone/ })).not.toBeInTheDocument();
 });
 
 test('a team project says why Aiden’s task waits, and Stop or Try again changes it', async () => {

@@ -12,7 +12,6 @@ import {
 } from '../packages/core/src/accounts/client.js';
 import { documentFor, materialize } from '../packages/core/src/accounts/documents.js';
 import { InventoryProbe } from '../packages/core/src/accounts/inventory.js';
-import { inviteCode } from '../packages/core/src/accounts/methods.js';
 import { AccountSession } from '../packages/core/src/accounts/session.js';
 import { Engine } from '../packages/core/src/engine.js';
 import { Store } from '../packages/core/src/storage.js';
@@ -338,10 +337,7 @@ void test('inventory reports verified tools, exact provider modes, and connected
   assert.deepEqual((await signedOut.read()).tools.gh, { installed: true, signedIn: false });
 });
 
-void test('invite links, server URLs, and errors are handled safely', () => {
-  assert.equal(inviteCode('opheleon://join?code=abc123'), 'abc123');
-  assert.equal(inviteCode('  abc123 '), 'abc123');
-  assert.throws(() => inviteCode('opheleon://join'), /no code/);
+void test('server URLs and errors are handled safely', () => {
   assert.equal(accountsUrl({}), 'https://accounts.opheleon.ai');
   assert.equal(
     accountsUrl({ AIDEN_ACCOUNTS_URL: 'http://localhost:8787' }),

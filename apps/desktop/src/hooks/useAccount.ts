@@ -24,10 +24,6 @@ export interface AccountView {
   /** Open the browser to sign in; the screen updates when it finishes. */
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
-  create: (name: string) => Promise<void>;
-  join: (invite: string) => Promise<void>;
-  invite: () => Promise<{ code: string; link: string; expiresAt: string }>;
-  setAdmin: (userId: string, isAdmin: boolean) => Promise<void>;
   take: (taskId: string) => Promise<void>;
   finish: (taskId: string, answer?: string) => Promise<void>;
   setPickup: (change: { pickupEnabled?: boolean; usageCapPct?: number }) => Promise<void>;
@@ -97,11 +93,6 @@ export function useAccount(call: DesktopBridge['request']): AccountView {
     reload: () => act(() => Promise.resolve()),
     signIn: () => act(() => call('accountSignIn')),
     signOut: () => act(() => call('accountSignOut')),
-    create: (name: string) => act(() => call('accountCreate', { name })),
-    join: (invite: string) => act(() => call('accountJoin', { invite })),
-    invite: () => call('accountInvite', { accountId }),
-    setAdmin: (userId: string, isAdmin: boolean) =>
-      act(() => call('accountSetAdmin', { accountId, userId, isAdmin })),
     take: (taskId: string) => act(() => call('accountTakeTask', { taskId })),
     finish: (taskId: string, answer?: string) =>
       act(() => call('accountFinishTask', answer ? { taskId, answer } : { taskId })),

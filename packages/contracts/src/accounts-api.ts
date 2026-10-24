@@ -191,14 +191,10 @@ export const ApiErrorSchema = z.object({ error: z.string(), message: z.string() 
 
 /** The signed-in person and their accounts. */
 export type Me = z.infer<typeof MeSchema>;
-/** An invite link. */
-export type Invite = z.infer<typeof InviteSchema>;
 /** A created project with its first tasks. */
 export type ProjectCreated = z.infer<typeof ProjectCreatedSchema>;
 /** Answer to a work poll. */
 export type WorkAnswer = z.infer<typeof WorkAnswerSchema>;
-/** An account. */
-export type AccountSummary = z.infer<typeof AccountSummarySchema>;
 
 /** A task in an account's queue. */
 export type AccountTask = z.infer<typeof AccountTaskSchema>;

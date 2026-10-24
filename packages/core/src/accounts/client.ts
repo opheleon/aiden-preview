@@ -5,15 +5,10 @@ import {
   AccountProjectSchema,
   type AccountState,
   AccountStateSchema,
-  type AccountSummary,
-  AccountSummarySchema,
   type AccountTask,
   AccountTaskSchema,
   ApiErrorSchema,
-  type Invite,
-  InviteSchema,
   type Me,
-  MemberAdminSchema,
   MeSchema,
   type NewAccountTask,
   type ProjectCreated,
@@ -139,31 +134,6 @@ export class AccountsClient {
   /** The signed-in person and their accounts. */
   me(): Promise<Me> {
     return this.call('GET', '/me', MeSchema);
-  }
-
-  /** Create an account owned by the caller. */
-  createAccount(name: string): Promise<AccountSummary> {
-    return this.call('POST', '/accounts', AccountSummarySchema, { name });
-  }
-
-  /** Create an invite link (owners only). */
-  invite(accountId: string): Promise<Invite> {
-    return this.call('POST', `/accounts/${encodeURIComponent(accountId)}/invites`, InviteSchema);
-  }
-
-  /** Grant or revoke team admin access for a member. */
-  setAdmin(accountId: string, userId: string, isAdmin: boolean): Promise<{ isAdmin: boolean }> {
-    return this.call(
-      'PUT',
-      `/accounts/${encodeURIComponent(accountId)}/members/${encodeURIComponent(userId)}/admin`,
-      MemberAdminSchema,
-      { isAdmin },
-    );
-  }
-
-  /** Join with an invite code. */
-  join(code: string): Promise<AccountSummary> {
-    return this.call('POST', '/accounts/join', AccountSummarySchema, { code });
   }
 
   /** The shared work view for one account. */
