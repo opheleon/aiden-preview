@@ -51,6 +51,19 @@ export function accountsUrl(env: NodeJS.ProcessEnv = process.env): string {
   return url.origin;
 }
 
+/**
+ * The Teams dashboard's address, where teams, invitations, admins, billing and profiles are
+ * managed. AIDEN_DASHBOARD_URL wins; otherwise an `api.` host becomes `app.` (the dashboard and
+ * API live on sibling subdomains), and any other API address is used as is.
+ * Example: AIDEN_ACCOUNTS_URL https://api.example.com gives https://app.example.com.
+ */
+export function dashboardUrl(env: NodeJS.ProcessEnv = process.env): string {
+  if (env.AIDEN_DASHBOARD_URL) return new URL(env.AIDEN_DASHBOARD_URL).origin;
+  const api = new URL(accountsUrl(env));
+  if (api.hostname.startsWith('api.')) api.hostname = `app.${api.hostname.slice(4)}`;
+  return api.origin;
+}
+
 /** Typed calls to the Accounts API. The session token is sent as a bearer token and never logged. */
 export class AccountsClient {
   /**

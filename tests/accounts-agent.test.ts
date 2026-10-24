@@ -9,6 +9,7 @@ import {
   type AccountsClient,
   AccountsError,
   accountsUrl,
+  dashboardUrl,
 } from '../packages/core/src/accounts/client.js';
 import { documentFor, materialize } from '../packages/core/src/accounts/documents.js';
 import { InventoryProbe } from '../packages/core/src/accounts/inventory.js';
@@ -344,4 +345,16 @@ void test('server URLs and errors are handled safely', () => {
     'http://localhost:8787',
   );
   assert.throws(() => accountsUrl({ AIDEN_ACCOUNTS_URL: 'http://example.com' }), /HTTPS/);
+  assert.equal(
+    dashboardUrl({ AIDEN_ACCOUNTS_URL: 'https://api.example.com' }),
+    'https://app.example.com',
+  );
+  assert.equal(
+    dashboardUrl({ AIDEN_DASHBOARD_URL: 'https://teams.example.com/x' }),
+    'https://teams.example.com',
+  );
+  assert.equal(
+    dashboardUrl({ AIDEN_ACCOUNTS_URL: 'http://localhost:8787' }),
+    'http://localhost:8787',
+  );
 });

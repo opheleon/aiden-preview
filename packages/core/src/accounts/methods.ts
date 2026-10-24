@@ -9,7 +9,7 @@ import type { Runtimes } from '../../../runtimes/src/index.js';
 import type { Engine } from '../engine.js';
 import { readProject } from '../engine-queries.js';
 import { AccountAgent, deviceName } from './agent.js';
-import { AccountsClient, AccountsError, accountsUrl } from './client.js';
+import { AccountsClient, AccountsError, accountsUrl, dashboardUrl } from './client.js';
 import { documentFor, materialize } from './documents.js';
 import { InventoryProbe } from './inventory.js';
 import { TeamsSignIn } from './oidc.js';
@@ -189,7 +189,7 @@ async function status({
   const preferences = await session.preferences();
   const machine = {
     ...agent.status(),
-    settingsUrl: accountsUrl(),
+    settingsUrl: dashboardUrl(),
     deviceName: deviceName(),
     pickupEnabled: preferences.pickupEnabled,
     usageCapPct: preferences.usageCapPct,
