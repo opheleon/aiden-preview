@@ -36,7 +36,10 @@ function BranchPicker({
       setLoading(false);
     }
   }
-  /** Save the choice for this project, reload evidence, and start a fresh assessment of that branch. */
+  /**
+   * Save the choice for this project and reload it. The check starts from the card, so a project
+   * with several repositories can choose every branch before one check reads them all.
+   */
   async function save(): Promise<void> {
     const branch = choices.find((choice) => JSON.stringify(choice) === value);
     if (!branch) return;
@@ -49,7 +52,6 @@ function BranchPicker({
           monitoredBranch: branch,
         });
         await workspace.load(workspace.project.id);
-        await workspace.lookNow();
         setOpen(false);
       } finally {
         setLoading(false);
@@ -115,7 +117,7 @@ function BranchPicker({
             }
             onClick={() => void save()}
           >
-            Save and check branch
+            Save branch
           </button>
         </div>
       )}
@@ -144,6 +146,17 @@ export function BranchMonitoring({ workspace }: { workspace: Workspace }): JSX.E
           repo={repo}
         />
       ))}
+      {workspace.project.repositories.length > 0 && (
+        <div className="button-row">
+          <button
+            className="secondary"
+            disabled={workspace.busy}
+            onClick={() => void workspace.lookNow()}
+          >
+            Check these branches
+          </button>
+        </div>
+      )}
       <p className="fine-print">
         Branch checks establish code progress. Deployment and acceptance checks are separate
         evidence.

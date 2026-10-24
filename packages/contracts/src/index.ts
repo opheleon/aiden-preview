@@ -36,6 +36,16 @@ export const RequirementSchema = z
     edgeCases: z.array(EdgeCaseSchema).max(8).optional(),
   })
   .strict();
+/**
+ * A remote branch the goal names for one repository, as owner/name.
+ * Example: { repository: "acme/api", branch: "release-2" }.
+ */
+export const NamedBranchSchema = z
+  .object({
+    repository: z.string().regex(/^[\w.-]+\/[\w.-]+$/),
+    branch: z.string().trim().min(1).max(200),
+  })
+  .strict();
 export const ProductSchema = z
   .object({
     /** Scope-derived project name; absent on baselines saved before project naming. */
@@ -56,6 +66,11 @@ export const ProductSchema = z
       .min(1)
       .max(20)
       .optional(),
+    /**
+     * Branches the goal or its linked pages name for a repository, such as "the server is on
+     * branch release-2", so connecting the code checks that branch first. Absent when none.
+     */
+    namedBranches: z.array(NamedBranchSchema).min(1).max(20).optional(),
   })
   .strict()
   .superRefine((product, context) => {

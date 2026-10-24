@@ -7,7 +7,6 @@ import {
   type Discovery,
   DiscoverySchema,
   type Findings,
-  FindingsSchema,
   type ReadReceipt,
   type Report,
   type RunManifest,
@@ -22,6 +21,7 @@ import { validateProjectRepositories } from '../../tools/src/discovery.js';
 import { freezeRepository, inventory, validateRepository } from '../../tools/src/git.js';
 import { fetchMonitoredBranch } from '../../tools/src/remote-branches.js';
 import { appendActivity } from './activity.js';
+import { assessInParts } from './assessment-parts.js';
 import { applyBlockers, blockerOrigins } from './blockers.js';
 import { openDecisions as readOpenDecisions, readCalls } from './calls.js';
 import { linkedWork, repositoryRemotes } from './linked-work.js';
@@ -65,11 +65,11 @@ export async function assessReport(
   };
   delete eligible.deliveryPlan;
   const assessed: Findings = eligible.requirements.length
-    ? await stage(
-        'assess',
-        FindingsSchema,
+    ? await assessInParts(
+        stage,
+        eligible,
+        baseline.product.deliveryPlan,
         {
-          baseline: eligible,
           intent: run.project.context,
           linkedWork: await linkedWork(
             run.project.context,
@@ -85,7 +85,7 @@ export async function assessReport(
             : null,
           openDecisions: await readOpenDecisions(context.store, run.projectId),
         },
-        (v) => validateFindings(v, eligible, discovery.snapshots, broker.reads),
+        (v, part) => validateFindings(v, part, discovery.snapshots, broker.reads),
       )
     : { assessments: [], risks: [], dependencies: [], unknowns: [] };
   const findings = await applyBlockers(context.store, run.projectId, baseline.product, assessed);

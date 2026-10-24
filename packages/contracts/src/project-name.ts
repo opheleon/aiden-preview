@@ -16,7 +16,8 @@ export function scopeName(
     .replace(/https?:\/\/\S+/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  const sentence = text.split(/[.!?](?:\s|$)/)[0] || text;
+  // A removed link can leave "in this spec:" behind; a name never ends in a colon or comma.
+  const sentence = (text.split(/[.!?](?:\s|$)/)[0] || text).replace(/[\s,;:]+$/, '');
   // Long legacy overviews often continue from the outcome into implementation or constraints.
   const outcome = sentence.split(/\s+(?:by \w+ing|without|while|so that)\b/i)[0]!;
   if (outcome.length >= 20 && outcome.length <= 72) return outcome;

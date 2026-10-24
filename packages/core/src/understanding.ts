@@ -10,6 +10,7 @@ import {
   CallDraftSchema,
   DeliveryPlanSchema,
   edgeCaseId,
+  NamedBranchSchema,
   type Product,
   ProductSchema,
   requirementId,
@@ -50,6 +51,8 @@ export const UnderstandingSchema = z
     repositories: z.array(z.string()).max(100),
     /** GitHub owner/name repositories the goal or its linked pages name as the code. */
     namedRepositories: z.array(z.string().regex(/^[\w.-]+\/[\w.-]+$/)).max(20),
+    /** Branches the goal or its linked pages name for those repositories; empty when none. */
+    namedBranches: z.array(NamedBranchSchema).max(20),
   })
   .strict();
 /** Parsed understand-stage output. */
@@ -60,6 +63,7 @@ const StoredUnderstandingSchema = UnderstandingSchema.partial({
   title: true,
   settledCalls: true,
   namedRepositories: true,
+  namedBranches: true,
 }).extend({
   calls: z.array(CallDraftSchema).max(8),
 });
@@ -91,6 +95,7 @@ export function productFromUnderstanding(
     ...(understanding.namedRepositories?.length
       ? { namedRepositories: [...new Set(understanding.namedRepositories)] }
       : {}),
+    ...(understanding.namedBranches?.length ? { namedBranches: understanding.namedBranches } : {}),
     requirements: understanding.requirements.map((r) => ({
       id: r.id,
       text: r.text,

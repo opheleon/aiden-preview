@@ -83,13 +83,15 @@ async function understandIntent(
       ? ((await optionalJson<string>(revisionFile)) ?? '')
       : hash(await answeredDecisions(context.store, run.projectId));
   if (checkpoint === null) await atomic(revisionFile, decisionsHash);
+  const sources = await contextSources(context, run.project);
   const understanding = await stage<StoredUnderstanding>(
     'understand',
     UnderstandingSchema,
     {
       context: run.project.context,
       linkedPages: notionLinks(run.project.context),
-      contextSources: await contextSources(context, run.project),
+      contextSources: sources.sources,
+      unavailableSources: sources.unavailable,
       previous,
       openCalls,
       repositories: await Promise.all(run.project.repositories.map(describeRepository)),
@@ -217,6 +219,7 @@ export async function execute(
   broker.signal = signal;
   broker.reads = (await optionalJson<ReadReceipt[]>(path.join(dir, 'reads.json'))) ?? [];
   const tools = await serveTools(broker);
+  const validators = new Map<string, Map<string, (value: unknown) => unknown>>();
   const stage = createModelStage({
     context,
     run,
@@ -225,9 +228,13 @@ export async function execute(
     workspace,
     tools,
     includeAnswers: true,
-    onStage: async (name, validate) => {
+    onStage: async (name, validate, part) => {
       await checkpoint(name as Stage);
-      broker.validateArtifact = validate;
+      // Parts of one stage can run at once; a candidate passes when it fits any of them.
+      if (!part || !validators.has(name)) validators.set(name, new Map());
+      const stageValidators = validators.get(name)!;
+      stageValidators.set(part ?? '', validate);
+      broker.validateArtifact = (value) => anyValid([...stageValidators.values()], value);
     },
   });
   try {
@@ -239,4 +246,20 @@ export async function execute(
   } finally {
     await tools.close();
   }
+}
+
+/**
+ * Accept a candidate that one of the running validators accepts, or report the first problem.
+ * Example: parts 1 and 2 of assess both run; part 2's answer passes part 2's validator.
+ */
+function anyValid(validate: ((value: unknown) => unknown)[], value: unknown): unknown {
+  let first: unknown;
+  for (const check of validate) {
+    try {
+      return check(value);
+    } catch (error) {
+      first ??= error;
+    }
+  }
+  throw first;
 }

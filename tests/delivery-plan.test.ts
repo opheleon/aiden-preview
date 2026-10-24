@@ -41,6 +41,7 @@ void test('delivery plans round-trip with complete ownership, stable order, and 
     requirements: product.requirements.map((r) => ({ ...r, edgeCases: [] })),
     repositories: [],
     namedRepositories: [],
+    namedBranches: [],
     calls: [],
     settledCalls: [],
   };
@@ -88,6 +89,7 @@ void test('new foundation plans need a test plan while stored baselines remain c
     settledCalls: [],
     repositories: [],
     namedRepositories: [],
+    namedBranches: [],
   };
   assert.throws(() => parseUnderstanding(understanding, null), /requires a testPlan/);
   assert.equal(
