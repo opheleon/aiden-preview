@@ -63,7 +63,7 @@ function AccountProfile({ account }: { account: ReturnType<typeof useAccount> })
       <button
         onClick={() =>
           void window.aiden?.openExternal(
-            `${status.settingsUrl ?? 'https://aiden-teams.pages.dev'}/profile`,
+            `${status.settingsUrl ?? 'https://app.opheleon.ai'}/profile`,
           )
         }
       >
@@ -73,7 +73,7 @@ function AccountProfile({ account }: { account: ReturnType<typeof useAccount> })
         <button
           onClick={() =>
             void window.aiden?.openExternal(
-              `${status.settingsUrl ?? 'https://aiden-teams.pages.dev'}/team?team=${encodeURIComponent(account.accountId)}`,
+              `${status.settingsUrl ?? 'https://app.opheleon.ai'}/team?team=${encodeURIComponent(account.accountId)}`,
             )
           }
         >

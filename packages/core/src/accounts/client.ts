@@ -20,15 +20,10 @@ import type { AgentStatus, DeliveryCheckpoint } from '../../../contracts/src/acc
 import { responseSummary, teamsDebug } from './debug.js';
 
 /**
- * Where the Accounts API lives unless AIDEN_ACCOUNTS_URL points elsewhere (beta or local
- * development): the Cloudflare Worker in front of the Teams API.
+ * Where the Accounts API lives unless AIDEN_ACCOUNTS_URL points elsewhere (beta at
+ * https://api-beta.opheleon.ai, or local development).
  */
-const defaultUrl = 'https://aiden-teams-api.opheleon.workers.dev';
-/** The dashboard for each published API address, which are not sibling subdomains. */
-const publishedDashboards: Record<string, string> = {
-  [defaultUrl]: 'https://aiden-teams.pages.dev',
-  'https://aiden-teams-api-beta.opheleon.workers.dev': 'https://beta.aiden-teams.pages.dev',
-};
+const defaultUrl = 'https://api.opheleon.ai';
 /** No Accounts call should hold up the app for long. */
 const timeoutMs = 15_000;
 
@@ -61,16 +56,15 @@ export function accountsUrl(env: NodeJS.ProcessEnv = process.env): string {
 
 /**
  * The Teams dashboard's address, where teams, invitations, admins, billing and profiles are
- * managed. AIDEN_DASHBOARD_URL wins, then the published dashboard for a published API address;
- * otherwise an `api.` host becomes `app.` (sibling subdomains), and any other API address is
- * used as is. Example: AIDEN_ACCOUNTS_URL https://api.example.com gives https://app.example.com.
+ * managed. AIDEN_DASHBOARD_URL wins; otherwise the API host's first label `api` or `api-<stage>`
+ * becomes `app` or `app-<stage>` (sibling subdomains), and any other API address is used as is.
+ * Examples: https://api.opheleon.ai gives https://app.opheleon.ai, and
+ * https://api-beta.opheleon.ai gives https://app-beta.opheleon.ai.
  */
 export function dashboardUrl(env: NodeJS.ProcessEnv = process.env): string {
   if (env.AIDEN_DASHBOARD_URL) return new URL(env.AIDEN_DASHBOARD_URL).origin;
-  const published = publishedDashboards[accountsUrl(env)];
-  if (published) return published;
   const api = new URL(accountsUrl(env));
-  if (api.hostname.startsWith('api.')) api.hostname = `app.${api.hostname.slice(4)}`;
+  api.hostname = api.hostname.replace(/^api(-[a-z0-9]+)?\./, 'app$1.');
   return api.origin;
 }
 
