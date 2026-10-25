@@ -2,10 +2,11 @@ import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { app, BrowserWindow, dialog } from 'electron';
+import { app, BrowserWindow, dialog, powerMonitor } from 'electron';
 
 import type { RunEvent } from '../../../packages/contracts/src/index.js';
 import { WorkerClient } from '../../../packages/core/src/client.js';
+import { AccountPoller } from './account-poller.js';
 import { registerFileIpc, registerPreferenceIpc } from './desktop-ipc.js';
 import { LocalDiagnostics } from './diagnostics.js';
 import { registerFirstUseIpc } from './first-use-ipc.js';
@@ -30,6 +31,7 @@ app.on('second-instance', () => {
   }
 });
 let watcher: ProjectWatcher;
+let poller: AccountPoller;
 const here = path.dirname(fileURLToPath(import.meta.url));
 let worker: WorkerClient;
 let window: BrowserWindow;
@@ -55,6 +57,7 @@ function observeDesktop(): void {
     if (quitting) return;
     void diagnostics.record({ component: 'worker', code: 'worker_stopped' });
     watcher.stop();
+    poller.stop();
     if (!window.isDestroyed())
       window.webContents.send('aiden:event', {
         type: 'failed',
@@ -83,6 +86,7 @@ app
       ...process.env,
       AIDEN_HOME: dataRoot,
       AIDEN_PACKAGED: app.isPackaged ? '1' : '0',
+      AIDEN_APP_VERSION: app.getVersion(),
       ...(app.isPackaged
         ? { PLAYWRIGHT_BROWSERS_PATH: path.join(process.resourcesPath, 'playwright') }
         : {}),
@@ -117,16 +121,23 @@ app
       isBusy: () => activeRuns.size > 0 || activeCodingJobs.size > 0,
       onError: () => void diagnostics.record({ component: 'watcher', code: 'check_failed' }),
     });
+    poller = new AccountPoller({
+      worker,
+      isBusy: () => activeRuns.size > 0 || activeCodingJobs.size > 0,
+      idleSeconds: () => powerMonitor.getSystemIdleTime(),
+      onBattery: () => powerMonitor.isOnBatteryPower(),
+    });
     updater = new DesktopUpdater({
       dataRoot,
       isRunActive: () => activeRuns.size > 0 || activeCodingJobs.size > 0,
     });
     registerPreferenceIpc(authorized, updater);
     registerFirstUseIpc(authorized, dataRoot);
-    registerWorkerIpc(authorized, worker);
+    registerWorkerIpc(authorized, worker, () => poller.nudge());
     registerFileIpc(authorized, window, worker);
     observeDesktop();
     await watcher.start();
+    poller.start();
     await window.loadFile(path.resolve(here, '../../../desktop/index.html'));
     await updater.start();
   })
@@ -146,6 +157,7 @@ app.on('before-quit', (event) => {
   if (quitting) return;
   quitting = true;
   watcher?.stop();
+  poller?.stop();
   updater?.dispose();
   if (worker) {
     void worker.close().then(() => {

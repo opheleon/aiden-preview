@@ -13,6 +13,7 @@ const understanding: Understanding = {
   title: 'Reschedule calendar events',
   repositories: [],
   namedRepositories: [],
+  namedBranches: [],
   overview: 'A calendar.',
   milestones: [],
   deliveryPlan: [

@@ -1,6 +1,7 @@
 import { z } from 'zod/v3';
 
 import type { Call } from './index.js';
+import { setupTasks } from './task-model.js';
 
 /** Where people get help outside the app; shared by the sidebar and the project Guide. */
 export const helpLinks = {
@@ -324,20 +325,12 @@ export function setupProgress(facts: SetupFacts): SetupProgress {
     extras: facts.trackerLinked,
   };
   const details = stepDetails(facts, methods, done);
-  const labels: Record<SetupStepId, string> = {
-    understand: 'Define goal',
-    confirm: 'Review requirements',
-    code: 'Connect code',
-    verify: 'Choose checks',
-    'first-check': 'First check',
-    extras: 'Ticket tracker',
-  };
   const order = SetupStepIdSchema.options;
   const required = order.filter((id) => id !== 'extras');
   const next = required.find((id) => !done[id] && !skipped.has(id)) ?? null;
   const steps = order.map((id) => ({
     id,
-    label: labels[id],
+    label: setupTasks[id].action,
     detail: details[id],
     status: done[id]
       ? ('done' as const)

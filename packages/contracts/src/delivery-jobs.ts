@@ -2,9 +2,25 @@ import { z } from 'zod/v3';
 
 import { RuntimeSchema } from './runtime.js';
 
+/** A coding question requiring review, with optional routing to a known team member. */
+const CodingQuestionSchema = z
+  .object({
+    question: z.string().min(1).max(2000),
+    assigneeUserId: z.string().max(64).optional(),
+    blocking: z.boolean(),
+  })
+  .strict();
+
+const decisionFields = {
+  decisions: z.array(z.string().max(1000)).max(30).optional(),
+  assumptions: z.array(z.string().max(1000)).max(30).optional(),
+  openQuestions: z.array(CodingQuestionSchema).max(20).optional(),
+};
+
 /** External coding jobs track delivery separately from requirement verification. */
 export const CodingJobSchema = z
   .object({
+    ...decisionFields,
     id: z.string().uuid(),
     projectId: z.string(),
     baselineId: z.string(),
@@ -57,6 +73,7 @@ export type BetaSettings = z.infer<typeof BetaSettingsSchema>;
 /** Claude's report is a delivery claim, independently checked against GitHub before scheduling beta. */
 export const CodingResultSchema = z
   .object({
+    ...decisionFields,
     outcome: z.enum(['ready', 'needs_input']),
     summary: z.string().min(1).max(3000),
     pullRequestUrl: z.string().nullable(),

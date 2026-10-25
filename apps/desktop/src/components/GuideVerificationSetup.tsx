@@ -21,6 +21,18 @@ const methods: { id: VerifyMethod; label: string; detail: string }[] = [
   { id: 'manual', label: "I'll check it myself", detail: 'Use a manual test list' },
 ];
 
+/**
+ * Whether confirming code checks must restart analysis: the repositories changed since the project
+ * was saved, and no run is already in progress (the code check after connecting code covers it).
+ */
+function reposChanged(workspace: Workspace, projectId: string): boolean {
+  const saved = workspace.projects.find((project) => project.id === projectId);
+  return (
+    !workspace.busy &&
+    JSON.stringify(saved?.repositories) !== JSON.stringify(workspace.project.repositories)
+  );
+}
+
 /** Shared setup fields; only app targets need a separate access check before confirmation. */
 type SetupProps = {
   workspace: Workspace;
@@ -136,12 +148,7 @@ function useVerificationSetup(props: SetupProps) {
       if (save) {
         // Drop submitted secrets immediately, even if the following chat reply fails.
         setDraft(clearSubmittedSecrets);
-        const saved = workspace.projects.find((project) => project.id === projectId);
-        if (
-          code &&
-          JSON.stringify(saved?.repositories) !== JSON.stringify(workspace.project.repositories)
-        )
-          await workspace.start();
+        if (code && reposChanged(workspace, projectId)) await workspace.start();
         props.onSaved?.();
         await guide.ask(
           confirmation +

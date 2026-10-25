@@ -1,7 +1,9 @@
-@import url('./styles/foundation.css');
-@import url('./styles/project-nav.css');
-@import url('./styles/navigation.css');
-@import url('./styles/project-forms.css');
-@import url('./styles/workspace-panels.css');
-@import url('./styles/settings-overlays.css');
-@import url('./styles/device-testing.css');
+@import './styles/foundation.css';
+@import './styles/project-nav.css';
+@import './styles/navigation.css';
+@import './styles/project-forms.css';
+@import './styles/workspace-panels.css';
+@import './styles/settings-overlays.css';
+@import './styles/device-testing.css';
+@import './styles/account.css';
+@import './styles/work.css';

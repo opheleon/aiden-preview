@@ -108,3 +108,16 @@
 .setup-item-skipped .setup-marker {
   border-style: dashed;
 }
+
+/* A team project's current Aiden task, right under setup, so a wait always says why. */
+.team-task {
+  flex-shrink: 0;
+  display: grid;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.team-task p {
+  margin: 0;
+}

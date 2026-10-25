@@ -123,6 +123,38 @@ export class Engine {
       throw new Error('Review the changed project context before running another report.');
     return this.start(project, 'report', baseline, reason ? { reason } : {});
   }
+  /**
+   * Run the code check against chosen remote branches instead of each repository's usual one,
+   * for example a team build's pull request branches, and wait for it. The project's own latest
+   * report stays the one for its usual branches; this result is returned and kept as its own run.
+   * @param projectId The project.
+   * @param branches GitHub branch per repository id, for example `{ api: 'aiden/job-1' }`.
+   */
+  async checkBranches(projectId: string, branches: Record<string, string>): Promise<Report> {
+    const project = await initializeMonitoring(this.store, projectId);
+    const baseline = await json<Baseline>(
+      path.join(this.store.project(projectId), 'baseline.json'),
+    );
+    const latestFile = path.join(this.store.project(projectId), 'latest.json');
+    const before = await optionalJson<{ id: string }>(latestFile);
+    const checked: Project = {
+      ...project,
+      repositories: project.repositories.map((repo) =>
+        branches[repo.id]
+          ? { ...repo, monitoredBranch: { remote: 'origin', branch: branches[repo.id]! } }
+          : repo,
+      ),
+    };
+    const { runId } = await this.start(checked, 'report', baseline);
+    await this.wait(runId);
+    const run = await json<RunManifest>(
+      path.join(this.store.run(projectId, runId), 'manifest.json'),
+    );
+    if (run.status !== 'completed')
+      throw new Error(run.error ?? `The check stopped (${run.status}).`);
+    if (before) await atomic(latestFile, before);
+    return this.getReport(projectId, runId);
+  }
   /** Persist an explicitly chosen provider configuration only while the project is idle. */
   async updateRuntime(projectId: string, config: Project['runtime']): Promise<void> {
     const release = await this.lock(projectId);

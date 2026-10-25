@@ -15,8 +15,8 @@ import type {
 import { newProject } from '../renderer/project-state';
 import type { UpdatePreferences, UpdateStatus } from '../updater';
 
-/** Where the main window is: a project's brief, or settings. */
-export type Area = 'projects' | 'runs' | 'settings' | 'devices';
+/** Where the main window is: a project's brief, the team's shared work, or settings. */
+export type Area = 'projects' | 'runs' | 'settings' | 'devices' | 'account' | 'work' | 'agents';
 /** Settings tabs; the project tab holds everything specific to the selected project. */
 export type SettingsTab = 'project' | 'model' | 'integrations' | 'preferences' | 'desktop';
 
@@ -98,7 +98,11 @@ function usePreferenceState() {
   });
   const [integrations, setIntegrations] = useState<McpConnection[]>([]);
   const [integrationTools, setIntegrationTools] = useState<Record<string, McpTool[]>>({});
+  /** The team a new project goes to; empty when the person is not in a team. */
+  const [accountScope, setAccountScope] = useState('');
   return {
+    accountScope,
+    setAccountScope,
     area,
     setArea,
     settingsTab,

@@ -1,6 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 
+import type { z } from 'zod/v3';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
 import {
@@ -10,15 +11,26 @@ import {
   CodingResultSchema,
 } from '../../contracts/src/index.js';
 import { publicError } from '../../runtimes/src/index.js';
-import { codingWorktree, readPullRequest } from '../../tools/src/delivery-git.js';
+import type { RuntimeRequest } from '../../runtimes/src/types.js';
+import { codingWorktree, publishJobBranch, readPullRequest } from '../../tools/src/delivery-git.js';
+import { git } from '../../tools/src/git.js';
+import type { TaskControls } from './accounts/runner.js';
 import { requireDefinedScope } from './blockers.js';
 import type { Engine } from './engine.js';
 import { requireOpenProject } from './project-lifecycle.js';
 import { acquireProjectLock } from './run-lifecycle.js';
 import { atomic, json, optionalJson, uid } from './storage.js';
 
+/** Claude Code's structured final answer. */
+export type CodingResult = z.infer<typeof CodingResultSchema>;
 /** Injectable external boundaries for deterministic lifecycle tests. */
-export const codingServices = { worktree: codingWorktree, readPullRequest };
+export const codingServices = {
+  worktree: codingWorktree,
+  readPullRequest,
+  publish: publishJobBranch,
+  head: async (worktree: string): Promise<string> =>
+    (await git(worktree, ['rev-parse', 'HEAD'])).trim(),
+};
 /** Active sessions belong to this worker; persisted running jobs are reconciled after restart. */
 const sessions = new WeakMap<
   Engine,
@@ -127,7 +139,9 @@ export async function startCodingJob(
       sessions.get(engine) ??
       new Map<string, { controller: AbortController; done: Promise<void> }>();
     sessions.set(engine, active);
-    const done = executeCoding(engine, job, prompt, controller).finally(() => active.delete(id));
+    const done = executeCoding(engine, job, prompt, controller)
+      .then(() => undefined)
+      .finally(() => active.delete(id));
     void done.then(onFinish).catch(() => {});
     active.set(id, { controller, done });
     return job;
@@ -135,28 +149,31 @@ export async function startCodingJob(
     await release();
   }
 }
-/** Consume Claude's terminal result once; failed/unknown jobs are never silently relaunched. */
-async function executeCoding(
+/**
+ * Consume Claude's terminal result once; failed/unknown jobs are never silently relaunched.
+ * `directories` are further worktrees the same session may work in (a team build across repos).
+ */
+export async function executeCoding(
   engine: Engine,
   job: CodingJob,
   prompt: string,
   controller: AbortController,
-): Promise<void> {
+  progress: (line: string) => void = () => {},
+  directories: string[] = [],
+  controls?: TaskControls,
+): Promise<CodingResult | null> {
+  let output: CodingResult | null = null;
   try {
-    const result = await engine.runtime.run({
-      coding: { sessionId: job.sessionId! },
-      config: job.runtime,
-      cwd: job.worktree,
-      prompt,
-      schema: zodToJsonSchema(CodingResultSchema),
-      tools: { url: '', token: '' },
-      signal: controller.signal,
-      progress: () => {},
-    });
-    const output = CodingResultSchema.parse(result.value);
+    const result = await engine.runtime.run(
+      codingRequest(job, prompt, controller.signal, progress, directories, controls),
+    );
+    output = CodingResultSchema.parse(result.value);
     if (result.model) job.model = result.model;
     job.message = output.summary;
     job.checks = output.localChecks;
+    job.decisions = output.decisions;
+    job.assumptions = output.assumptions;
+    job.openQuestions = output.openQuestions;
     job.status = 'needs_input';
     if (output.outcome === 'ready' && output.pullRequestUrl) {
       job.pullRequestUrl = output.pullRequestUrl;
@@ -180,6 +197,7 @@ async function executeCoding(
       : publicError(error);
   }
   await saveJob(engine, job);
+  return output;
 }
 /** Detect orphaned jobs after restart without trusting a reusable OS process ID. */
 export function codingActive(engine: Engine, jobId: string): boolean {
@@ -197,4 +215,30 @@ export async function closeCoding(engine: Engine): Promise<void> {
   const active = [...(sessions.get(engine)?.values() ?? [])];
   for (const session of active) session.controller.abort();
   await Promise.all(active.map((session) => session.done));
+}
+
+/** Build the runtime handoff while preserving optional supervision and selected billing. */
+function codingRequest(
+  job: CodingJob,
+  prompt: string,
+  signal: AbortSignal,
+  progress: (line: string) => void,
+  directories: string[],
+  controls?: TaskControls,
+): RuntimeRequest {
+  return {
+    coding: {
+      sessionId: job.sessionId!,
+      ...(directories.length ? { directories } : {}),
+      ...(controls?.limits ? { limits: controls.limits } : {}),
+    },
+    config: job.runtime,
+    cwd: job.worktree,
+    prompt,
+    schema: zodToJsonSchema(CodingResultSchema),
+    tools: controls?.tools ?? { url: '', token: '' },
+    ...(controls?.activity ? { activity: controls.activity } : {}),
+    signal,
+    progress,
+  };
 }

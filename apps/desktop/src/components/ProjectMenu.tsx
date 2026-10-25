@@ -1,10 +1,16 @@
 import { MoreHorizontal } from 'lucide-react';
-import { type JSX, useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import type { JSX } from 'react';
 
 import type { Project } from '../../../../packages/contracts/src/index';
 import type { Workspace } from '../hooks/useWorkspace';
 import { outcomeReady } from './ProjectOutcome';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 const api = window.aiden;
 
 /** A decision that needs a confirmation dialog, for one project. */
@@ -87,7 +93,7 @@ function tidy(items: Item[]): Item[] {
 /**
  * The "…" button on a project row and its menu. The menu is drawn above the whole window, below
  * the button, so a scrolling sidebar never clips or offsets it; Escape, a click elsewhere, or
- * choosing an item closes it.
+ * choosing an item closes it, and arrow keys move between the actions.
  */
 export function ProjectMenu({
   workspace,
@@ -100,69 +106,31 @@ export function ProjectMenu({
   name: string;
   onOutcome: (request: OutcomeRequest) => void;
 }): JSX.Element {
-  const trigger = useRef<HTMLButtonElement>(null);
-  const menu = useRef<HTMLDivElement>(null);
-  const [at, setAt] = useState<{ top: number; left: number } | null>(null);
-  useEffect(() => {
-    if (!at) return;
-    menu.current?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled)')?.focus();
-    /** Close on Escape, a click outside the menu and its button, or a window resize. */
-    const dismiss = (event: Event): void => {
-      if (event instanceof KeyboardEvent && event.key !== 'Escape') return;
-      if (event.target instanceof Node && menu.current?.contains(event.target)) return;
-      if (event.target instanceof Node && trigger.current?.contains(event.target)) return;
-      setAt(null);
-    };
-    addEventListener('pointerdown', dismiss);
-    addEventListener('keydown', dismiss);
-    addEventListener('resize', dismiss);
-    return () => {
-      removeEventListener('pointerdown', dismiss);
-      removeEventListener('keydown', dismiss);
-      removeEventListener('resize', dismiss);
-    };
-  }, [at]);
-  /** Open the menu under the button, kept inside the window. */
-  function toggle(): void {
-    const box = trigger.current?.getBoundingClientRect();
-    setAt(at || !box ? null : { top: box.bottom + 4, left: Math.min(box.left, innerWidth - 228) });
-  }
   return (
-    <>
-      <button
-        ref={trigger}
-        className="project-row-trigger"
-        aria-label={`Actions for ${name}`}
-        aria-haspopup="menu"
-        aria-expanded={!!at}
-        onClick={toggle}
-      >
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger className="project-row-trigger" aria-label={`Actions for ${name}`}>
         <MoreHorizontal size={15} />
-      </button>
-      {at &&
-        createPortal(
-          <div ref={menu} className="project-menu" role="menu" aria-label={name} style={at}>
-            {tidy(projectItems(workspace, project, onOutcome)).map((item, index) =>
-              item ? (
-                <button
-                  key={item.label}
-                  role="menuitem"
-                  className={item.danger ? 'project-menu-danger' : undefined}
-                  disabled={item.disabled}
-                  onClick={() => {
-                    setAt(null);
-                    item.run();
-                  }}
-                >
-                  {item.label}
-                </button>
-              ) : (
-                <hr key={`divider-${index}`} />
-              ),
-            )}
-          </div>,
-          document.body,
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-[210px]">
+        {tidy(projectItems(workspace, project, onOutcome)).map((item, index) =>
+          item ? (
+            // Real buttons keep the native disabled state that tests and assistive tech read.
+            <DropdownMenuItem
+              key={item.label}
+              asChild
+              disabled={!!item.disabled}
+              variant={item.danger ? 'destructive' : 'default'}
+              onSelect={item.run}
+            >
+              <button type="button" disabled={!!item.disabled}>
+                {item.label}
+              </button>
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuSeparator key={`divider-${index}`} />
+          ),
         )}
-    </>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

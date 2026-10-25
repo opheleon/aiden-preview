@@ -197,6 +197,7 @@ export async function guideInput(
         source: r.source?.name ?? null,
       })),
       namedRepositories: baseline?.product.namedRepositories ?? [],
+      namedBranches: baseline?.product.namedBranches ?? [],
       runtime: { provider: project.runtime.provider, auth: project.runtime.auth },
     },
     requirements: baseline?.product.requirements.map((r) => ({ id: r.id, text: r.text })) ?? null,

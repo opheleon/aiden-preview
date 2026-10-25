@@ -23,7 +23,7 @@ export function PlanDialogs({
 }): JSX.Element | null {
   if (dialog === 'plan')
     return (
-      <Modal label="Adjust plan" title="Adjust plan" className="plan-modal" onClose={onClose}>
+      <Modal label="Adjust plan" title="Adjust plan" className="w-[820px]" onClose={onClose}>
         <DeliveryPlanEditor
           product={product}
           busy={workspace.busy}

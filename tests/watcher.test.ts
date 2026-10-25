@@ -5,6 +5,18 @@ import path from 'node:path';
 import test from 'node:test';
 
 import { localDay, ProjectWatcher } from '../apps/desktop/src/watcher.js';
+import type { WorkerClient } from '../packages/core/src/client.js';
+
+/**
+ * Type a partial fake worker. It answers only the methods and fields the watcher reads, so it is
+ * not a full WorkerClient; the cast says so instead of relying on how TypeScript compares large
+ * result unions.
+ */
+function fakeWorker(
+  request: (method: string, params: never) => Promise<unknown>,
+): Pick<WorkerClient, 'request'> {
+  return { request } as unknown as Pick<WorkerClient, 'request'>;
+}
 
 type Heads = { ready: boolean; active: boolean; changed: boolean; lastLookAt?: string | null };
 
@@ -26,29 +38,27 @@ async function fixture(initial: Partial<Heads> = {}) {
     now: () => now,
     isBusy: () => busy,
     onError: (message) => errors.push(message),
-    worker: {
-      request: ((method: string, params: { projectId: string; reason?: string }) => {
-        if (fail) return Promise.reject(new Error('worker unavailable'));
-        operations.push(method);
-        if (method === 'projects')
-          return Promise.resolve([
-            {
-              id: 'project',
-              repositories: code ? [{ id: 'app', path: '/synthetic/app', notes: '' }] : [],
-              lifecycle: { status: closed ? 'closed' : 'active' },
-            },
-          ]);
-        if (method === 'reconcileDelivery') return Promise.resolve([]);
-        if (method === 'syncTickets')
-          return Promise.resolve({ settings: { enabled: true }, needsAssessment });
-        if (method === 'heads') return Promise.resolve({ repositories: [], ...heads });
-        if (method === 'look') {
-          looks.push(params);
-          return Promise.resolve({ runId: 'look-run' });
-        }
-        return Promise.reject(new Error(`unexpected ${method}`));
-      }) as never,
-    },
+    worker: fakeWorker((method: string, params: { projectId: string; reason?: string }) => {
+      if (fail) return Promise.reject(new Error('worker unavailable'));
+      operations.push(method);
+      if (method === 'projects')
+        return Promise.resolve([
+          {
+            id: 'project',
+            repositories: code ? [{ id: 'app', path: '/synthetic/app', notes: '' }] : [],
+            lifecycle: { status: closed ? 'closed' : 'active' },
+          },
+        ]);
+      if (method === 'reconcileDelivery') return Promise.resolve([]);
+      if (method === 'syncTickets')
+        return Promise.resolve({ settings: { enabled: true }, needsAssessment });
+      if (method === 'heads') return Promise.resolve({ repositories: [], ...heads });
+      if (method === 'look') {
+        looks.push(params);
+        return Promise.resolve({ runId: 'look-run' });
+      }
+      return Promise.reject(new Error(`unexpected ${method}`));
+    }),
   });
   await watcher.start(false);
   return {
@@ -106,25 +116,22 @@ void test('one morning look a day is saved across restarts, and projects without
       dataRoot: f.root,
       now: () => new Date(2026, 8, 29, 9, 0),
       isBusy: () => false,
-      worker: {
-        request: ((method: string, params: unknown) => {
-          if (method === 'projects')
-            return Promise.resolve([
-              { id: 'project', repositories: [{ id: 'app', path: '/synthetic/app', notes: '' }] },
-            ]);
-          if (method === 'reconcileDelivery' || method === 'syncTickets')
-            return Promise.resolve([]);
-          if (method === 'heads')
-            return Promise.resolve({
-              repositories: [],
-              ready: true,
-              active: false,
-              changed: false,
-            });
-          f.looks.push(params as never);
-          return Promise.resolve({ runId: 'again' });
-        }) as never,
-      },
+      worker: fakeWorker((method: string, params: unknown) => {
+        if (method === 'projects')
+          return Promise.resolve([
+            { id: 'project', repositories: [{ id: 'app', path: '/synthetic/app', notes: '' }] },
+          ]);
+        if (method === 'reconcileDelivery' || method === 'syncTickets') return Promise.resolve([]);
+        if (method === 'heads')
+          return Promise.resolve({
+            repositories: [],
+            ready: true,
+            active: false,
+            changed: false,
+          });
+        f.looks.push(params as never);
+        return Promise.resolve({ runId: 'again' });
+      }),
     });
     await restarted.start(false);
     await restarted.tick();

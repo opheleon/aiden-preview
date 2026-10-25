@@ -18,7 +18,9 @@ import { GuideWidgetCard } from '../components/GuideWidgets';
 import { ProjectChatAction } from '../components/ProjectChatAction';
 import { ProviderNotice } from '../components/ProviderNotice';
 import { SetupChecklist } from '../components/SetupChecklist';
+import { TeamTaskStatus } from '../components/TeamTaskStatus';
 import type { Guide } from '../hooks/useGuide';
+import { useTeamSetupSync } from '../hooks/useTeamSetupSync';
 import type { Workspace } from '../hooks/useWorkspace';
 import { contextualGuideMessage, type ProjectChatEntry } from '../renderer/project-chat-entry';
 
@@ -90,6 +92,15 @@ function Line({
       <ChatSteps steps={message.nextSteps} />
     </>
   );
+}
+
+/**
+ * Whether to show a quiet "Thinking" while the requirements load. A team project's requirements
+ * come from a team task, whose own status line says what is happening, so it never shows here.
+ */
+function loadingRequirements(guide: Guide, workspace: Workspace): boolean {
+  if (workspace.project.account || guide.thinking || guide.error || workspace.busy) return false;
+  return !guide.view || !workspace.baseline;
 }
 
 /** Derive the current conversational state without treating old cards as active setup. */
@@ -210,6 +221,7 @@ export function GuideChat({
     if (visible && ready && autoPlayback && passive(entry)) playback();
   }, [visible, ready, autoPlayback, playback, entry]);
   const { view, thinking, asking } = guide;
+  useTeamSetupSync(workspace, view);
   const missingRequirement = requirementMissing(entry, workspace);
   const { messages, lastReply, waiting } = conversationState(guide);
   const saved = new Set(messages.flatMap((m) => (m.result ? [m.result.runId] : [])));
@@ -249,7 +261,14 @@ export function GuideChat({
   return (
     <div className="guide-tab">
       <ProviderNotice workspace={workspace} />
-      {view && <SetupChecklist setup={view.setup} />}
+      {view && (
+        <SetupChecklist
+          setup={view.setup}
+          working={workspace.busy}
+          team={!!workspace.project.account}
+        />
+      )}
+      <TeamTaskStatus workspace={workspace} />
       <div
         className="guide-thread"
         ref={thread}
@@ -262,9 +281,7 @@ export function GuideChat({
               element.scrollHeight - element.scrollTop - element.clientHeight < 80;
         }}
       >
-        {(!view || !workspace.baseline) && !thinking && !guide.error && !workspace.busy && (
-          <GuideThinking />
-        )}
+        {loadingRequirements(guide, workspace) && <GuideThinking />}
         {view?.thread.summary && (
           <p className="guide-event">Earlier in this conversation: {view.thread.summary}</p>
         )}

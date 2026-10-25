@@ -5,6 +5,7 @@ import {
   type Options,
   query,
   type SDKMessage,
+  type SDKRateLimitInfo,
   type SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 
@@ -24,6 +25,13 @@ import {
   messages,
 } from './claude-auth.js';
 import { parseJson } from './environment.js';
+import {
+  claudeEventWindows,
+  claudeWindows,
+  type PlanUsage,
+  planUsage,
+  type UsageWindows,
+} from './plan-usage.js';
 import type { RuntimeRequest, RuntimeResult } from './types.js';
 export {
   claudeAuthStatus,
@@ -34,6 +42,9 @@ export {
   isSubscriptionAccount,
   subscriptionFromStatus,
 } from './claude-auth.js';
+import { codingActivity } from './coding-activity.js';
+import { codingSteps } from './coding-progress.js';
+import { superviseCoding } from './coding-supervision.js';
 /** Allow only Aiden’s MCP tools; ignore inherited plugins, settings, and shell capabilities. */
 function executionOptions(
   r: RuntimeRequest,
@@ -59,13 +70,29 @@ function executionOptions(
       ...(r.config.model ? { model: r.config.model } : {}),
       ...(r.config.effort ? { effort: r.config.effort } : {}),
       sessionId: r.coding.sessionId,
+      ...(r.coding.directories?.length ? { additionalDirectories: r.coding.directories } : {}),
       persistSession: true,
       tools: { type: 'preset', preset: 'claude_code' },
       permissionMode: 'auto',
       settingSources: [],
       plugins: [],
       strictMcpConfig: true,
-      mcpServers: {},
+      mcpServers: r.tools.url
+        ? {
+            aiden_status: {
+              type: 'http',
+              url: r.tools.url,
+              headers: { Authorization: `Bearer ${r.tools.token}` },
+            },
+          }
+        : {},
+      disallowedTools: ['AskUserQuestion', 'EnterPlanMode', 'ExitPlanMode'],
+      canUseTool: () =>
+        Promise.resolve({
+          behavior: 'deny',
+          message:
+            'This is unattended work. Report the required approval through aiden_status.report_status and continue independent authorized work.',
+        }),
       systemPrompt: { type: 'preset', preset: 'claude_code' },
       outputFormat: { type: 'json_schema', schema: r.schema },
       stderr: () => {},
@@ -219,14 +246,15 @@ function observeMessage(r: RuntimeRequest, message: SDKMessage, subscription: bo
     message.tools.some((tool) => !tool.startsWith('mcp__aiden__') && tool !== 'StructuredOutput')
   )
     throw new Error('Claude exposed unexpected tools; Aiden stopped the run.');
+  if (r.coding) for (const activity of codingActivity(message)) r.activity?.(activity);
   if (message.type === 'assistant') {
-    if (r.coding) r.progress('Claude Code is working. Local tests are owned by Claude Code.');
+    if (r.coding) for (const step of codingSteps(message)) r.progress(step);
     if (message.error) throw executionError(message.error, subscription);
   }
 }
 
 /** Execute one isolated Claude turn after confirming the requested billing mode; always close its stream. */
-export async function runClaude(
+async function executeClaude(
   r: RuntimeRequest,
   home: string,
   key: string | undefined,
@@ -278,6 +306,8 @@ export async function runClaude(
         actualModel = message.model;
       }
       observeMessage(r, message, subscription);
+      if (subscription && message.type === 'rate_limit_event')
+        recordClaudeRateLimit(message.rate_limit_info);
       if (message.type === 'result') {
         if (message.subtype !== 'success')
           throw new Error(
@@ -297,6 +327,43 @@ export async function runClaude(
     stream?.close();
     r.signal.removeEventListener('abort', stop);
   }
+}
+
+/** Supervise external coding independently of the desktop polling loop. */
+export async function runClaude(
+  request: RuntimeRequest,
+  home: string,
+  key: string | undefined,
+  version: string,
+  deps = defaults,
+): Promise<RuntimeResult> {
+  return superviseCoding(request, (boundedRequest) =>
+    executeClaude(boundedRequest, home, key, version, deps),
+  );
+}
+
+/** A query that can only answer control requests: no tools, settings, plugins, or MCP servers. */
+function discoveryOptions(
+  home: string,
+  env: NodeJS.ProcessEnv,
+  binary: string,
+  controller: AbortController,
+): Options {
+  return {
+    cwd: home,
+    env,
+    pathToClaudeCodeExecutable: binary,
+    abortController: controller,
+    tools: [],
+    allowedTools: [],
+    permissionMode: 'dontAsk',
+    settingSources: [],
+    plugins: [],
+    strictMcpConfig: true,
+    mcpServers: {},
+    persistSession: false,
+    stderr: () => {},
+  };
 }
 
 /** Discover the selected auth profile's models without submitting a user prompt. */
@@ -331,21 +398,7 @@ export async function claudeModels(
     }
     stream = deps.query({
       prompt: input(),
-      options: {
-        cwd: home,
-        env,
-        pathToClaudeCodeExecutable: binary,
-        abortController: controller,
-        tools: [],
-        allowedTools: [],
-        permissionMode: 'dontAsk',
-        settingSources: [],
-        plugins: [],
-        strictMcpConfig: true,
-        mcpServers: {},
-        persistSession: false,
-        stderr: () => {},
-      },
+      options: discoveryOptions(home, env, binary, controller),
     });
     const account = await bounded(stream.accountInfo(), controller.signal, 15000);
     verifyAccount(account, config.auth === 'subscription');
@@ -367,4 +420,75 @@ export async function claudeModels(
     release();
     stream?.close();
   }
+}
+
+/** Each usage read starts a Claude Code process, so a reading is reused for five minutes. */
+const usageCacheMs = 5 * 60_000;
+let usageCache: { at: number; windows: UsageWindows } | undefined;
+let usageRead: Promise<UsageWindows> | undefined;
+
+/** Read subscription plan usage without sending a prompt; any failure is unknown, never an error. */
+async function readClaudeUsage(home: string, deps: ClaudeDependencies): Promise<UsageWindows> {
+  const controller = new AbortController();
+  let release!: () => void;
+  const hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  /** Keep the input open without yielding, so no prompt is ever sent. */
+  // eslint-disable-next-line require-yield -- The usage read deliberately sends no prompt.
+  async function* input(): AsyncGenerator<SDKUserMessage> {
+    await hold;
+  }
+  let stream: ReturnType<typeof query> | undefined;
+  try {
+    const env = claudeEnvironment(home, 'subscription');
+    const binary = deps.binary();
+    await mkdir(home, { recursive: true, mode: 0o700 });
+    stream = deps.query({
+      prompt: input(),
+      options: discoveryOptions(home, env, binary, controller),
+    });
+    const account = await bounded(stream.accountInfo(), controller.signal, 15000);
+    if (!isSubscriptionAccount(account)) return {};
+    const usage = await bounded(
+      stream.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true }),
+      controller.signal,
+      15000,
+    );
+    return claudeWindows(usage);
+  } catch {
+    // An older Claude Code, a signed-out profile, or a network error all mean unknown usage.
+    return {};
+  } finally {
+    controller.abort();
+    release();
+    stream?.close();
+  }
+}
+
+/** Claude subscription plan usage, read at most every five minutes and shared by concurrent callers. */
+export async function claudeUsage(
+  home: string,
+  deps = defaults,
+  now = Date.now(),
+): Promise<PlanUsage> {
+  if (usageCache && now - usageCache.at < usageCacheMs)
+    return { ...planUsage(usageCache.windows), readAt: new Date(usageCache.at).toISOString() };
+  usageRead ??= readClaudeUsage(home, deps).finally(() => {
+    usageRead = undefined;
+  });
+  const windows = await usageRead;
+  usageCache = { at: now, windows };
+  return { ...planUsage(windows), readAt: new Date(now).toISOString() };
+}
+
+/** Refresh the cached windows from a run's rate-limit event; a window it lacks keeps its reading. */
+export function recordClaudeRateLimit(info: SDKRateLimitInfo): void {
+  if (usageCache) usageCache.windows = { ...usageCache.windows, ...claudeEventWindows(info) };
+}
+
+/** Forget the cached reading; tests use this to start clean. */
+export function resetClaudeUsage(): void {
+  usageCache = undefined;
+  usageRead = undefined;
 }

@@ -69,7 +69,7 @@ export function RequirementSheet({
   return (
     <Modal
       label={`Requirement ${requirement.id}`}
-      className="requirement-sheet"
+      className="requirement-sheet w-[720px]"
       eyebrow={feature ? `${requirement.id} · ${feature}` : requirement.id}
       title={requirement.text}
       onClose={onClose}

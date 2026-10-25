@@ -43,7 +43,7 @@ test('a new project opens on the Guide, plays back the requirements, and sets up
   await userEvent.click(within(checklist).getByRole('button', { name: 'Show steps' }));
   const steps = within(checklist).getByRole('list', { name: 'Setup' });
   for (const text of [
-    /Describe what you want to build/,
+    /Aiden turns what you described/,
     /Review the requirements and resolve any open questions/,
     /Choose code, web, API, or manual checks/,
     /Check your requirements and see progress/,
@@ -93,7 +93,7 @@ test('a new project opens on the Guide, plays back the requirements, and sets up
     projectId: f.project().id,
     text: 'I checked access and confirmed these verification methods: Code checks, Web app.',
   });
-  expect(await screen.findByText('Step 5 of 5 · First check')).toBeVisible();
+  expect(await screen.findByText('Step 5 of 5 · Run first check')).toBeVisible();
 });
 
 test('a typed message round-trips, and an unanswered one can be asked again', async () => {

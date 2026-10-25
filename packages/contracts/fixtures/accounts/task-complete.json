@@ -1,0 +1,52 @@
+{
+  "id": "00000000-0000-4000-8000-000000000006",
+  "accountId": "00000000-0000-4000-8000-000000000002",
+  "projectId": "00000000-0000-4000-8000-000000000005",
+  "actor": "agent",
+  "kind": "write-requirements",
+  "title": "Write requirements",
+  "instructions": "Turn the goal into requirements.",
+  "requirementIds": [],
+  "requires": {
+    "tools": [],
+    "connections": [],
+    "runtime": {
+      "provider": "claude",
+      "auth": "subscription"
+    },
+    "pinnedUserId": null,
+    "pinnedDeviceId": "alice-mac"
+  },
+  "status": "done",
+  "blockedBy": null,
+  "assigneeUserId": null,
+  "leasedDeviceId": "alice-mac",
+  "leaseExpiresAt": null,
+  "attempts": 2,
+  "execution": {
+    "attemptId": "00000000-0000-4000-8000-000000000006:2",
+    "location": "local",
+    "startedAt": "2026-10-20T15:00:00.000Z",
+    "deadlineAt": "2026-10-20T15:45:00.000Z",
+    "activityAt": "2026-10-20T15:00:00.000Z",
+    "activitySequence": 0,
+    "reportedAt": null,
+    "phase": "completed",
+    "limits": {
+      "idleMs": 600000,
+      "toolMs": 1800000,
+      "absoluteMs": 2700000
+    },
+    "checkpoint": null
+  },
+  "result": {
+    "requirements": 4
+  },
+  "resume": {
+    "humanTaskId": "00000000-0000-4000-8000-000000000007",
+    "answer": "USD only for now"
+  },
+  "queuedAt": "2026-10-20T15:00:00.000Z",
+  "updatedAt": "2026-10-20T15:00:00.000Z",
+  "progress": null
+}

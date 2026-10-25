@@ -73,6 +73,7 @@ export const PullRequestSchema = z.object({
   url: z.string().url(),
   state: z.enum(['OPEN', 'CLOSED', 'MERGED']),
   headRefName: z.string(),
+  headRefOid: z.string().optional(),
   baseRefName: z.string(),
   headRepository: z.object({ name: z.string() }).nullable(),
   headRepositoryOwner: z.object({ login: z.string() }).nullable(),
@@ -105,7 +106,7 @@ export async function readPullRequest(
       '--repo',
       repository,
       '--json',
-      'url,state,headRefName,baseRefName,headRepository,headRepositoryOwner,mergeCommit,reviewDecision,statusCheckRollup',
+      'url,state,headRefName,headRefOid,baseRefName,headRepository,headRepositoryOwner,mergeCommit,reviewDecision,statusCheckRollup',
     ]),
   );
   if (
@@ -143,8 +144,139 @@ export async function findJobPullRequest(
         '2',
       ]),
     );
-  if (matches.length !== 1) return null;
+  if (matches.length > 1)
+    throw new Error(
+      'Multiple pull requests match this delivery branch. Review them before continuing.',
+    );
+  if (!matches.length) return null;
   const url = matches[0]!.url;
   await readPullRequest(repository, url, branch, baseBranch);
   return url;
+}
+/**
+ * Publish a finished team coding job: push only its `aiden/job-*` branch with the GitHub CLI's
+ * credentials, then open the pull request. The clone itself stays read-only (its push URL is a
+ * guard), so the coding agent can never push; Aiden publishes exactly one branch, never the base.
+ * Returns the new pull request's URL.
+ */
+/** A publication is restricted to a committed Aiden branch and current attempt authority. */
+export interface PublicationInput {
+  worktree: string;
+  repository: string;
+  branch: string;
+  baseBranch: string;
+  title: string;
+  body: string;
+  signal?: AbortSignal;
+  authorize?: () => Promise<void>;
+  commit?: string;
+  remoteOnly?: boolean;
+}
+
+/** Publish or reconcile one committed branch without duplicating an existing PR. */
+export async function publishJobBranch(input: PublicationInput): Promise<string> {
+  const { repository, branch, baseBranch } = input;
+  if (!name.test(repository) || !/^aiden\/job-[a-f0-9-]+$/.test(branch))
+    throw new Error('Aiden publishes only its own job branches.');
+  input.signal?.throwIfAborted();
+  await input.authorize?.();
+  const existing = await findJobPullRequest(repository, branch, baseBranch);
+  if (existing) {
+    await verifyPublicationCommit(repository, existing, branch, baseBranch, input.commit);
+    return existing;
+  }
+  await ensurePublishedBranch(input);
+  await input.authorize?.();
+  input.signal?.throwIfAborted();
+  try {
+    const { stdout } = await exec(
+      'gh',
+      ['pr', 'create', '--repo', repository, '--base', baseBranch, '--head', branch].concat([
+        '--title',
+        input.title.slice(0, 200),
+        '--body',
+        input.body.slice(0, 60000),
+      ]),
+      { timeout: 60000, signal: input.signal, env: { ...process.env, GH_PROMPT_DISABLED: '1' } },
+    );
+    const url = stdout.trim().split('\n').pop() ?? '';
+    if (!/^https:\/\/github\.com\/\S+\/pull\/\d+$/.test(url)) throw new Error(url);
+    await verifyPublicationCommit(repository, url, branch, baseBranch, input.commit);
+    return url;
+  } catch {
+    input.signal?.throwIfAborted();
+    const recovered = await findJobPullRequest(repository, branch, baseBranch);
+    if (recovered) {
+      await verifyPublicationCommit(repository, recovered, branch, baseBranch, input.commit);
+      return recovered;
+    }
+    throw new Error('Aiden pushed the branch but could not open the pull request with gh.');
+  }
+}
+
+/** A branch match alone is insufficient: publication must contain the checkpointed commit. */
+export async function verifyPublicationCommit(
+  repository: string,
+  url: string,
+  branch: string,
+  baseBranch: string,
+  commit?: string,
+): Promise<void> {
+  const pr = await readPullRequest(repository, url, branch, baseBranch);
+  if (commit && pr.headRefOid !== commit)
+    throw new Error('The pull request does not contain the checkpointed commit.');
+}
+
+/** A checkpoint exists but its commit is neither on this machine nor on the remote branch. */
+export class MissingPublicationCommit extends Error {
+  /** Explain the recovery boundary without pretending unpublished local files are portable. */
+  constructor() {
+    super(
+      'The committed work is only available on the previous machine. Bring it online to recover the checkpoint.',
+    );
+    this.name = 'MissingPublicationCommit';
+  }
+}
+
+/** Push the checkpointed local commit, or confirm a previously pushed remote commit. */
+async function ensurePublishedBranch(input: PublicationInput): Promise<void> {
+  const { worktree, repository, branch } = input;
+  if (input.remoteOnly) {
+    const remote = await deliveryGitServices.git(
+      worktree,
+      [
+        '-c',
+        'credential.helper=',
+        '-c',
+        'credential.helper=!gh auth git-credential',
+        'ls-remote',
+        `https://github.com/${repository}.git`,
+        `refs/heads/${branch}`,
+      ],
+      input.signal,
+    );
+    if (!remote.trim()) throw new MissingPublicationCommit();
+    if (remote.trim().split(/\s+/)[0] !== input.commit)
+      throw new Error('The remote branch differs from the committed checkpoint.');
+  } else {
+    if (
+      input.commit &&
+      (await deliveryGitServices.git(worktree, ['rev-parse', 'HEAD'])).trim() !== input.commit
+    )
+      throw new Error('The worktree changed after its publication checkpoint.');
+    await input.authorize?.();
+    await deliveryGitServices.git(
+      worktree,
+      [
+        '-c',
+        'credential.helper=',
+        '-c',
+        'credential.helper=!gh auth git-credential',
+        'push',
+        `https://github.com/${repository}.git`,
+        `HEAD:refs/heads/${branch}`,
+      ],
+      input.signal,
+    );
+  }
 }

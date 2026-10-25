@@ -1,6 +1,6 @@
-import { X } from 'lucide-react';
 import type { JSX } from 'react';
 
+import { Modal } from '../components/Modal';
 import type { Workspace } from '../hooks/useWorkspace';
 
 /** Show cited code evidence without privileged renderer access. */
@@ -9,32 +9,17 @@ export function WorkspaceDialogs({ workspace }: { workspace: Workspace }): JSX.E
   return (
     <>
       {evidence && (
-        <div className="modal-overlay">
-          <section
-            className="modal evidence-modal card"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Code evidence"
-          >
-            <div className="card-heading">
-              <div>
-                <h2>{evidence.path}</h2>
-                <p>
-                  {evidence.repositoryId} · {evidence.sha.slice(0, 12)}
-                </p>
-              </div>
-              <button
-                className="icon-button"
-                aria-label="Close evidence"
-                onClick={() => setEvidence(undefined)}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <p>{evidence.explanation}</p>
-            <pre>{evidence.text}</pre>
-          </section>
-        </div>
+        <Modal
+          label="Code evidence"
+          closeLabel="Close evidence"
+          className="evidence-modal w-[900px]"
+          title={evidence.path}
+          description={`${evidence.repositoryId} · ${evidence.sha.slice(0, 12)}`}
+          onClose={() => setEvidence(undefined)}
+        >
+          <p>{evidence.explanation}</p>
+          <pre>{evidence.text}</pre>
+        </Modal>
       )}
     </>
   );
