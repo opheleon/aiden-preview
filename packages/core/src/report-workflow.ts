@@ -14,6 +14,7 @@ import { deliveryTickets } from '../../reporting/src/tickets.js';
 import { ToolBroker } from '../../tools/src/broker.js';
 import { serveTools } from '../../tools/src/mcp.js';
 import { appendActivity, counted, recordStep } from './activity.js';
+import { partValidators } from './assessment-parts.js';
 import { commitBaseline } from './baseline.js';
 import { answeredDecisions, openDecisions, readCalls, replaceOpenDecisions } from './calls.js';
 import { requestClarification } from './clarification.js';
@@ -83,13 +84,15 @@ async function understandIntent(
       ? ((await optionalJson<string>(revisionFile)) ?? '')
       : hash(await answeredDecisions(context.store, run.projectId));
   if (checkpoint === null) await atomic(revisionFile, decisionsHash);
+  const sources = await contextSources(context, run.project);
   const understanding = await stage<StoredUnderstanding>(
     'understand',
     UnderstandingSchema,
     {
       context: run.project.context,
       linkedPages: notionLinks(run.project.context),
-      contextSources: await contextSources(context, run.project),
+      contextSources: sources.sources,
+      unavailableSources: sources.unavailable,
       previous,
       openCalls,
       repositories: await Promise.all(run.project.repositories.map(describeRepository)),
@@ -217,6 +220,8 @@ export async function execute(
   broker.signal = signal;
   broker.reads = (await optionalJson<ReadReceipt[]>(path.join(dir, 'reads.json'))) ?? [];
   const tools = await serveTools(broker);
+  // Parts of one stage can run at once; a candidate passes when it fits any of them.
+  const validators = partValidators();
   const stage = createModelStage({
     context,
     run,
@@ -225,9 +230,9 @@ export async function execute(
     workspace,
     tools,
     includeAnswers: true,
-    onStage: async (name, validate) => {
+    onStage: async (name, validate, part) => {
       await checkpoint(name as Stage);
-      broker.validateArtifact = validate;
+      broker.validateArtifact = validators(name, validate, part);
     },
   });
   try {

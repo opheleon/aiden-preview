@@ -14,6 +14,7 @@ import {
 import type { Engine } from './engine.js';
 import { recordGuideEvent } from './guide.js';
 import { startLook } from './look.js';
+import { saveMonitoredBranch } from './monitoring.js';
 
 /** The project's own code folder, where Aiden keeps a fresh read-only clone of each repository. */
 export function projectCodeFolder(engine: Engine, projectId: string): string {
@@ -87,6 +88,38 @@ export async function connectGithubCode(
 }
 
 /**
+ * Monitor the branch the goal names for each connected repository, before the first code check
+ * reads it. A named branch that does not exist keeps the usual branch, and the note says so.
+ * Example: namedBranches [{ repository: "acme/api", branch: "release-2" }] gives
+ * ["Checking acme/api on release-2."].
+ */
+async function applyNamedBranches(
+  engine: Engine,
+  projectId: string,
+  repositories: Project['repositories'],
+): Promise<string[]> {
+  const named = (await engine.state(projectId)).baseline?.product.namedBranches ?? [];
+  const notes: string[] = [];
+  for (const repo of repositories) {
+    const source = repo.source?.name.toLowerCase();
+    const wanted = named.find((n) => n.repository.toLowerCase() === source);
+    if (!wanted || repo.monitoredBranch?.branch === wanted.branch) continue;
+    try {
+      await saveMonitoredBranch(engine.store, projectId, repo.id, {
+        remote: 'origin',
+        branch: wanted.branch,
+      });
+      notes.push(`Checking ${wanted.repository} on ${wanted.branch}.`);
+    } catch {
+      notes.push(
+        `${wanted.repository} has no branch ${wanted.branch}, so Aiden checks its usual one.`,
+      );
+    }
+  }
+  return notes;
+}
+
+/**
  * Copies waiting or running per project. They run one at a time, and only the last one starts the
  * code check, so naming repositories under two owners gives one check that reads all of them.
  */
@@ -134,10 +167,14 @@ export function startGithubConnect(
   queue.tail = queue.tail.then(async () => {
     try {
       const { links, capped } = await chooseRepositories(owner, names);
-      await connectGithubCode(engine, projectId, links, { keep: true, check: false });
+      const { repositories } = await connectGithubCode(engine, projectId, links, {
+        keep: true,
+        check: false,
+      });
+      const branches = await applyNamedBranches(engine, projectId, repositories);
       const { baseline } = await engine.state(projectId);
       const last = queue.waiting === 1;
-      const event = `Connected ${links.join(', ')} from GitHub.${capped ? ` That is the ${maxConnectedRepositories} most recently pushed; name others to add them.` : ''}${baseline && last ? ' Aiden is reading the code.' : ''}`;
+      const event = `Connected ${links.join(', ')} from GitHub.${branches.map((note) => ` ${note}`).join('')}${capped ? ` That is the ${maxConnectedRepositories} most recently pushed; name others to add them.` : ''}${baseline && last ? ' Aiden is reading the code.' : ''}`;
       // Record the event before the check starts, so the chat shows it when it follows the run.
       await recordGuideEvent(engine, projectId, event).catch(() => {});
       if (baseline && last) await startLook(engine, projectId, 'you');

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Code checks read large projects more closely: more than eight requirements are checked in parts that follow the delivery plan, and every clause of a requirement needs its own evidence, including defaults, limits, copy, failure paths, and behavior shared across people or machines.
+- When a linked Notion page cannot be read, Aiden says why (for example, its tools changed and need review in Settings, Integrations) and waits for the page instead of writing placeholder requirements. Settings, Integrations shows each connection's current status when it opens.
+- A goal or spec that names a branch for a repository, such as "the server is on branch release-2", connects that repository on that branch before the first code check. In Project settings, Branch monitoring saves each repository's branch, and Check these branches runs one check for all of them.
 - Bound unattended Teams coding with execution deadlines, authenticated status reporting, assigned blockers, and recovery that preserves committed work and avoids duplicate PRs.
 
 - Setup steps and action items are now tasks with the same names, roles, and status words as My work: setup reads Write requirements, Review requirements, Connect code, Choose checks, and Run first check.

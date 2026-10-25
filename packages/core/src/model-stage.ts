@@ -25,16 +25,21 @@ interface ModelStageOptions {
   workspace: string;
   tools: LocalToolServer;
   includeAnswers?: boolean;
-  onStage?: (name: string, validate: (value: unknown) => unknown) => Promise<void>;
+  onStage?: (name: string, validate: (value: unknown) => unknown, part?: string) => Promise<void>;
 }
 
-/** Typed validator boundary shared by report and estimate stages; stored output is revalidated on resume. */
+/**
+ * Typed validator boundary shared by report and estimate stages; stored output is revalidated on
+ * resume. `part` names one slice of a stage that runs in several calls with the same prompt, so
+ * each slice keeps its own checkpoint, for example `assess-2.json`.
+ */
 export interface ModelStage {
   <T>(
     name: string,
     schema: z.ZodType<T>,
     input: unknown,
     validate: (value: unknown) => T,
+    part?: string,
   ): Promise<T>;
 }
 
@@ -58,11 +63,13 @@ export function createModelStage(options: ModelStageOptions): ModelStage {
     schema: z.ZodType<T>,
     input: unknown,
     validate: (value: unknown) => T,
+    part?: string,
   ): Promise<T> {
     signal.throwIfAborted();
-    const saved = await optionalJson<unknown>(path.join(dir, `${name}.json`));
+    const output = path.join(dir, `${part ? `${name}-${part}` : name}.json`);
+    const saved = await optionalJson<unknown>(output);
     if (saved !== null) return validate(saved);
-    await options.onStage?.(name, validate);
+    await options.onStage?.(name, validate, part);
     const instructions = await readFile(
       path.join(workflowRoot, 'workflows/v1', `${name}.md`),
       'utf8',
@@ -116,7 +123,7 @@ export function createModelStage(options: ModelStageOptions): ModelStage {
         continue;
       }
       // Persistence is outside correction handling: retrying a paid turn cannot repair a disk failure.
-      await atomic(path.join(dir, `${name}.json`), parsed, signal);
+      await atomic(output, parsed, signal);
       await atomic(path.join(dir, 'manifest.json'), run, signal);
       return parsed;
     }

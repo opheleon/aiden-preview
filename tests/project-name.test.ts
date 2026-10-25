@@ -78,5 +78,15 @@ void test('legacy scope labels remain readable with long or empty intent', () =>
   // Long names end at a word with no ellipsis; the sidebar fades them and the heading shows all.
   const long = 'A useful outcome with several words, '.repeat(5);
   assert.doesNotMatch(scopeName(long), /[…,]$/);
-  assert.equal(scopeName(long, undefined, true), long.replace(/\s+/g, ' ').trim());
+  assert.equal(
+    scopeName(long, undefined, true),
+    long
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/[\s,;:]+$/, ''),
+  );
+  assert.equal(
+    scopeName('Verify the requirements in this spec: https://www.notion.so/acme/Spec-1a2b'),
+    'Verify the requirements in this spec',
+  );
 });

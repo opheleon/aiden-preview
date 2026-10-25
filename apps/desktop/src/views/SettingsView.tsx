@@ -1,4 +1,5 @@
 import { ChevronRight, Plug, Settings2, ShieldCheck } from 'lucide-react';
+import { useEffect } from 'react';
 
 import type { WorkerResult } from '../../../../packages/contracts/src/api';
 import type { WorkerMethod, WorkerParams } from '../../../../packages/contracts/src/api.js';
@@ -239,6 +240,12 @@ function SavedConnections(props: SettingsViewProps): React.JSX.Element {
     refresh,
     setNotice,
   } = props;
+  // A run can change a connection's status after startup, for example when its tools change.
+  useEffect(() => {
+    void call('integrations')
+      .then(setIntegrations)
+      .catch(() => undefined);
+  }, [call, setIntegrations]);
   return (
     <>
       {integrations
