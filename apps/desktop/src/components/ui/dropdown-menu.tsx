@@ -1,6 +1,7 @@
 // Adapted from shadcn/ui (https://ui.shadcn.com), MIT License, Copyright (c) 2023 shadcn.
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import type { ComponentProps, JSX } from 'react';
+import { useRef } from 'react';
 
 import { cn } from '../../lib/utils';
 
@@ -21,22 +22,37 @@ export function DropdownMenuTrigger(
 /**
  * The menu panel, portalled to the document body and placed beside its trigger, flipping or
  * shifting to stay inside the window. It fades, zooms, and slides in from the trigger's side.
+ * Clicks on its own trigger are left to the trigger, so reopening the menu while the last panel
+ * is still fading out keeps the new menu open.
  */
 export function DropdownMenuContent({
   className,
   sideOffset = 4,
+  onInteractOutside,
   ...props
-}: ComponentProps<typeof DropdownMenuPrimitive.Content>): JSX.Element {
+}: Omit<ComponentProps<typeof DropdownMenuPrimitive.Content>, 'ref'>): JSX.Element {
+  const panel = useRef<HTMLDivElement>(null);
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
+        {...props}
+        ref={panel}
+        onInteractOutside={(event) => {
+          onInteractOutside?.(event);
+          // Radix keeps a closing panel mounted until its exit animation ends and reuses it when
+          // the menu reopens, so the trigger click that reopened it would also dismiss it. The
+          // trigger already toggles the menu on its own, as Radix Popover does for its trigger.
+          const triggerId = panel.current?.getAttribute('aria-labelledby');
+          const trigger = triggerId ? document.getElementById(triggerId) : null;
+          if (event.target instanceof Node && trigger?.contains(event.target))
+            event.preventDefault();
+        }}
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
           'z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
           className,
         )}
-        {...props}
       />
     </DropdownMenuPrimitive.Portal>
   );
