@@ -114,3 +114,44 @@ export async function assessInParts(
     unknowns: unique(results.map((r) => r.unknowns)),
   };
 }
+
+/** Checks a model's submitted artifact against one stage's schema; throws on a mismatch. */
+export type ArtifactValidator = (value: unknown) => unknown;
+
+/**
+ * Track the artifact validators of stages whose parts run at the same time, so a submitted
+ * candidate passes when it fits any running part of its stage. A stage without parts, or a
+ * stage seen for the first time, starts a fresh set.
+ * Example: parts 1 and 2 of assess both run; part 2's answer passes part 2's validator.
+ * @returns Register a stage's validator and get the combined check for that stage.
+ */
+export function partValidators(): (
+  stage: string,
+  validate: ArtifactValidator,
+  part?: string,
+) => ArtifactValidator {
+  const byStage = new Map<string, Map<string, ArtifactValidator>>();
+  return (stage, validate, part) => {
+    if (!part || !byStage.has(stage)) byStage.set(stage, new Map());
+    const running = byStage.get(stage)!;
+    running.set(part ?? '', validate);
+    return (value) => anyValid([...running.values()], value);
+  };
+}
+
+/**
+ * Accept a candidate that one of the validators accepts, or report the first problem.
+ * @param validators The running parts' validators, in the order they started.
+ * @param value The submitted candidate.
+ */
+function anyValid(validators: ArtifactValidator[], value: unknown): unknown {
+  let first: unknown;
+  for (const check of validators) {
+    try {
+      return check(value);
+    } catch (error) {
+      first ??= error;
+    }
+  }
+  throw first;
+}

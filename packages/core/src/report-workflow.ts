@@ -14,6 +14,7 @@ import { deliveryTickets } from '../../reporting/src/tickets.js';
 import { ToolBroker } from '../../tools/src/broker.js';
 import { serveTools } from '../../tools/src/mcp.js';
 import { appendActivity, counted, recordStep } from './activity.js';
+import { partValidators } from './assessment-parts.js';
 import { commitBaseline } from './baseline.js';
 import { answeredDecisions, openDecisions, readCalls, replaceOpenDecisions } from './calls.js';
 import { requestClarification } from './clarification.js';
@@ -219,7 +220,8 @@ export async function execute(
   broker.signal = signal;
   broker.reads = (await optionalJson<ReadReceipt[]>(path.join(dir, 'reads.json'))) ?? [];
   const tools = await serveTools(broker);
-  const validators = new Map<string, Map<string, (value: unknown) => unknown>>();
+  // Parts of one stage can run at once; a candidate passes when it fits any of them.
+  const validators = partValidators();
   const stage = createModelStage({
     context,
     run,
@@ -230,11 +232,7 @@ export async function execute(
     includeAnswers: true,
     onStage: async (name, validate, part) => {
       await checkpoint(name as Stage);
-      // Parts of one stage can run at once; a candidate passes when it fits any of them.
-      if (!part || !validators.has(name)) validators.set(name, new Map());
-      const stageValidators = validators.get(name)!;
-      stageValidators.set(part ?? '', validate);
-      broker.validateArtifact = (value) => anyValid([...stageValidators.values()], value);
+      broker.validateArtifact = validators(name, validate, part);
     },
   });
   try {
@@ -246,20 +244,4 @@ export async function execute(
   } finally {
     await tools.close();
   }
-}
-
-/**
- * Accept a candidate that one of the running validators accepts, or report the first problem.
- * Example: parts 1 and 2 of assess both run; part 2's answer passes part 2's validator.
- */
-function anyValid(validate: ((value: unknown) => unknown)[], value: unknown): unknown {
-  let first: unknown;
-  for (const check of validate) {
-    try {
-      return check(value);
-    } catch (error) {
-      first ??= error;
-    }
-  }
-  throw first;
 }

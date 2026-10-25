@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { Findings, Product } from '../packages/contracts/src/index.js';
-import { assessInParts, assessmentParts } from '../packages/core/src/assessment-parts.js';
+import {
+  assessInParts,
+  assessmentParts,
+  partValidators,
+} from '../packages/core/src/assessment-parts.js';
 import type { ModelStage } from '../packages/core/src/model-stage.js';
 
 const ids = (n: number, from = 1) => Array.from({ length: n }, (_, i) => `REQ-${from + i}`);
@@ -65,4 +69,21 @@ void test('a large baseline is assessed part by part and merged in requirement o
     ids(10),
   );
   assert.deepEqual(findings.risks, ['shared risk', 'risk 1', 'risk 2']);
+});
+
+void test('parts running at once accept a candidate that fits any part, and a new run starts fresh', () => {
+  /** A validator that accepts only answers for one part. */
+  const only = (part: number) => (value: unknown) => {
+    if ((value as { part?: number }).part !== part) throw new Error(`not part ${part}`);
+    return value;
+  };
+  const register = partValidators();
+  register('assess', only(1), '1');
+  const check = register('assess', only(2), '2');
+  assert.deepEqual(check({ part: 1 }), { part: 1 });
+  assert.deepEqual(check({ part: 2 }), { part: 2 });
+  assert.throws(() => check({ part: 3 }), /not part 1/);
+  const fresh = register('assess', only(3));
+  assert.throws(() => fresh({ part: 1 }), /not part 3/);
+  assert.deepEqual(register('understand', only(9))({ part: 9 }), { part: 9 });
 });
