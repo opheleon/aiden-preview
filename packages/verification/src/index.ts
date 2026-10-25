@@ -25,10 +25,13 @@ export {
   summarize,
 } from './verdict.js';
 
-/** Start one headless Chromium for a run; each criterion attempt gets its own fresh context. */
+/**
+ * Start one headless Chromium for a run; each criterion attempt gets its own fresh context.
+ * Playwright disables Chromium's OS sandbox unless asked, so pages under test stay sandboxed here.
+ */
 export async function launchBrowser(): Promise<Browser> {
   try {
-    return await chromium.launch({ headless: true });
+    return await chromium.launch({ headless: true, chromiumSandbox: true });
   } catch {
     throw new Error(
       process.env.AIDEN_PACKAGED === '1'
