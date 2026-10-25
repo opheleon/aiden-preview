@@ -105,6 +105,12 @@ export function accountMethods(
     };
     return built;
   };
+  // Desktop tests follow the team admins' allowed app publishers whenever this machine is signed in.
+  engine.desktops.teamPublishers = async () => {
+    const { session, client } = context();
+    if (!(await session.refreshToken())) return null;
+    return (await client.me()).accounts.flatMap((team) => team.allowedPublishers ?? []);
+  };
   return {
     accountStatus: operation(none, () => status(context())),
     accountSignIn: operation(none, () => context().signIn.begin()),

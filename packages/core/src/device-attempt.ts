@@ -23,16 +23,29 @@ const conclusion = z
     evidence: z.array(z.number().int().positive()).max(8),
   })
   .strict();
-/** Dependencies for a source-free, tool-restricted mobile verification turn. */
-interface DeviceTurn {
+/** Dependencies for a source-free, tool-restricted verification turn against a running app. */
+export interface EvidenceTurn {
   runtime: AgentRuntime;
-  config: DeviceTest;
-  run: DeviceRun;
+  config: Pick<DeviceTest, 'runtime' | 'stepLimit'>;
+  run: Pick<DeviceRun, 'runtimeVersion'>;
   workspace: string;
   signal: AbortSignal;
 }
+/** A live tool session that records numbered screenshots the reviewer can inspect afterwards. */
+export interface EvidenceSession extends ToolProvider {
+  observations: { id: number; screenshot: string; at: string }[];
+  exhausted: boolean;
+}
+/** Workflow prompts and the reviewer's evidence tool name for one kind of app under test. */
+export interface EvidenceKind {
+  actor: string;
+  review: string;
+  evidenceTool: string;
+}
+/** Shared result fields for a phone or desktop criterion. */
+type EvidenceCriterion<O> = Omit<DeviceCriterion, 'observations'> & { observations: O[] };
 /** Run under the explicitly selected provider and auth, using only the supplied device/evidence tools. */
-async function turn(v: DeviceTurn, workflow: string, input: unknown, provider: ToolProvider) {
+async function turn(v: EvidenceTurn, workflow: string, input: unknown, provider: ToolProvider) {
   const instructions = await readFile(path.join(workflowRoot, 'workflows/v1', workflow), 'utf8');
   const tools = await serveTools(provider);
   try {
@@ -53,9 +66,9 @@ async function turn(v: DeviceTurn, workflow: string, input: unknown, provider: T
   }
 }
 /** Expose only recorded images selected by trusted IDs, with no live device control or actor reasoning. */
-function proofTools(session: DeviceSession, dir: string): ToolProvider {
+function proofTools(session: EvidenceSession, dir: string, name: string): ToolProvider {
   const tool = defineTool({
-    name: 'view_phone_evidence',
+    name,
     description:
       'Read a saved screenshot by observation ID. Review all cited observations before concluding.',
     schema: z.object({ id: z.number().int().positive() }).strict(),
@@ -78,16 +91,30 @@ function proofTools(session: DeviceSession, dir: string): ToolProvider {
     },
   };
 }
-/** Check one criterion without code access, then have a separate turn judge its recorded visual evidence. */
+/** Check one criterion on an installed phone app; see `evidenceAttempt` for the review rules. */
 export async function deviceAttempt(
-  v: DeviceTurn,
+  v: EvidenceTurn,
   device: AppiumDevice,
   criterion: string,
   dir: string,
 ): Promise<DeviceCriterion> {
   await mkdir(dir, { recursive: true, mode: 0o700 });
   const session = new DeviceSession(device, dir, v.config.stepLimit);
-  const base: DeviceCriterion = {
+  return evidenceAttempt(v, session, criterion, dir, {
+    actor: 'verify-device.md',
+    review: 'verify-device-review.md',
+    evidenceTool: 'view_phone_evidence',
+  });
+}
+/** Check one criterion without code access, then have a separate turn judge its recorded visual evidence. */
+export async function evidenceAttempt<S extends EvidenceSession>(
+  v: EvidenceTurn,
+  session: S,
+  criterion: string,
+  dir: string,
+  kind: EvidenceKind,
+): Promise<EvidenceCriterion<S['observations'][number]>> {
+  const base: EvidenceCriterion<S['observations'][number]> = {
     criterion,
     verdict: 'unverified',
     explanation: 'No decisive evidence.',
@@ -95,12 +122,7 @@ export async function deviceAttempt(
     observations: session.observations,
   };
   try {
-    const actor = await turn(
-      v,
-      'verify-device.md',
-      { criterion, stepLimit: v.config.stepLimit },
-      session,
-    );
+    const actor = await turn(v, kind.actor, { criterion, stepLimit: v.config.stepLimit }, session);
     if (session.exhausted) return { ...base, explanation: 'The step limit was reached.' };
     if (actor.verdict === 'unverified') return { ...base, explanation: actor.explanation };
     const valid =
@@ -108,7 +130,7 @@ export async function deviceAttempt(
       actor.evidence.every((id) => session.observations.some((o) => o.id === id));
     if (!valid) return { ...base, explanation: 'The agent did not cite recorded evidence.' };
     const viewed = new Set<number>();
-    const proofs = proofTools(session, dir);
+    const proofs = proofTools(session, dir, kind.evidenceTool);
     const reviewer: ToolProvider = {
       definitions: () => proofs.definitions(),
       call: async (name, input) => {
@@ -119,7 +141,7 @@ export async function deviceAttempt(
     };
     const review = await turn(
       v,
-      'verify-device-review.md',
+      kind.review,
       {
         criterion,
         observations: session.observations.map(({ id, at }) => ({ id, at })),
@@ -149,7 +171,7 @@ export async function deviceAttempt(
     return {
       ...base,
       explanation:
-        'The device or model could not finish this check. Review the recorded steps and device setup before retrying.',
+        'The app session or model could not finish this check. Review the recorded steps and setup before retrying.',
     };
   }
 }

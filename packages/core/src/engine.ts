@@ -23,6 +23,7 @@ import { commitBaseline } from './baseline.js';
 import { requireCheckableScope } from './blockers.js';
 import { closeCoding } from './coding-jobs.js';
 import { withLinkedSources } from './context-sources.js';
+import { DesktopVerification } from './desktop-verification.js';
 import { DeviceVerification } from './device-verification.js';
 import {
   exportReport,
@@ -56,6 +57,7 @@ export class Engine {
   private closing = false;
   private active = new Map<string, ActiveRun>();
   readonly devices: DeviceVerification;
+  readonly desktops: DesktopVerification;
   /** How Aiden probes localhost for a running app; tests replace `fetch` so no socket opens. */
   discover: DiscoverOptions = {};
   /** Bind storage, provider, and integration dependencies without starting provider execution. */
@@ -66,6 +68,7 @@ export class Engine {
     public integrations = new ConnectionManager(store.root),
   ) {
     this.devices = new DeviceVerification(store.root, runtime);
+    this.desktops = new DesktopVerification(store.root, runtime);
   }
   /** List saved project metadata; a new home returns no projects, while corruption remains an error. */
   async projects(): Promise<Project[]> {
@@ -422,6 +425,7 @@ export class Engine {
   async dispose(): Promise<void> {
     this.closing = true;
     await this.devices.dispose();
+    await this.desktops.dispose();
     await closeCoding(this);
     for (const a of this.active.values()) a.controller.abort(new RunStopped(stopReasons.shutdown));
     await Promise.all([...this.active.values()].map((a) => a.done));

@@ -1,6 +1,12 @@
 import type { AccountState, AccountTask } from './accounts-api.js';
 import type { BetaSettings, CodingJob } from './delivery-jobs.js';
 import type {
+  DesktopApp,
+  DesktopReadiness,
+  DesktopRun,
+  DesktopTest,
+} from './desktop-verification.js';
+import type {
   DeviceRun,
   DeviceTarget,
   DeviceTest,
@@ -126,6 +132,14 @@ export type WorkerAPI = {
   deviceRuns: { params: Record<string, never>; result: DeviceRun[] };
   deviceRun: { params: { runId: string }; result: DeviceRun | null };
   deviceCancel: { params: { runId: string }; result: { cancelled: boolean } };
+  desktopReadiness: { params: Record<string, never>; result: DesktopReadiness };
+  /** Show the operating system's Accessibility and Screen Recording prompts for Aiden. */
+  desktopRequestAccess: { params: Record<string, never>; result: DesktopReadiness };
+  desktopApps: { params: Record<string, never>; result: DesktopApp[] };
+  desktopTest: { params: DesktopTest; result: { runId: string } };
+  desktopRuns: { params: Record<string, never>; result: DesktopRun[] };
+  desktopRun: { params: { runId: string }; result: DesktopRun | null };
+  desktopCancel: { params: { runId: string }; result: { cancelled: boolean } };
   discoverRepositories: { params: { rootPath: string }; result: RepositoryDiscovery };
   /** Record human acceptance of the currently displayed scope and evidence. */
   acceptOutcome: { params: ProjectRef & { note: string; evidenceKey: string }; result: Project };
