@@ -93,7 +93,7 @@ void test('classification validators preserve exact requirement/history identity
       stageFor({ requirements: [{ ...complexity, requirementId: 'REQ-2' }] }),
       baseline,
     ),
-    /exactly every/,
+    /exactly every reviewed requirement once\. Expected: REQ-1\. Missing: REQ-1\. Not expected: REQ-2\./,
   );
   await assert.rejects(
     originalEstimates(stageFor({ requirements: [{ ...complexity, points: 3 }] }), baseline),
@@ -152,7 +152,11 @@ void test('remaining-work validation distinguishes implemented, unknown, missing
       pattern: /shared size scale/,
     },
     { status: 'unknown', row: { ...remaining, estimable: false }, pattern: /unknown work cannot/ },
-    { status: 'missing', row: { ...remaining, requirementId: 'REQ-2' }, pattern: /every reviewed/ },
+    {
+      status: 'missing',
+      row: { ...remaining, requirementId: 'REQ-2' },
+      pattern: /Expected: REQ-1\. Missing: REQ-1\. Not expected: REQ-2\./,
+    },
   ] as const;
   for (const entry of cases) {
     const current = {
@@ -206,6 +210,97 @@ void test('remaining-work validation distinguishes implemented, unknown, missing
       )
     ).get('REQ-1')?.points,
     null,
+  );
+});
+
+void test('remaining-work sizing asks only for partly built requirements when others are missing', async () => {
+  const requirements = ['REQ-1', 'REQ-2', 'REQ-3'].map((id) => ({ id, text: `Synthetic ${id}` }));
+  const feature = (id: string, requirementIds: string[], dependsOn: string[] = []) => ({
+    id,
+    title: `Synthetic ${id}`,
+    outcome: 'Synthetic outcome',
+    kind: 'feature' as const,
+    rationale: 'Synthetic rationale',
+    requirementIds,
+    dependsOn,
+  });
+  const mixedBaseline: Baseline = {
+    ...baseline,
+    product: {
+      ...baseline.product,
+      requirements,
+      deliveryPlan: [feature('F-1', ['REQ-2']), feature('F-2', ['REQ-1', 'REQ-3'], ['F-1'])],
+    },
+  };
+  const assessment = (requirementId: string, status: 'partial' | 'missing') => ({
+    ...report.assessments[0]!,
+    requirementId,
+    status,
+  });
+  const mixed = {
+    ...report,
+    baseline: mixedBaseline.product,
+    summary: 'REQ-1 and REQ-3 are partly built; REQ-2 has no code yet.',
+    assessments: [
+      assessment('REQ-1', 'partial'),
+      assessment('REQ-2', 'missing'),
+      assessment('REQ-3', 'partial'),
+    ],
+  };
+  const originals = requirements.map(({ id }) => ({ ...complexity, requirementId: id }));
+  let modelInput: any;
+  /** Answer with the given rows while recording what the estimator was asked for. */
+  const answer =
+    (rows: RemainingEstimate[]): ModelStage =>
+    (_name, _schema, input, validate) => {
+      modelInput = input;
+      return Promise.resolve().then(() => validate({ requirements: rows }));
+    };
+  const open = ['REQ-1', 'REQ-3'].map((id) => ({ ...remaining, requirementId: id }));
+  const result = await remainingEstimates(
+    answer(open),
+    mixedBaseline,
+    mixed,
+    { emit: () => {} },
+    run,
+    [],
+    originals,
+  );
+  const ids = (rows: { id?: string; requirementId?: string }[]) =>
+    rows.map((row) => row.requirementId ?? row.id);
+  assert.deepEqual(ids(modelInput.baseline.requirements), ['REQ-1', 'REQ-3']);
+  assert.deepEqual(ids(modelInput.report.baseline.requirements), ['REQ-1', 'REQ-3']);
+  assert.deepEqual(ids(modelInput.report.assessments), ['REQ-1', 'REQ-3']);
+  assert.deepEqual(modelInput.baseline.deliveryPlan, [
+    { ...feature('F-2', ['REQ-1', 'REQ-3']), dependsOn: [] },
+  ]);
+  assert.deepEqual(modelInput.alreadySized.requirementIds, ['REQ-2']);
+  assert.deepEqual([...result.keys()].sort(), ['REQ-1', 'REQ-2', 'REQ-3']);
+  assert.deepEqual(result.get('REQ-1'), open[0]);
+  assert.match(result.get('REQ-2')!.reasoning, /Nothing is built yet/);
+  await assert.rejects(
+    remainingEstimates(
+      answer([...open, { ...remaining, requirementId: 'REQ-2' }]),
+      mixedBaseline,
+      mixed,
+      { emit: () => {} },
+      run,
+      [],
+      originals,
+    ),
+    /Expected: REQ-1, REQ-3\. Not expected: REQ-2\./,
+  );
+  await assert.rejects(
+    remainingEstimates(
+      answer([open[0]!, open[0]!]),
+      mixedBaseline,
+      mixed,
+      { emit: () => {} },
+      run,
+      [],
+      originals,
+    ),
+    /Missing: REQ-3\. Repeated: REQ-1\./,
   );
 });
 
