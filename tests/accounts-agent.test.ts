@@ -339,7 +339,12 @@ void test('inventory reports verified tools, exact provider modes, and connected
 });
 
 void test('server URLs and errors are handled safely', () => {
-  assert.equal(accountsUrl({}), 'https://accounts.opheleon.ai');
+  assert.equal(accountsUrl({}), 'https://aiden-teams-api.opheleon.workers.dev');
+  assert.equal(dashboardUrl({}), 'https://aiden-teams.pages.dev');
+  assert.equal(
+    dashboardUrl({ AIDEN_ACCOUNTS_URL: 'https://aiden-teams-api-beta.opheleon.workers.dev' }),
+    'https://beta.aiden-teams.pages.dev',
+  );
   assert.equal(
     accountsUrl({ AIDEN_ACCOUNTS_URL: 'http://localhost:8787' }),
     'http://localhost:8787',

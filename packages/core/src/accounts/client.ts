@@ -19,8 +19,16 @@ import {
 import type { AgentStatus, DeliveryCheckpoint } from '../../../contracts/src/accounts-execution.js';
 import { responseSummary, teamsDebug } from './debug.js';
 
-/** Where the Accounts API lives unless AIDEN_ACCOUNTS_URL points elsewhere (local development). */
-const defaultUrl = 'https://accounts.opheleon.ai';
+/**
+ * Where the Accounts API lives unless AIDEN_ACCOUNTS_URL points elsewhere (beta or local
+ * development): the Cloudflare Worker in front of the Teams API.
+ */
+const defaultUrl = 'https://aiden-teams-api.opheleon.workers.dev';
+/** The dashboard for each published API address, which are not sibling subdomains. */
+const publishedDashboards: Record<string, string> = {
+  [defaultUrl]: 'https://aiden-teams.pages.dev',
+  'https://aiden-teams-api-beta.opheleon.workers.dev': 'https://beta.aiden-teams.pages.dev',
+};
 /** No Accounts call should hold up the app for long. */
 const timeoutMs = 15_000;
 
@@ -53,12 +61,14 @@ export function accountsUrl(env: NodeJS.ProcessEnv = process.env): string {
 
 /**
  * The Teams dashboard's address, where teams, invitations, admins, billing and profiles are
- * managed. AIDEN_DASHBOARD_URL wins; otherwise an `api.` host becomes `app.` (the dashboard and
- * API live on sibling subdomains), and any other API address is used as is.
- * Example: AIDEN_ACCOUNTS_URL https://api.example.com gives https://app.example.com.
+ * managed. AIDEN_DASHBOARD_URL wins, then the published dashboard for a published API address;
+ * otherwise an `api.` host becomes `app.` (sibling subdomains), and any other API address is
+ * used as is. Example: AIDEN_ACCOUNTS_URL https://api.example.com gives https://app.example.com.
  */
 export function dashboardUrl(env: NodeJS.ProcessEnv = process.env): string {
   if (env.AIDEN_DASHBOARD_URL) return new URL(env.AIDEN_DASHBOARD_URL).origin;
+  const published = publishedDashboards[accountsUrl(env)];
+  if (published) return published;
   const api = new URL(accountsUrl(env));
   if (api.hostname.startsWith('api.')) api.hostname = `app.${api.hostname.slice(4)}`;
   return api.origin;

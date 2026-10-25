@@ -39,7 +39,7 @@ export function AccountSignIn({ account }: { account: AccountView }): JSX.Elemen
  * opens it; an invitation link from a teammate opens the dashboard's join page directly.
  */
 export function AccountNoTeam({ account }: { account: AccountView }): JSX.Element {
-  const dashboard = account.status?.settingsUrl ?? 'https://accounts.opheleon.ai';
+  const dashboard = account.status?.settingsUrl ?? 'https://aiden-teams.pages.dev';
   return (
     <section className="card account-intro" aria-label="Join a team">
       <h1>
