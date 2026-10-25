@@ -15,6 +15,10 @@ These exact-version exceptions were approved on 2026-09-26 after reviewing regis
 
 The registry SHA-512 hashes match the existing locked artifacts. This establishes continuity, not an independent security audit. Review the exceptions whenever their parent dependency changes and remove them when those versions leave the graph. No package-wide or age-based trust bypass is permitted.
 
+## Security overrides
+
+On 2026-10-24, `pnpm-workspace.yaml` gained `overrides` for transitive packages with open advisories. Each selector matches only the vulnerable range and pins the lowest patched release that already satisfies the 14-day cooldown: brace-expansion 1.1.21, 2.1.7 and 5.0.12; fast-uri 3.1.8; hono 4.13.11; http-cache-semantics 4.3.0; ip-address 10.7.1; proxy-addr 2.0.8; smol-toml 1.9.0; and source-map-js 1.2.2. Remove an entry once every parent resolves a patched version on its own.
+
 ## Install scripts and emergency updates
 
 The following exact-version build scripts were reviewed and disabled:
