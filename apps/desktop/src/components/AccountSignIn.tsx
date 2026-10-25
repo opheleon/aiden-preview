@@ -1,5 +1,5 @@
 import { ArrowRight } from 'lucide-react';
-import { type JSX, useState } from 'react';
+import type { JSX } from 'react';
 
 import type { AccountView } from '../hooks/useAccount';
 
@@ -27,61 +27,31 @@ export function AccountSignIn({ account }: { account: AccountView }): JSX.Elemen
         </button>
       )}
       <p className="account-muted">
-        Sign in in your browser with the account your team admin set up for you. Without signing in,
-        Aiden keeps working on this computer as it does now.
+        Sign in or create your account in your browser. Without signing in, Aiden keeps working on
+        this computer as it does now.
       </p>
     </section>
   );
 }
 
-/** Signed in with no team yet: create one or paste an invite link. */
-export function AccountSetup({ account }: { account: AccountView }): JSX.Element {
-  const [name, setName] = useState('');
-  const [invite, setInvite] = useState('');
+/**
+ * Signed in with no team yet. Teams are created and joined in the Teams dashboard, so this only
+ * opens it; an invitation link from a teammate opens the dashboard's join page directly.
+ */
+export function AccountNoTeam({ account }: { account: AccountView }): JSX.Element {
+  const dashboard = account.status?.settingsUrl ?? 'https://app.opheleon.ai';
   return (
-    <section className="card account-intro" aria-label="Set up your team">
+    <section className="card account-intro" aria-label="Join a team">
       <h1>
-        Start or join a <span className="serif">team</span>
+        Join a <span className="serif">team</span>
       </h1>
-      <form
-        className="account-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void account.create(name);
-        }}
-      >
-        <label htmlFor="team-name">Create a team</label>
-        <div className="account-row">
-          <input
-            id="team-name"
-            placeholder="Team name"
-            value={name}
-            maxLength={120}
-            onChange={(event) => setName(event.target.value)}
-          />
-          <button className="primary" disabled={account.working || !name.trim()}>
-            Create <ArrowRight size={14} aria-hidden="true" />
-          </button>
-        </div>
-      </form>
-      <form
-        className="account-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void account.join(invite);
-        }}
-      >
-        <label htmlFor="team-invite">Join with an invite link</label>
-        <div className="account-row">
-          <input
-            id="team-invite"
-            placeholder="opheleon://join?code=…"
-            value={invite}
-            onChange={(event) => setInvite(event.target.value)}
-          />
-          <button disabled={account.working || !invite.trim()}>Join</button>
-        </div>
-      </form>
+      <p>
+        Create a team or join one in the Teams dashboard. To join, open the invitation link a
+        teammate sent you. This page updates once you are in a team.
+      </p>
+      <button className="primary" onClick={() => void window.aiden?.openExternal(dashboard)}>
+        Open the Teams dashboard <ArrowRight size={14} aria-hidden="true" />
+      </button>
     </section>
   );
 }

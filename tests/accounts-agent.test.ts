@@ -9,10 +9,10 @@ import {
   type AccountsClient,
   AccountsError,
   accountsUrl,
+  dashboardUrl,
 } from '../packages/core/src/accounts/client.js';
 import { documentFor, materialize } from '../packages/core/src/accounts/documents.js';
 import { InventoryProbe } from '../packages/core/src/accounts/inventory.js';
-import { inviteCode } from '../packages/core/src/accounts/methods.js';
 import { AccountSession } from '../packages/core/src/accounts/session.js';
 import { Engine } from '../packages/core/src/engine.js';
 import { Store } from '../packages/core/src/storage.js';
@@ -338,14 +338,28 @@ void test('inventory reports verified tools, exact provider modes, and connected
   assert.deepEqual((await signedOut.read()).tools.gh, { installed: true, signedIn: false });
 });
 
-void test('invite links, server URLs, and errors are handled safely', () => {
-  assert.equal(inviteCode('opheleon://join?code=abc123'), 'abc123');
-  assert.equal(inviteCode('  abc123 '), 'abc123');
-  assert.throws(() => inviteCode('opheleon://join'), /no code/);
-  assert.equal(accountsUrl({}), 'https://accounts.opheleon.ai');
+void test('server URLs and errors are handled safely', () => {
+  assert.equal(accountsUrl({}), 'https://api.opheleon.ai');
+  assert.equal(dashboardUrl({}), 'https://app.opheleon.ai');
+  assert.equal(
+    dashboardUrl({ AIDEN_ACCOUNTS_URL: 'https://api-beta.opheleon.ai' }),
+    'https://app-beta.opheleon.ai',
+  );
   assert.equal(
     accountsUrl({ AIDEN_ACCOUNTS_URL: 'http://localhost:8787' }),
     'http://localhost:8787',
   );
   assert.throws(() => accountsUrl({ AIDEN_ACCOUNTS_URL: 'http://example.com' }), /HTTPS/);
+  assert.equal(
+    dashboardUrl({ AIDEN_ACCOUNTS_URL: 'https://api.example.com' }),
+    'https://app.example.com',
+  );
+  assert.equal(
+    dashboardUrl({ AIDEN_DASHBOARD_URL: 'https://teams.example.com/x' }),
+    'https://teams.example.com',
+  );
+  assert.equal(
+    dashboardUrl({ AIDEN_ACCOUNTS_URL: 'http://localhost:8787' }),
+    'http://localhost:8787',
+  );
 });

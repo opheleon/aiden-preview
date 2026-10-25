@@ -13,6 +13,7 @@ import {
 } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import { id, safeRelative } from '../../contracts/src/index.js';
 
@@ -34,6 +35,25 @@ export async function optionalJson<T>(file: string): Promise<T | null> {
     throw error;
   }
 }
+/** Windows codes for a destination that another handle or an antivirus scan holds for a moment. */
+const heldOnWindows = new Set(['EPERM', 'EACCES', 'EBUSY']);
+/**
+ * Move `from` over `to`. Windows refuses to replace a file while another handle has it open, such
+ * as a state read of the same manifest or a virus scan of the new file, so retry there for about
+ * five seconds before reporting the error. Other platforms replace open files and fail at once.
+ */
+async function replace(from: string, to: string, signal?: AbortSignal): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await rename(from, to);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code ?? '';
+      if (process.platform !== 'win32' || !heldOnWindows.has(code) || attempt > 20) throw error;
+      signal?.throwIfAborted();
+      await delay(25 * attempt);
+    }
+  }
+}
 /** Atomically replace JSON with owner-only permissions; cancellation preserves the previous file. */
 export async function atomic(file: string, value: unknown, signal?: AbortSignal): Promise<void> {
   signal?.throwIfAborted();
@@ -44,7 +64,7 @@ export async function atomic(file: string, value: unknown, signal?: AbortSignal)
   try {
     await writeFile(temporary, serialized + '\n', { mode: 0o600, flag: 'wx' });
     signal?.throwIfAborted();
-    await rename(temporary, file);
+    await replace(temporary, file, signal);
   } catch (error) {
     await rm(temporary, { force: true });
     throw error;

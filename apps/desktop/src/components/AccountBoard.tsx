@@ -1,53 +1,16 @@
-import { Copy, UserPlus } from 'lucide-react';
-import { type JSX, useState } from 'react';
+import type { JSX } from 'react';
 
 import type { AccountState } from '../../../../packages/contracts/src/accounts-api';
-import type { AccountView } from '../hooks/useAccount';
 
-/** Invite link for owners, copied in one click. */
-function Invite({ account }: { account: AccountView }): JSX.Element {
-  const [link, setLink] = useState('');
-  const [failed, setFailed] = useState('');
-  return (
-    <div className="account-invite">
-      {link ? (
-        <button onClick={() => void navigator.clipboard?.writeText(link)} title={link}>
-          <Copy size={14} aria-hidden="true" /> Copy invite link
-        </button>
-      ) : (
-        <button
-          onClick={() =>
-            void account
-              .invite()
-              .then((invite) => setLink(invite.link))
-              .catch((e: unknown) =>
-                setFailed(e instanceof Error ? e.message : 'Could not create an invite.'),
-              )
-          }
-        >
-          <UserPlus size={14} aria-hidden="true" /> Invite someone
-        </button>
-      )}
-      {failed && <span className="account-muted">{failed}</span>}
-    </div>
-  );
-}
-
-/** The team itself: members, admin controls, and machines picking up its work. */
-export function AccountTeam({
-  account,
-  state,
-}: {
-  account: AccountView;
-  state: AccountState;
-}): JSX.Element {
-  const me = state.members.find((member) => member.id === account.status?.userId);
-  const owner = me?.role === 'owner';
+/**
+ * The team itself: members and the machines picking up its work. Invitations, admin access, and
+ * removing people happen in the Teams dashboard.
+ */
+export function AccountTeam({ state }: { state: AccountState }): JSX.Element {
   return (
     <div className="account-board">
       <header className="account-header">
         <h1>{state.account.name}</h1>
-        {me?.isAdmin && <Invite account={account} />}
       </header>
       <section className="card" aria-label="Members">
         <div className="card-label">Members</div>
@@ -59,15 +22,6 @@ export function AccountTeam({
                 {member.email} ·{' '}
                 {member.role === 'owner' ? 'Owner' : member.isAdmin ? 'Admin' : 'Member'}
               </span>
-              {owner && member.role === 'member' && (
-                <button
-                  className="text-button"
-                  disabled={account.working}
-                  onClick={() => void account.setAdmin(member.id, !member.isAdmin)}
-                >
-                  {member.isAdmin ? 'Remove admin access' : 'Make admin'}
-                </button>
-              )}
             </li>
           ))}
         </ul>

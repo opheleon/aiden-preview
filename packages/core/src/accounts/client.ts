@@ -5,15 +5,10 @@ import {
   AccountProjectSchema,
   type AccountState,
   AccountStateSchema,
-  type AccountSummary,
-  AccountSummarySchema,
   type AccountTask,
   AccountTaskSchema,
   ApiErrorSchema,
-  type Invite,
-  InviteSchema,
   type Me,
-  MemberAdminSchema,
   MeSchema,
   type NewAccountTask,
   type ProjectCreated,
@@ -24,8 +19,11 @@ import {
 import type { AgentStatus, DeliveryCheckpoint } from '../../../contracts/src/accounts-execution.js';
 import { responseSummary, teamsDebug } from './debug.js';
 
-/** Where the Accounts API lives unless AIDEN_ACCOUNTS_URL points elsewhere (local development). */
-const defaultUrl = 'https://accounts.opheleon.ai';
+/**
+ * Where the Accounts API lives unless AIDEN_ACCOUNTS_URL points elsewhere (beta at
+ * https://api-beta.opheleon.ai, or local development).
+ */
+const defaultUrl = 'https://api.opheleon.ai';
 /** No Accounts call should hold up the app for long. */
 const timeoutMs = 15_000;
 
@@ -54,6 +52,20 @@ export function accountsUrl(env: NodeJS.ProcessEnv = process.env): string {
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && local))
     throw new Error('The Accounts server must use HTTPS.');
   return url.origin;
+}
+
+/**
+ * The Teams dashboard's address, where teams, invitations, admins, billing and profiles are
+ * managed. AIDEN_DASHBOARD_URL wins; otherwise the API host's first label `api` or `api-<stage>`
+ * becomes `app` or `app-<stage>` (sibling subdomains), and any other API address is used as is.
+ * Examples: https://api.opheleon.ai gives https://app.opheleon.ai, and
+ * https://api-beta.opheleon.ai gives https://app-beta.opheleon.ai.
+ */
+export function dashboardUrl(env: NodeJS.ProcessEnv = process.env): string {
+  if (env.AIDEN_DASHBOARD_URL) return new URL(env.AIDEN_DASHBOARD_URL).origin;
+  const api = new URL(accountsUrl(env));
+  api.hostname = api.hostname.replace(/^api(-[a-z0-9]+)?\./, 'app$1.');
+  return api.origin;
 }
 
 /** Typed calls to the Accounts API. The session token is sent as a bearer token and never logged. */
@@ -139,31 +151,6 @@ export class AccountsClient {
   /** The signed-in person and their accounts. */
   me(): Promise<Me> {
     return this.call('GET', '/me', MeSchema);
-  }
-
-  /** Create an account owned by the caller. */
-  createAccount(name: string): Promise<AccountSummary> {
-    return this.call('POST', '/accounts', AccountSummarySchema, { name });
-  }
-
-  /** Create an invite link (owners only). */
-  invite(accountId: string): Promise<Invite> {
-    return this.call('POST', `/accounts/${encodeURIComponent(accountId)}/invites`, InviteSchema);
-  }
-
-  /** Grant or revoke team admin access for a member. */
-  setAdmin(accountId: string, userId: string, isAdmin: boolean): Promise<{ isAdmin: boolean }> {
-    return this.call(
-      'PUT',
-      `/accounts/${encodeURIComponent(accountId)}/members/${encodeURIComponent(userId)}/admin`,
-      MemberAdminSchema,
-      { isAdmin },
-    );
-  }
-
-  /** Join with an invite code. */
-  join(code: string): Promise<AccountSummary> {
-    return this.call('POST', '/accounts/join', AccountSummarySchema, { code });
   }
 
   /** The shared work view for one account. */

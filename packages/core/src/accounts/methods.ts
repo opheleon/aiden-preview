@@ -9,7 +9,7 @@ import type { Runtimes } from '../../../runtimes/src/index.js';
 import type { Engine } from '../engine.js';
 import { readProject } from '../engine-queries.js';
 import { AccountAgent, deviceName } from './agent.js';
-import { AccountsClient, AccountsError, accountsUrl } from './client.js';
+import { AccountsClient, AccountsError, accountsUrl, dashboardUrl } from './client.js';
 import { documentFor, materialize } from './documents.js';
 import { InventoryProbe } from './inventory.js';
 import { TeamsSignIn } from './oidc.js';
@@ -22,10 +22,6 @@ type AccountMethod = Extract<
   | 'accountStatus'
   | 'accountSignIn'
   | 'accountSignOut'
-  | 'accountCreate'
-  | 'accountJoin'
-  | 'accountInvite'
-  | 'accountSetAdmin'
   | 'accountState'
   | 'accountTakeTask'
   | 'accountFinishTask'
@@ -50,9 +46,7 @@ function operation<T>(
 }
 
 const none = z.object({}).strict();
-const createAccount = z.object({ name: z.string().trim().min(1).max(120) }).strict();
 const account = z.object({ accountId: z.string().min(1).max(64) }).strict();
-const admin = account.extend({ userId: z.string().min(1).max(64), isAdmin: z.boolean() }).strict();
 const task = z.object({ taskId: z.string().min(1).max(64) }).strict();
 
 /** The first task of every account project: the same requirements step the solo app starts with. */
@@ -80,15 +74,6 @@ async function retry(client: AccountsClient, taskId: string): Promise<AccountTas
     connections: old.requires.connections,
     usesModel: old.requires.runtime !== null,
   });
-}
-
-/** Accept a pasted invite link (opheleon://join?code=...) or a bare code. */
-export function inviteCode(text: string): string {
-  const trimmed = text.trim();
-  if (!trimmed.includes('://')) return trimmed;
-  const code = new URL(trimmed).searchParams.get('code');
-  if (!code) throw new Error('That invite link has no code. Ask for a new link.');
-  return code;
 }
 
 /** Wire the Teams tier into the worker. Signed out, every method answers without touching the network. */
@@ -127,14 +112,6 @@ export function accountMethods(
       await context().signIn.signOut();
       return null;
     }),
-    accountCreate: operation(createAccount, (p) => context().client.createAccount(p.name)),
-    accountJoin: operation(z.object({ invite: z.string().trim().min(1).max(500) }).strict(), (p) =>
-      context().client.join(inviteCode(p.invite)),
-    ),
-    accountInvite: operation(account, (p) => context().client.invite(p.accountId)),
-    accountSetAdmin: operation(admin, (p) =>
-      context().client.setAdmin(p.accountId, p.userId, p.isAdmin),
-    ),
     accountState: operation(account, (p) => syncState(engine, context().client, p.accountId)),
     accountTakeTask: operation(task, (p) => context().client.take(p.taskId)),
     accountFinishTask: operation(
@@ -212,7 +189,7 @@ async function status({
   const preferences = await session.preferences();
   const machine = {
     ...agent.status(),
-    settingsUrl: accountsUrl(),
+    settingsUrl: dashboardUrl(),
     deviceName: deviceName(),
     pickupEnabled: preferences.pickupEnabled,
     usageCapPct: preferences.usageCapPct,

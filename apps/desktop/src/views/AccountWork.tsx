@@ -2,7 +2,7 @@ import { type JSX, useEffect } from 'react';
 
 import { AccountTeam } from '../components/AccountBoard';
 import { AccountMachine } from '../components/AccountMachine';
-import { AccountSetup, AccountSignIn } from '../components/AccountSignIn';
+import { AccountNoTeam, AccountSignIn } from '../components/AccountSignIn';
 import { useAccount } from '../hooks/useAccount';
 import type { Workspace } from '../hooks/useWorkspace';
 
@@ -29,10 +29,10 @@ export function AccountWork({ workspace }: { workspace: Workspace }): JSX.Elemen
       ) : !status.signedIn ? (
         <AccountSignIn account={account} />
       ) : !status.accounts.length ? (
-        <AccountSetup account={account} />
+        <AccountNoTeam account={account} />
       ) : (
         <>
-          {state && <AccountTeam account={account} state={state} />}
+          {state && <AccountTeam state={state} />}
           <AccountMachine account={account} />
           <p className="account-muted">
             Signed in as {status.email}.{' '}
@@ -63,7 +63,7 @@ function AccountProfile({ account }: { account: ReturnType<typeof useAccount> })
       <button
         onClick={() =>
           void window.aiden?.openExternal(
-            `${status.settingsUrl ?? 'https://accounts.opheleon.ai'}/profile`,
+            `${status.settingsUrl ?? 'https://app.opheleon.ai'}/profile`,
           )
         }
       >
@@ -73,7 +73,7 @@ function AccountProfile({ account }: { account: ReturnType<typeof useAccount> })
         <button
           onClick={() =>
             void window.aiden?.openExternal(
-              `${status.settingsUrl ?? 'https://accounts.opheleon.ai'}/team?team=${encodeURIComponent(account.accountId)}`,
+              `${status.settingsUrl ?? 'https://app.opheleon.ai'}/team?team=${encodeURIComponent(account.accountId)}`,
             )
           }
         >

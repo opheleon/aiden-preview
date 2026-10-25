@@ -12,10 +12,6 @@ const methods = new Set([
   'accountStatus',
   'accountSignIn',
   'accountSignOut',
-  'accountCreate',
-  'accountJoin',
-  'accountInvite',
-  'accountSetAdmin',
   'accountState',
   'accountTakeTask',
   'accountFinishTask',
@@ -155,10 +151,7 @@ export function registerWorkerIpc(
     const r = await worker.request(method, params as WorkerParams<WorkerMethod>);
     await openAuthorization(method, r);
     // Ask for work right away after anything that can change what this machine should do.
-    if (
-      ['accountSetPickup', 'accountCreate', 'accountJoin', 'accountCreateProject'].includes(method)
-    )
-      onAccountChange();
+    if (['accountSetPickup', 'accountCreateProject'].includes(method)) onAccountChange();
     if (method === 'accountStatus') {
       const now = (r as WorkerResult<'accountStatus'>).signedIn;
       if (signedIn !== undefined && signedIn !== now) onAccountChange();
