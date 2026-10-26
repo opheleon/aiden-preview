@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Aiden Beta: every change merged to main now ships as a signed Aiden Beta pre-release, a separate app with a BETA band on its icon that installs next to Aiden. It uses the beta Teams server and sign-in, keeps its data in `~/.aiden-beta`, and only updates to newer Aiden Beta builds. Aiden itself never offers Aiden Beta builds, even with beta updates on. Running Aiden from source shows a LOCAL band on the Dock icon.
+
 - Code checks read large projects more closely: more than eight requirements are checked in parts that follow the delivery plan, and every clause of a requirement needs its own evidence, including defaults, limits, copy, failure paths, and behavior shared across people or machines.
 - When a linked Notion page cannot be read, Aiden says why (for example, its tools changed and need review in Settings, Integrations) and waits for the page instead of writing placeholder requirements. Settings, Integrations shows each connection's current status when it opens.
 - A goal or spec that names a branch for a repository, such as "the server is on branch release-2", connects that repository on that branch before the first code check. In Project settings, Branch monitoring saves each repository's branch, and Check these branches runs one check for all of them.

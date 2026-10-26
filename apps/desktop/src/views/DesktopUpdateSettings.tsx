@@ -1,6 +1,7 @@
 import { Download, RefreshCw } from 'lucide-react';
 import React, { useState } from 'react';
 
+import { isBetaAppVersion } from '../../../../packages/contracts/src/app-flavor';
 import type { DesktopBridge } from '../bridge';
 import type { UpdatePreferences, UpdateStatus } from '../updater';
 
@@ -59,24 +60,27 @@ export function DesktopUpdateSettings(props: DesktopUpdateSettingsProps): React.
           }
         />
       </div>
-      <div className="update-preference">
-        <label htmlFor="beta-updates">
-          <strong>Receive beta updates</strong>
-          <small>Include pre-releases published on GitHub.</small>
-        </label>
-        <input
-          id="beta-updates"
-          aria-label="Receive beta updates"
-          type="checkbox"
-          checked={updatePreferences.channel === 'beta'}
-          onChange={(event) =>
-            saveUpdatePreferences({
-              ...updatePreferences,
-              channel: event.target.checked ? 'beta' : 'stable',
-            })
-          }
-        />
-      </div>
+      {/* Aiden Beta always follows its own builds, so it has no channel to choose. */}
+      {!isBetaAppVersion(updateStatus?.currentVersion ?? '') && (
+        <div className="update-preference">
+          <label htmlFor="beta-updates">
+            <strong>Receive beta updates</strong>
+            <small>Include pre-releases published on GitHub.</small>
+          </label>
+          <input
+            id="beta-updates"
+            aria-label="Receive beta updates"
+            type="checkbox"
+            checked={updatePreferences.channel === 'beta'}
+            onChange={(event) =>
+              saveUpdatePreferences({
+                ...updatePreferences,
+                channel: event.target.checked ? 'beta' : 'stable',
+              })
+            }
+          />
+        </div>
+      )}
       <UpdateDetails updateStatus={updateStatus} />
       <UpdateActions
         updateStatus={updateStatus}

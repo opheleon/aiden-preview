@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { z } from 'zod';
 
+import { betaPrerelease, isBetaAppVersion } from '../../../packages/contracts/src/app-flavor.js';
 import { defaultUpdateChannel } from './update-channel.js';
 import type { UpdatePreferences, UpdateProgress, UpdateStatus } from './update-types.js';
 
@@ -22,6 +23,8 @@ const progressSchema = z.object({
 export interface UpdateBackend {
   autoDownload: boolean;
   allowPrerelease: boolean;
+  allowDowngrade: boolean;
+  channel: string | null;
   autoInstallOnAppQuit: boolean;
   on(event: string, listener: (payload: unknown) => void): unknown;
   removeListener(event: string, listener: (payload: unknown) => void): unknown;
@@ -251,10 +254,24 @@ export class UpdateService {
     await rename(temporary, this.preferencesPath);
   }
 
-  /** Match download and prerelease routing to the persisted user preference. */
+  /**
+   * Match download and prerelease routing to the persisted user preference. Both apps publish to
+   * the same GitHub releases, so the channel is always explicit: electron-updater then skips
+   * custom channels, which keeps Aiden Beta builds (`aidenbeta`) out of production, and Aiden
+   * Beta only ever follows its own builds.
+   */
   private applyPreferences(): void {
-    this.options.backend.autoDownload = this.preferences.autoDownload;
-    this.options.backend.allowPrerelease = this.preferences.channel === 'beta';
+    const betaApp = isBetaAppVersion(this.options.version);
+    const backend = this.options.backend;
+    backend.autoDownload = this.preferences.autoDownload;
+    backend.channel = betaApp
+      ? betaPrerelease
+      : this.preferences.channel === 'beta'
+        ? 'beta'
+        : 'latest';
+    // Setting a channel turns downgrades on; updates only ever move forward.
+    backend.allowDowngrade = false;
+    backend.allowPrerelease = betaApp || this.preferences.channel === 'beta';
   }
 
   /** Register a listener whose lifetime belongs to this service instance. */

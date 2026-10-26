@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { app, BrowserWindow, dialog, powerMonitor } from 'electron';
 
+import { appFlavor } from '../../../packages/contracts/src/app-flavor.js';
 import type { RunEvent } from '../../../packages/contracts/src/index.js';
 import { WorkerClient } from '../../../packages/core/src/client.js';
 import { AccountPoller } from './account-poller.js';
@@ -13,12 +14,19 @@ import { registerFirstUseIpc } from './first-use-ipc.js';
 import { DesktopUpdater } from './updater.js';
 import { ProjectWatcher } from './watcher.js';
 import { registerWorkerIpc } from './worker-ipc.js';
+// Aiden Beta is its own app: its own name, data folder, sign-in, servers, and update feed. The
+// worker inherits AIDEN_FLAVOR, which selects the beta Teams server, tenant, and keychain entries.
+const flavor = appFlavor(app.getVersion(), app.isPackaged);
+process.env.AIDEN_FLAVOR = flavor;
+const appName = flavor === 'beta' ? 'Aiden Beta' : 'Aiden';
 // Electron otherwise names the macOS app menu after package.json's npm name.
-app.setName('Aiden');
+app.setName(appName);
 // Automated verification renders normally without presenting or activating a native window.
 const headless = process.env.AIDEN_HEADLESS === '1';
 if (headless && process.platform === 'darwin') app.setActivationPolicy('prohibited');
-const dataRoot = process.env.AIDEN_HOME || path.join(app.getPath('home'), '.aiden');
+const dataRoot =
+  process.env.AIDEN_HOME ||
+  path.join(app.getPath('home'), flavor === 'beta' ? '.aiden-beta' : '.aiden');
 const diagnostics = new LocalDiagnostics(dataRoot);
 mkdirSync(path.join(dataRoot, 'desktop'), { recursive: true, mode: 0o700 });
 app.setPath('userData', path.join(dataRoot, 'desktop'));
@@ -78,8 +86,9 @@ app
   .whenReady()
   .then(async () => {
     if (!ownsInstance) return;
-    // Packaged builds take the icon from the app bundle; development shows the same one in the Dock.
-    const devIcon = path.resolve(here, '../../../../build/app-icon.png');
+    // Packaged builds take the icon from the app bundle; development shows the LOCAL-badged one
+    // in the Dock so it is never mistaken for an installed Aiden or Aiden Beta.
+    const devIcon = path.resolve(here, '../../../../build/app-icon-local.png');
     if (process.platform === 'darwin' && !app.isPackaged && existsSync(devIcon))
       app.dock?.setIcon(devIcon);
     worker = new WorkerClient({
@@ -96,7 +105,7 @@ app
       height: 900,
       minWidth: 950,
       minHeight: 680,
-      title: 'Aiden',
+      title: appName,
       show: !headless,
       focusable: !headless,
       skipTaskbar: headless,

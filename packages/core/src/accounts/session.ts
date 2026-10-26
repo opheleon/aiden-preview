@@ -4,12 +4,22 @@ import path from 'node:path';
 import { AsyncEntry } from '@napi-rs/keyring';
 import { z } from 'zod/v3';
 
+import { flavorFromEnv } from '../../../contracts/src/app-flavor.js';
 import { SecretVault } from '../../../integrations/src/credentials.js';
 import { atomic, optionalJson, type Store } from '../storage.js';
 
-/** OS credential entries for the Accounts session; replaced in tests so no real keychain is touched. */
+/**
+ * OS credential entries for the Accounts session; replaced in tests so no real keychain is
+ * touched. Aiden Beta signs in to a different tenant, so it keeps its own entries.
+ */
 export const accountSessionEntries = {
-  create: (id: string): AsyncEntry => new AsyncEntry('com.opheleon.aiden.accounts', id),
+  create: (id: string): AsyncEntry =>
+    new AsyncEntry(
+      flavorFromEnv(process.env) === 'beta'
+        ? 'com.opheleon.aiden-beta.accounts'
+        : 'com.opheleon.aiden.accounts',
+      id,
+    ),
 };
 const vault = new SecretVault(true, (id) => accountSessionEntries.create(id));
 

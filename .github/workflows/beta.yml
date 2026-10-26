@@ -1,0 +1,29 @@
+# Builds Aiden Beta from every push to main with the same pipeline as production releases
+# (quality, signing, notarization, packaged-app tests, provenance) and publishes it as a GitHub
+# pre-release on the "aidenbeta" update channel. Aiden Beta installs update to it; production
+# installs never do. See release.yml.
+name: Beta
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# One build at a time, in push order; a newer push waits rather than cancelling a publish.
+concurrency:
+  group: beta
+  cancel-in-progress: false
+
+jobs:
+  release:
+    uses: ./.github/workflows/release.yml
+    with:
+      flavor: beta
+    secrets: inherit
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      security-events: write
