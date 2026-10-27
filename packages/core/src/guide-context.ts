@@ -228,6 +228,7 @@ export async function guideInput(
         requirementId: c.requirementId,
       })),
     requirementsPending: facts.facts.requirementsPending,
+    workRunning: engine.isBusy(project.id),
     help: {
       slack: helpLinks.slack,
       inApp:

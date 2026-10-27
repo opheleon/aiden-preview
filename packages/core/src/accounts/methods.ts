@@ -29,6 +29,7 @@ type AccountMethod = Extract<
   | 'accountCreateProject'
   | 'accountShareProject'
   | 'accountPoll'
+  | 'activeWork'
   | 'accountSyncSetup'
   | 'accountCancelTask'
   | 'accountRetryTask'
@@ -131,6 +132,12 @@ export function accountMethods(
     };
     return built;
   };
+  /**
+   * Whether this machine is doing work, read from what the worker is actually running: engine
+   * work or a Teams task it leased. Never from the host's view of run events, which a log line
+   * arriving after a run finished could leave stuck on busy.
+   */
+  const busy = (): boolean => engine.hasActiveWork() || !!built?.agent.status().running;
   // Desktop tests follow the team admins' allowed app publishers whenever this machine is signed in.
   engine.desktops.teamPublishers = async () => {
     const { session, client } = context();
@@ -197,10 +204,16 @@ export function accountMethods(
     ),
     accountPoll: operation(
       z
-        .object({ idleSeconds: z.number().min(0), onBattery: z.boolean(), busy: z.boolean() })
+        .object({
+          idleSeconds: z.number().min(0),
+          onBattery: z.boolean(),
+          // Accepted from older hosts but ignored: the worker knows what it is running.
+          busy: z.boolean().optional(),
+        })
         .strict(),
-      (p) => context().agent.poll(p),
+      (p) => context().agent.poll({ ...p, busy: busy() }),
     ),
+    activeWork: operation(none, () => ({ busy: busy() })),
   };
 }
 

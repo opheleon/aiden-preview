@@ -203,6 +203,10 @@ export async function executeCoding(
 export function codingActive(engine: Engine, jobId: string): boolean {
   return sessions.get(engine)?.has(jobId) ?? false;
 }
+/** Whether this worker owns any running coding session, for any project. */
+export function codingRunning(engine: Engine): boolean {
+  return (sessions.get(engine)?.size ?? 0) > 0;
+}
 /** Cancel an owned external session, preserving the worktree and its saved result. */
 export async function cancelCoding(engine: Engine, jobId: string): Promise<void> {
   const active = sessions.get(engine)?.get(jobId);

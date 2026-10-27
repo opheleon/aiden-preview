@@ -4,7 +4,6 @@ import path from 'node:path';
 import { z } from 'zod/v3';
 
 import type { AccountStatus } from '../../../packages/contracts/src/api.js';
-import type { RunEvent } from '../../../packages/contracts/src/index.js';
 import { AccountPoller } from '../../../packages/core/src/accounts/poller.js';
 import type { WorkerClient } from '../../../packages/core/src/client.js';
 import { atomic, optionalJson } from '../../../packages/core/src/storage.js';
@@ -81,7 +80,7 @@ export function loopbackCallback(pasted: string, ports: number[]): URL {
 }
 
 /** The worker requests and events a host needs; tests replace the process. */
-export type HostWorker = Pick<WorkerClient, 'request' | 'on' | 'close'>;
+export type HostWorker = Pick<WorkerClient, 'request' | 'close'>;
 
 /**
  * Runs Aiden as a Teams machine with no desktop: asks the account for work on the server's schedule,
@@ -89,8 +88,6 @@ export type HostWorker = Pick<WorkerClient, 'request' | 'on' | 'close'>;
  * the headless counterpart of Electron main for Linux servers such as a Fly.io machine.
  */
 export class TeamsHost {
-  private readonly runs = new Set<string>();
-  private readonly codingJobs = new Set<string>();
   private readonly poller: AccountPoller;
   private timer?: ReturnType<typeof setTimeout>;
   private signInUrl: string | null = null;
@@ -115,29 +112,19 @@ export class TeamsHost {
   ) {
     this.poller = new AccountPoller({
       worker: options.worker,
-      isBusy: () => this.runs.size > 0 || this.codingJobs.size > 0,
       // Nobody uses a server's keyboard, so it has been idle since it booted.
       idleSeconds: () => os.uptime(),
       onBattery: () => false,
     });
   }
 
-  /** Follow worker activity, start asking for work, and start the status loop. */
+  /**
+   * Start asking for work and start the status loop. The worker tells the server whether this
+   * machine is busy from the work it is running, so the host tracks no run events.
+   */
   start(): void {
-    this.options.worker.on('event', (event: RunEvent) => this.observe(event));
     this.poller.start();
     void this.loop();
-  }
-
-  /** Track running work the same way the desktop does, so the server is told when this machine is busy. */
-  private observe(event: RunEvent): void {
-    if (event.type === 'coding') {
-      if (event.codingActive) this.codingJobs.add(event.runId);
-      else this.codingJobs.delete(event.runId);
-    }
-    if (event.type === 'progress' || event.type === 'activity') this.runs.add(event.runId);
-    if (['review', 'completed', 'failed', 'cancelled'].includes(event.type))
-      this.runs.delete(event.runId);
   }
 
   /** Check, then schedule the next check; a failed check is logged and retried on schedule. */

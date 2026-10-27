@@ -8,6 +8,7 @@ import { appFlavor } from '../../../packages/contracts/src/app-flavor.js';
 import type { RunEvent } from '../../../packages/contracts/src/index.js';
 import { AccountPoller } from '../../../packages/core/src/accounts/poller.js';
 import { WorkerClient } from '../../../packages/core/src/client.js';
+import { ActiveWork } from './active-work.js';
 import { BackgroundMode, registerBackgroundIpc } from './background.js';
 import { registerFileIpc, registerPreferenceIpc } from './desktop-ipc.js';
 import { LocalDiagnostics } from './diagnostics.js';
@@ -51,19 +52,12 @@ let updater: DesktopUpdater;
 let background: BackgroundMode | undefined;
 let quitting = false;
 let quitReady = false;
-const activeRuns = new Set<string>();
-const activeCodingJobs = new Set<string>();
+// Busy comes from what the worker is running, never from bookkeeping of its run events.
+let activeWork: ActiveWork;
 /** Connect lifecycle observers before loading renderer content; failures never relaunch paid work. */
 function observeDesktop(): void {
   worker.on('event', (event: RunEvent) => {
-    if (event.type === 'coding') {
-      if (event.codingActive) activeCodingJobs.add(event.runId);
-      else activeCodingJobs.delete(event.runId);
-    }
-    if (event.type === 'progress' || event.type === 'activity') activeRuns.add(event.runId);
-    if (['review', 'completed', 'failed', 'cancelled'].includes(event.type)) {
-      activeRuns.delete(event.runId);
-    }
+    void activeWork.refresh();
     if (!window.isDestroyed()) window.webContents.send('aiden:event', event);
   });
   worker.on('workerStopped', () => {
@@ -71,6 +65,7 @@ function observeDesktop(): void {
     void diagnostics.record({ component: 'worker', code: 'worker_stopped' });
     watcher.stop();
     poller.stop();
+    activeWork.stop();
     // Bring a window hidden in the tray back, so the person sees that work stopped.
     background?.show();
     if (!window.isDestroyed())
@@ -134,21 +129,21 @@ app
       if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame)
         throw new Error('Untrusted IPC sender.');
     };
+    activeWork = new ActiveWork(worker);
     watcher = new ProjectWatcher({
       dataRoot,
       worker,
-      isBusy: () => activeRuns.size > 0 || activeCodingJobs.size > 0,
+      isBusy: () => activeWork.isBusy(),
       onError: () => void diagnostics.record({ component: 'watcher', code: 'check_failed' }),
     });
     poller = new AccountPoller({
       worker,
-      isBusy: () => activeRuns.size > 0 || activeCodingJobs.size > 0,
       idleSeconds: () => powerMonitor.getSystemIdleTime(),
       onBattery: () => powerMonitor.isOnBatteryPower(),
     });
     updater = new DesktopUpdater({
       dataRoot,
-      isRunActive: () => activeRuns.size > 0 || activeCodingJobs.size > 0,
+      isRunActive: () => activeWork.isBusy(),
     });
     registerPreferenceIpc(authorized, updater);
     registerFirstUseIpc(authorized, dataRoot);
@@ -156,6 +151,7 @@ app
     registerFileIpc(authorized, window, worker);
     registerBackgroundIpc(authorized, dataRoot);
     observeDesktop();
+    activeWork.start();
     if (!headless) {
       background = new BackgroundMode({
         dataRoot,
@@ -189,6 +185,7 @@ app.on('before-quit', (event) => {
   quitting = true;
   watcher?.stop();
   poller?.stop();
+  activeWork?.stop();
   updater?.dispose();
   background?.dispose();
   if (worker) {

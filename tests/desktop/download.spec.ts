@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { expect, test } from '@playwright/test';
 
+import { defaultUpdateChannel } from '../../apps/desktop/src/update-channel.js';
 import { downloadFixture } from './download-fixture.js';
 import { createProject, desktopFixture } from './journey-fixture.js';
 
@@ -19,9 +20,11 @@ test('background update check downloads automatically, rejects corrupt bytes, an
   let download: Awaited<ReturnType<typeof downloadFixture>> | undefined;
   try {
     download = await downloadFixture(desktop.app, fixture.root);
+    // Packaged Aiden Beta builds (1.2.5-aidenbeta.N) start on the beta channel; stable builds do not.
+    const version = await desktop.app.evaluate(({ app }) => app.getVersion());
     await expect
       .poll(() => desktop.page.evaluate(() => window.aiden!.getUpdatePreferences()))
-      .toEqual({ autoDownload: true, channel: 'stable' });
+      .toEqual({ autoDownload: true, channel: defaultUpdateChannel(version) });
     // Do not click Check or Download: the real 30-second startup timer must initiate both.
     await expect
       .poll(

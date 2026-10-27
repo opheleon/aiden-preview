@@ -21,7 +21,7 @@ import { validateProjectRepositories } from '../../tools/src/discovery.js';
 import type { DiscoverOptions } from '../../verification/src/index.js';
 import { commitBaseline } from './baseline.js';
 import { requireCheckableScope } from './blockers.js';
-import { closeCoding } from './coding-jobs.js';
+import { closeCoding, codingRunning } from './coding-jobs.js';
 import { withLinkedSources } from './context-sources.js';
 import { DesktopVerification } from './desktop-verification.js';
 import { DeviceVerification } from './device-verification.js';
@@ -315,6 +315,10 @@ export class Engine {
   async wait(runId: string): Promise<void> {
     await this.active.get(runId)?.done;
   }
+  /** Whether the worker is shutting down, so no new work should start. */
+  isClosing(): boolean {
+    return this.closing;
+  }
   /** Whether this worker is executing the run; saved manifests can still say running after a crash. */
   isActive(runId: string): boolean {
     return this.active.has(runId);
@@ -324,6 +328,19 @@ export class Engine {
     return (
       this.devices.isBusy(projectId) ||
       [...this.active.values()].some((a) => a.projectId === projectId)
+    );
+  }
+  /**
+   * Whether this worker is executing anything at all: a run of any kind, a phone or desktop app
+   * check, or a coding session. Read from the work itself, so a finished run that still gets a
+   * follow-up log line (such as the browser check's question after a code check) never counts.
+   */
+  hasActiveWork(): boolean {
+    return (
+      this.active.size > 0 ||
+      this.devices.hasActive() ||
+      this.desktops.hasActive() ||
+      codingRunning(this)
     );
   }
   /** Signal cancellation for active work; accepted report pointers remain owned by workflow commit guards. */

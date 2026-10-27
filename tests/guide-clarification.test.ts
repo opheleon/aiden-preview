@@ -4,9 +4,10 @@ import test from 'node:test';
 
 import { readCalls, recordCall } from '../packages/core/src/calls.js';
 import { Engine } from '../packages/core/src/engine.js';
-import { askGuide, guideView } from '../packages/core/src/guide.js';
+import { askGuide, guideView, readThread } from '../packages/core/src/guide.js';
 import { confirmRequirements } from '../packages/core/src/guide-actions.js';
 import { readSetupState } from '../packages/core/src/guide-context.js';
+import { deferredAnswers } from '../packages/core/src/guide-scope.js';
 import { Store } from '../packages/core/src/storage.js';
 import { FixtureRuntime } from './fixture-runtime.js';
 import { fixture } from './helpers.js';
@@ -185,6 +186,93 @@ void test('a model cannot confirm or run past open questions, and asking about a
     assert.ok(!(await readSetupState(engine.store, project.id)).requirementsConfirmedAt);
     assert.equal((await engine.history(project.id)).length, 1);
   } finally {
+    await engine.dispose();
+  }
+});
+
+void test('an answer given while a code check runs is saved and applied when the check ends', async () => {
+  const f = await fixture();
+  const runtime = new FixtureRuntime(f);
+  const engine = new Engine(new Store(path.join(f.root, 'busy-answer-data')), runtime);
+  const poll = deferredAnswers.pollMs;
+  deferredAnswers.pollMs = 10;
+  let releaseCheck = () => {};
+  try {
+    const prepared = await engine.prepare(f.project, { autoAccept: true });
+    await engine.wait(prepared.runId);
+    const original = (await engine.state(f.project.id)).baseline!.id;
+    const call = await question(
+      engine,
+      f.project.id,
+      'What is the existing help page URL or route?',
+    );
+    runtime.holdAssess = new Promise<void>((resolve) => {
+      releaseCheck = resolve;
+    });
+    const check = await engine.report(f.project.id);
+    assert.ok(engine.isBusy(f.project.id), 'the code check is running');
+    runtime.guideReply = {
+      reply:
+        'Got it. Your answer is saved, and I will update the requirements as soon as the current check finishes.',
+      widgets: [],
+      actions: [
+        {
+          type: 'answer-clarification',
+          callId: call.id,
+          url: null,
+          allowMutations: null,
+          manual: null,
+          context: null,
+          step: null,
+        },
+      ],
+    };
+    const answer =
+      'There is no help page yet. Add a simple /help page and a footer with a Help link to it.';
+    const view = await askGuide(engine, f.project.id, { text: answer });
+    const events = view.thread.messages.filter((m) => m.from === 'event').map((m) => m.text);
+    assert.ok(!events.some((text) => text.startsWith('Could not apply')), events.join(' | '));
+    assert.ok(
+      events.some((text) => text.includes('as soon as the current work finishes')),
+      'the chat says the update waits for the current work',
+    );
+    assert.equal(view.clarifications?.length, 0, 'the question is answered, not reopened');
+    assert.equal(
+      (await readCalls(engine.store, f.project.id)).find((c) => c.id === call.id)?.answer,
+      answer,
+    );
+    const guideTurn = runtime.inputs.at(-1) as { workRunning?: boolean };
+    assert.equal(guideTurn.workRunning, true, 'the Guide was told work is running');
+    const rewrites = async () =>
+      (await engine.history(f.project.id)).filter((r) => r.kind === 'prepare');
+    assert.equal((await rewrites()).length, 1, 'no rewrite while the check runs');
+
+    releaseCheck();
+    runtime.holdAssess = null;
+    await engine.wait(check.runId);
+    for (let i = 0; i < 400; i++) {
+      const done = (await rewrites()).length === 2 && !engine.isBusy(f.project.id);
+      if (done && !(await guideView(engine, f.project.id)).requirementsPending) break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    const updated = await guideView(engine, f.project.id);
+    assert.equal(updated.requirementsPending, false, 'the requirements include the answer');
+    assert.notEqual((await engine.state(f.project.id)).baseline!.id, original);
+    assert.equal((await rewrites())[0]?.status, 'completed');
+    assert.equal(
+      (await engine.history(f.project.id)).find((r) => r.id === check.runId)?.status,
+      'completed',
+    );
+    const thread = await readThread(engine.store, f.project.id);
+    assert.ok(
+      thread.messages.some(
+        (m) => m.from === 'event' && m.text.startsWith('The current work finished.'),
+      ),
+      'the chat records when the update starts',
+    );
+  } finally {
+    releaseCheck();
+    deferredAnswers.pollMs = poll;
     await engine.dispose();
   }
 });

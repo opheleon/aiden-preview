@@ -23,6 +23,8 @@ export class FixtureRuntime implements AgentRuntime {
   clarificationBlocking = false;
   /** Holds the understand stage until the promise settles, for tests that act mid-rewrite. */
   holdUnderstand: Promise<void> | null = null;
+  /** Holds the assess stage until the promise settles, for tests that act during a code check. */
+  holdAssess: Promise<void> | null = null;
   /** Replaces the understand-stage output, for tests that need edge cases or calls. */
   understanding: Record<string, unknown> | null = null;
   pause = false;
@@ -62,6 +64,7 @@ export class FixtureRuntime implements AgentRuntime {
         r.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }),
       );
     if (this.holdUnderstand && stage === 'understand') await this.holdUnderstand;
+    if (this.holdAssess && stage === 'assess') await this.holdAssess;
     if (this.pauseEstimate && stage === 'estimate-original')
       await new Promise((_, reject) =>
         r.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }),

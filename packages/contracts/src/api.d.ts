@@ -120,11 +120,16 @@ export type WorkerAPI = {
   accountRetryTask: { params: { taskId: string }; result: AccountTask };
   /** Put the person's next setup step on the team queue and close setup tasks that are done. */
   accountSyncSetup: { params: { projectId: string }; result: null };
-  /** Ask the account what this machine should do next (Electron main calls this on a timer). */
+  /**
+   * Ask the account what this machine should do next (Electron main calls this on a timer). The
+   * worker reports whether it is busy from its own running work; a host-sent `busy` is ignored.
+   */
   accountPoll: {
-    params: { idleSeconds: number; onBattery: boolean; busy: boolean };
+    params: { idleSeconds: number; onBattery: boolean; busy?: boolean };
     result: { pollAfterSeconds: number };
   };
+  /** Whether the worker is running anything: a run, an app or phone check, coding, or a Teams task. */
+  activeWork: { params: Record<string, never>; result: { busy: boolean } };
   phoneSetup: { params: Record<string, never>; result: PhoneReadiness };
   savePhoneSetup: { params: PhoneSetup; result: PhoneSetup };
   phoneApps: { params: { udid: string }; result: PhoneApp[] };
