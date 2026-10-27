@@ -1,6 +1,7 @@
 import type { Product, RunManifest } from '../../../../packages/contracts/src/index';
 import { scopeName } from '../../../../packages/contracts/src/project-name';
 import type { DesktopBridge } from '../bridge';
+import { teamTarget } from './useTeamScope';
 import type { WorkspaceState } from './useWorkspaceState';
 
 type Call = DesktopBridge['request'];
@@ -61,6 +62,20 @@ async function load(state: WorkspaceState, call: Call, id: string): Promise<void
 }
 
 /**
+ * Where a new project goes, checked when it is created rather than read from a screen that may
+ * still be loading. The background check can lag behind a sign-in, or fail, and either would
+ * otherwise keep a signed-in person's project on this computer without a word.
+ * @param call The worker bridge.
+ */
+async function newProjectTarget(call: Call): Promise<{ scope: string; problem: string }> {
+  try {
+    return teamTarget(await call('accountStatus'));
+  } catch {
+    return { scope: '', problem: 'Aiden could not check whether you are signed in to a team.' };
+  }
+}
+
+/**
  * Hand the project to Aiden: it writes what done means, commits it without a review step, and
  * starts looking. Also used after changing the folder, which changes what Aiden looks at.
  */
@@ -72,20 +87,18 @@ async function start(state: WorkspaceState, call: Call): Promise<void> {
       );
     const project = { ...state.project, name: scopeName(state.project.context) };
     const saved = state.projects.some((p) => p.id === project.id);
-    // Signed in, a new project belongs to the team; when the team cannot be reached, say so
-    // instead of keeping it on this computer where teammates would never see it.
-    if (state.teamProblem && !saved)
-      throw new Error(
-        `${state.teamProblem} The project was not created. Try again when Aiden can reach your team.`,
-      );
     // Only a project that does not exist yet goes to the team; a saved project (for example after
     // its code changed) rewrites its own requirements and must never be copied into a new one.
-    if (state.accountScope && !saved) {
+    const target = saved ? null : await newProjectTarget(call);
+    // Signed in, a new project belongs to the team; when the team cannot be reached, say so
+    // instead of keeping it on this computer where teammates would never see it.
+    if (target?.problem)
+      throw new Error(
+        `${target.problem} The project was not created. Try again when Aiden can reach your team.`,
+      );
+    if (target?.scope) {
       // The team's queue decides which member's machine writes the requirements.
-      const created = await call('accountCreateProject', {
-        accountId: state.accountScope,
-        project,
-      });
+      const created = await call('accountCreateProject', { accountId: target.scope, project });
       state.setProjects(await call('projects'));
       if (created) await load(state, call, created.id);
       state.setLive('Your team will write the requirements on the best available machine.');

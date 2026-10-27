@@ -51,14 +51,12 @@ function fixture(current: AccountStatus, teamState: object = state, projects: ob
   const load = vi.fn(() => Promise.resolve());
   const setArea = vi.fn();
   const setAccountScope = vi.fn();
-  const setTeamProblem = vi.fn();
   const setProjects = vi.fn();
   const workspace = {
     call,
     load,
     setArea,
     setAccountScope,
-    setTeamProblem,
     projects,
     setProjects,
   } as unknown as Workspace;

@@ -54,6 +54,8 @@ export function appFixture() {
   let chats: Record<string, ChatMessage[]> = {};
   let runLogs: Record<string, ActivityEntry[]> = {};
   let confirmed: Record<string, string> = {};
+  /** Signed out by default; a signed-in person whose team cannot be reached when set. */
+  let teamUnreachable = false;
   let connections: McpConnection[] = [];
   let appUrl: string | null = null;
   let verification: WorkerResult<'verification'> = null;
@@ -98,6 +100,7 @@ export function appFixture() {
   ];
   /** Restore the saved project; `ready: false` is a project whose first rewrite is still running. */
   function reset(ready = true) {
+    teamUnreachable = false;
     project = {
       id: report.projectId,
       name: 'Synthetic books',
@@ -422,6 +425,20 @@ export function appFixture() {
           return guideView();
         case 'testAppUrl':
           return { reachable: true, message: 'Synthetic app answered (HTTP 200).' };
+        case 'accountStatus':
+          return {
+            signedIn: teamUnreachable,
+            email: teamUnreachable ? 'bob@example.com' : null,
+            userId: null,
+            accounts: [],
+            message: teamUnreachable ? 'Synthetic team server is unreachable.' : null,
+            deviceName: 'Synthetic Mac',
+            pickupEnabled: true,
+            usageCapPct: 70,
+            signingIn: false,
+            running: null,
+            last: null,
+          } satisfies WorkerResult<'accountStatus'>;
         default:
           throw new Error(`Unexpected fixture operation: ${method}`);
       }
@@ -519,6 +536,10 @@ export function appFixture() {
         repositories: 0,
         completedChecks: 0,
       };
+    },
+    /** Sign the person in to a team the app cannot reach. */
+    setTeamUnreachable: () => {
+      teamUnreachable = true;
     },
     guideMessages: () => guideMessages,
   };

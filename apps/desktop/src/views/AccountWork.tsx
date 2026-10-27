@@ -12,15 +12,12 @@ import type { Workspace } from '../hooks/useWorkspace';
 export function AccountWork({ workspace }: { workspace: Workspace }): JSX.Element {
   const account = useAccount(workspace.call);
   const { status, state } = account;
-  const { setAccountScope, setTeamProblem, projects, setProjects, call } = workspace;
+  const { setAccountScope, projects, setProjects, call } = workspace;
   const team = status?.accounts.find((a) => a.id === account.accountId)?.name ?? 'your team';
   // Signing in or out here changes the header tabs without a screen change.
   useEffect(() => {
-    if (!status) return;
-    const target = teamTarget(status);
-    setAccountScope(target.scope);
-    setTeamProblem(target.problem);
-  }, [status, setAccountScope, setTeamProblem]);
+    if (status) setAccountScope(teamTarget(status).scope);
+  }, [status, setAccountScope]);
   return (
     <div className="content account-view">
       {account.error && (
