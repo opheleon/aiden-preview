@@ -15,6 +15,8 @@ function send(value: unknown): void {
   process.stdout.write(JSON.stringify(value) + '\n');
 }
 const engine = new Engine(store, runtimes, (event) => send({ event }));
+// Tell the host when a run is fully gone, so its busy mirror never keeps a finished run.
+engine.onWorkChanged = () => send({ activeWork: { busy: engine.hasActiveWork() } });
 const ports = appPorts(process.env.AIDEN_APP_PORTS);
 if (ports) engine.discover = { ports };
 export const methods = createMethods(engine, runtimes);
