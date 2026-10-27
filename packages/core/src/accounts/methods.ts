@@ -51,6 +51,10 @@ const none = z.object({}).strict();
 const account = z.object({ accountId: z.string().min(1).max(64) }).strict();
 const task = z.object({ taskId: z.string().min(1).max(64) }).strict();
 const teamProject = account.extend({ projectId: z.string().min(1).max(64) }).strict();
+/** Machine signals a host sends with each poll; a host-sent `busy` is accepted but ignored. */
+const pollInput = z
+  .object({ idleSeconds: z.number().min(0), onBattery: z.boolean(), busy: z.boolean().optional() })
+  .strict();
 
 /** The first task of every account project: the same requirements step the solo app starts with. */
 const writeRequirements: NewAccountTask = {
@@ -202,17 +206,7 @@ export function accountMethods(
         return null;
       },
     ),
-    accountPoll: operation(
-      z
-        .object({
-          idleSeconds: z.number().min(0),
-          onBattery: z.boolean(),
-          // Accepted from older hosts but ignored: the worker knows what it is running.
-          busy: z.boolean().optional(),
-        })
-        .strict(),
-      (p) => context().agent.poll({ ...p, busy: busy() }),
-    ),
+    accountPoll: operation(pollInput, (p) => context().agent.poll({ ...p, busy: busy() })),
     activeWork: operation(none, () => ({ busy: busy() })),
   };
 }

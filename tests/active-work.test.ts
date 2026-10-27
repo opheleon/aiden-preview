@@ -10,7 +10,6 @@ import type { WorkerClient } from '../packages/core/src/client.js';
 import { Engine } from '../packages/core/src/engine.js';
 import { followWithBrowserCheck, startLook } from '../packages/core/src/look.js';
 import { Store } from '../packages/core/src/storage.js';
-import type { Runtimes } from '../packages/runtimes/src/index.js';
 import { FixtureRuntime } from './fixture-runtime.js';
 import { fixture } from './helpers.js';
 
@@ -31,20 +30,22 @@ async function setup() {
   const f = await fixture();
   const runtime = new FixtureRuntime(f);
   const events: RunEvent[] = [];
-  let mirror: ActiveWork | undefined;
+  // Created after the worker it reads; events before then have no mirror to refresh.
+  const holder: { mirror?: ActiveWork } = {};
   const engine = new Engine(new Store(path.join(f.root, 'data')), runtime, (event) => {
     events.push(event);
-    void mirror?.refresh();
+    void holder.mirror?.refresh();
   });
   // Nothing answers on localhost, so the browser check has to ask where the app runs.
   engine.discover = { fetch: () => Promise.reject(new Error('connection refused')) };
   const methods = accountMethods(engine, {
     diagnostics: () => Promise.reject(new Error('not used')),
-  } as unknown as Pick<Runtimes, 'diagnostics'>);
+  });
   const worker = {
     request: (method: 'activeWork' | 'accountPoll', params?: unknown) => methods[method](params),
   } as unknown as Pick<WorkerClient, 'request'>;
-  mirror = new ActiveWork(worker);
+  const mirror = new ActiveWork(worker);
+  holder.mirror = mirror;
   const prepared = await engine.prepare(f.project);
   await engine.wait(prepared.runId);
   // The written requirements carry a delivery plan, so a finished check goes on to sizing.
