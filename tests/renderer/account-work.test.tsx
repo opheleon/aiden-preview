@@ -141,6 +141,31 @@ test('My work puts Aiden’s question in its own card and answers it in place', 
   expect(screen.queryByRole('region', { name: 'This machine' })).not.toBeInTheDocument();
 });
 
+test('a coding question shows its formatted text and records a typed answer on the server', async () => {
+  const human = state.tasks.find((t) => t.actor === 'human')!;
+  const question = {
+    ...human,
+    kind: 'coding-question',
+    title: 'Which plan names?',
+    instructions:
+      'Claude Code paused here.\n- Starter and Pro\n- Basic and Plus\n\nSee `plans.ts`.',
+  };
+  const f = fixture(status({ userId: human.assigneeUserId }), { ...state, tasks: [question] });
+  render(<MyWork workspace={f.workspace} />);
+  const questions = await screen.findByRole('region', { name: 'Questions for you' });
+  await userEvent.click(within(questions).getByRole('button', { name: /Which plan names\?/ }));
+  expect(within(questions).getByText('Starter and Pro').tagName).toBe('LI');
+  expect(within(questions).getByText('plans.ts').tagName).toBe('CODE');
+  const box = screen.getByLabelText('Answer: Which plan names?');
+  await userEvent.type(box, 'Starter and Pro{Control>}{Enter}{/Control}');
+  expect(f.call).toHaveBeenCalledWith('accountFinishTask', {
+    taskId: question.id,
+    answer: 'Starter and Pro',
+  });
+  await userEvent.click(within(questions).getByRole('button', { name: 'Mark done' }));
+  expect(f.call).toHaveBeenCalledWith('accountFinishTask', { taskId: question.id });
+});
+
 test('a setup step lands in For you to do and closes from the project, not here', async () => {
   const human = state.tasks.find((t) => t.actor === 'human')!;
   const setup = { ...human, kind: 'setup-code', title: 'Connect code' };

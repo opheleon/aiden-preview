@@ -87,12 +87,9 @@ export function when(iso: string): string {
     : at.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-/** A task's text without markdown marks or PR links (those get their own buttons). */
+/** A task's text without its PR links (those get their own buttons); its formatting is kept. */
 export function summary(task: AccountTask): string {
-  return task.instructions
-    .replace(/https:\/\/github\.com\/\S+\/pull\/\d+/g, '')
-    .replace(/[#*`]+/g, '')
-    .trim();
+  return task.instructions.replace(/https:\/\/github\.com\/\S+\/pull\/\d+/g, '').trim();
 }
 
 /** The GitHub pull requests a task points at. */

@@ -3,6 +3,7 @@ import { type JSX, useState } from 'react';
 
 import type { AccountTask } from '../../../../packages/contracts/src/accounts-api';
 import { setupStepOf } from '../../../../packages/contracts/src/task-model';
+import { FormattedText } from '../components/FormattedText';
 import { type AccountView, useAccount } from '../hooks/useAccount';
 import type { Workspace } from '../hooks/useWorkspace';
 import { projectName, pullRequests, summary, toggle, WorkCard, WorkDot, WorkRow } from './WorkCard';
@@ -148,10 +149,12 @@ export function MyWork({ workspace }: { workspace: Workspace }): JSX.Element {
   );
 }
 
-/** A task's text, kept short. */
+/** A task's full text with its paragraphs and lists; PR links get their own buttons. */
 function Detail({ task }: { task: AccountTask }): JSX.Element | null {
   const text = summary(task);
-  return text ? <p className="work-note">{text}</p> : null;
+  return text && text !== task.title.trim() ? (
+    <FormattedText text={text} className="work-body" />
+  ) : null;
 }
 
 /** Setup steps finish in the project; anything else is marked done here. */
@@ -165,26 +168,31 @@ function Finish({
   onOpen: (projectId: string) => void;
 }): JSX.Element {
   return setupStepOf(task.kind) ? (
-    <button className="work-solid" onClick={() => onOpen(task.projectId)}>
+    <button type="button" className="work-solid" onClick={() => onOpen(task.projectId)}>
       Open project
     </button>
   ) : (
     <>
       <button
+        type="button"
         className="work-soft"
         disabled={account.working}
         onClick={() => void account.finish(task.id)}
       >
         Mark done
       </button>
-      <button className="text-button" onClick={() => onOpen(task.projectId)}>
+      <button type="button" className="text-button" onClick={() => onOpen(task.projectId)}>
         Open project
       </button>
     </>
   );
 }
 
-/** A question from Aiden: the context, then an answer that lets the paused work pick back up. */
+/**
+ * A question from Aiden: the context, then an answer that goes to the team's server. An answer
+ * task resumes the paused work with it; a coding question records it for the team, and can also
+ * be closed without one when the person took over the session themselves.
+ */
 function Question({
   task,
   account,
@@ -195,15 +203,10 @@ function Question({
   onOpen: (projectId: string) => void;
 }): JSX.Element {
   const [answer, setAnswer] = useState('');
-  if (task.kind !== 'answer')
-    return (
-      <>
-        <Detail task={task} />
-        <div className="work-actions">
-          <Finish task={task} account={account} onOpen={onOpen} />
-        </div>
-      </>
-    );
+  /** Record the answer on the server; a failed send keeps it for another try. */
+  const send = () => {
+    if (answer.trim() && !account.working) void account.finish(task.id, answer.trim());
+  };
   return (
     <>
       <Detail task={task} />
@@ -211,18 +214,30 @@ function Question({
         className="work-answer"
         onSubmit={(event) => {
           event.preventDefault();
-          void account.finish(task.id, answer);
+          send();
         }}
       >
-        <input
+        <textarea
           aria-label={`Answer: ${task.title}`}
           placeholder="Your answer"
+          rows={2}
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+              event.preventDefault();
+              send();
+            }
+          }}
         />
-        <button className="work-solid" disabled={account.working || !answer.trim()}>
-          Send
-        </button>
+        <div className="work-actions">
+          <button className="work-solid" disabled={account.working || !answer.trim()}>
+            Send
+          </button>
+          {task.kind === 'coding-question' && (
+            <Finish task={task} account={account} onOpen={onOpen} />
+          )}
+        </div>
       </form>
     </>
   );
