@@ -21,8 +21,12 @@ const base64url = (bytes: Buffer): string => bytes.toString('base64url');
 
 /** What the browser shows after the redirect; the page carries nothing sensitive. */
 function page(message: string): string {
-  return `<!doctype html><meta charset="utf-8"><title>Aiden</title><body style="font-family:system-ui;padding:48px"><h1>Aiden</h1><p>${message}</p></body>`;
+  const text = message.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+  return `<!doctype html><meta charset="utf-8"><title>Aiden</title><body style="font-family:system-ui;padding:48px"><h1>Aiden</h1><p>${text}</p></body>`;
 }
+
+/** A sign-in the account server turned away, with the reason to show the person. */
+class NotAdmitted extends Error {}
 
 /** A sign-in waiting for the browser redirect. */
 interface Pending {
@@ -41,6 +45,12 @@ export class TeamsSignIn {
   private refreshing: Promise<string | undefined> | undefined;
   private pending: Pending | undefined;
   private failure: string | undefined;
+  /**
+   * Checks a fresh sign-in with the account server before it is kept: the reason to refuse it,
+   * or null to keep it. Example: an email that is not on any team is refused, so the app never
+   * holds a sign-in that cannot reach team work.
+   */
+  admit: (() => Promise<string | null>) | undefined;
 
   /**
    * Bind configuration and storage.
@@ -86,20 +96,22 @@ export class TeamsSignIn {
         return;
       }
       const code = url.searchParams.get('code');
-      const ok = !!code && !url.searchParams.get('error');
-      response
-        .writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-        .end(
-          page(
-            ok
-              ? 'You are signed in to Aiden Teams. You can close this tab.'
-              : 'Sign-in was cancelled. You can close this tab.',
-          ),
-        );
-      if (!ok) return finish('Sign-in was cancelled.');
+      /** Answer the browser tab, then stop waiting. */
+      const reply = (message: string, failure?: string): void => {
+        response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(page(message));
+        finish(failure);
+      };
+      if (!code || url.searchParams.get('error'))
+        return reply('Sign-in was cancelled. You can close this tab.', 'Sign-in was cancelled.');
       void this.exchange(code, verifier, redirectUri).then(
-        () => finish(),
-        () => finish('Sign-in could not be completed. Try again.'),
+        () => reply('You are signed in to Aiden Teams. You can close this tab.'),
+        (error: unknown) => {
+          const reason =
+            error instanceof NotAdmitted
+              ? error.message
+              : 'Sign-in could not be completed. Try again.';
+          reply(`${reason} You can close this tab.`, reason);
+        },
       );
     });
     const authorize = new URL('authorize', this.config.issuer);
@@ -110,6 +122,8 @@ export class TeamsSignIn {
       audience: this.config.audience,
       resource: this.config.audience,
       scope: 'openid profile email offline_access',
+      // Always ask which email to use, so a browser still signed in to another email is not reused.
+      prompt: 'login',
       code_challenge: base64url(createHash('sha256').update(verifier).digest()),
       code_challenge_method: 'S256',
       state,
@@ -130,7 +144,7 @@ export class TeamsSignIn {
     throw new Error('Another sign-in is using the sign-in ports. Close it and try again.');
   }
 
-  /** Trade the authorization code for tokens and keep the refresh token. */
+  /** Trade the authorization code for tokens and keep the refresh token once the server admits it. */
   private async exchange(code: string, verifier: string, redirectUri: string): Promise<void> {
     const tokens = await this.token({
       grant_type: 'authorization_code',
@@ -140,8 +154,16 @@ export class TeamsSignIn {
       redirect_uri: redirectUri,
     });
     if (!tokens.refresh_token) throw new Error('Auth0 returned no refresh token.');
-    await this.session.saveRefresh(tokens.refresh_token);
     this.remember(tokens);
+    const refused = await this.admit?.().catch((error: unknown) => {
+      this.access = undefined;
+      throw error;
+    });
+    if (refused) {
+      this.access = undefined;
+      throw new NotAdmitted(refused);
+    }
+    await this.session.saveRefresh(tokens.refresh_token);
   }
 
   /** Call the token endpoint. */

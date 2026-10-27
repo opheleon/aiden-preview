@@ -39,9 +39,14 @@ export const AccountsUserSchema = z
   })
   .strict();
 
-/** A team. */
+/** A team, with the publishers whose installed apps its members may test (empty allows any). */
 export const AccountSummarySchema = z
-  .object({ id: z.string(), name: z.string(), createdAt: iso.optional() })
+  .object({
+    id: z.string(),
+    name: z.string(),
+    allowedPublishers: z.array(z.string().max(200)).max(50).optional(),
+    createdAt: iso.optional(),
+  })
   .strict();
 
 /** The signed-in person and their accounts. */

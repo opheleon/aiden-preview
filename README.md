@@ -82,6 +82,6 @@ Copyright © 2026 Opheleon. Licensed under [Apache 2.0](LICENSE). See [NOTICE](N
 
 ## Test an iPhone build
 
-Choose verification surfaces during setup or open **Verification** under an existing project. Save browser, API, and installed TestFlight targets, then run manually or after each successful code assessment. See [project verification configuration](docs/verification-configuration.md). See [iPhone verification setup and limits](docs/iphone-verification.md).
+Choose verification surfaces during setup or open **Verification** under an existing project. Save browser, API, and installed TestFlight targets, then run manually or after each successful code assessment. See [project verification configuration](docs/verification-configuration.md). See [iPhone verification setup and limits](docs/iphone-verification.md). To test a macOS or Windows app installed on your computer, see [desktop app verification](docs/desktop-verification.md).
 
 Desktop verification launches use `AIDEN_HEADLESS=1`: the real Electron renderer stays hidden, cannot take focus, and still produces screenshots and traces. Browser surface checks also run headlessly. Normal interactive app launches remain visible.

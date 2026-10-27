@@ -1,6 +1,7 @@
 import { z } from 'zod/v3';
 
 import type { WorkerMethod } from '../../contracts/src/api.js';
+import { DesktopTestSchema } from '../../contracts/src/desktop-verification.js';
 import {
   DeviceTargetSchema,
   DeviceTestSchema,
@@ -74,6 +75,7 @@ export function createMethods(
   return guardLifecycleMethods(engine, {
     ...accountMethods(engine, runtimes),
     ...deviceMethods(engine),
+    ...desktopMethods(engine),
     ...guideMethods(engine),
     discoverRepositories: operation(z.object({ rootPath: z.string().min(1) }).strict(), (p) =>
       discoverRepositories(p.rootPath),
@@ -381,6 +383,21 @@ function deviceMethods(engine: Engine) {
     deviceCancel: operation(z.object({ runId: z.string().uuid() }).strict(), (p) =>
       engine.devices.cancel(p.runId),
     ),
+  };
+}
+
+/** Validate installed-app desktop test operations at the worker boundary. */
+function desktopMethods(engine: Engine) {
+  const none = z.object({}).strict();
+  const run = z.object({ runId: z.string().uuid() }).strict();
+  return {
+    desktopReadiness: operation(none, () => engine.desktops.readiness()),
+    desktopRequestAccess: operation(none, () => engine.desktops.requestAccess()),
+    desktopApps: operation(none, () => engine.desktops.apps()),
+    desktopTest: operation(DesktopTestSchema, (p) => engine.desktops.start(p)),
+    desktopRuns: operation(none, () => engine.desktops.list()),
+    desktopRun: operation(run, (p) => engine.desktops.read(p.runId)),
+    desktopCancel: operation(run, (p) => engine.desktops.cancel(p.runId)),
   };
 }
 

@@ -104,7 +104,10 @@ app
       AIDEN_PACKAGED: app.isPackaged ? '1' : '0',
       AIDEN_APP_VERSION: app.getVersion(),
       ...(app.isPackaged
-        ? { PLAYWRIGHT_BROWSERS_PATH: path.join(process.resourcesPath, 'playwright') }
+        ? {
+            PLAYWRIGHT_BROWSERS_PATH: path.join(process.resourcesPath, 'playwright'),
+            AIDEN_NATIVE_PATH: path.join(process.resourcesPath, 'native'),
+          }
         : {}),
     });
     window = new BrowserWindow({

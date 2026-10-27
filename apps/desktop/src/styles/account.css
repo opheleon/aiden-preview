@@ -128,3 +128,17 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+.account-local {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+}
+
+.account-local-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -25,11 +25,22 @@ export {
   summarize,
 } from './verdict.js';
 
-/** Start one headless Chromium for a run; each criterion attempt gets its own fresh context. */
-export async function launchBrowser(): Promise<Browser> {
+/**
+ * Start one headless Chromium for a run; each criterion attempt gets its own fresh context.
+ * Playwright disables Chromium's OS sandbox unless asked, so pages under test stay sandboxed here.
+ * Some Linux distributions, including Ubuntu 23.10 and later, block the user namespaces the
+ * sandbox needs and the bundled browser has no setuid helper, so only Linux retries without it.
+ */
+export async function launchBrowser(
+  platform: NodeJS.Platform = process.platform,
+): Promise<Browser> {
   try {
-    return await chromium.launch({ headless: true });
+    return await chromium.launch({ headless: true, chromiumSandbox: true });
   } catch {
+    if (platform === 'linux') {
+      const unsandboxed = await chromium.launch({ headless: true }).catch(() => null);
+      if (unsandboxed) return unsandboxed;
+    }
     throw new Error(
       process.env.AIDEN_PACKAGED === '1'
         ? 'Aiden could not start its included test browser. Reopen Aiden or reinstall the latest version and try again.'

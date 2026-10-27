@@ -164,6 +164,8 @@ export class AccountsClient {
 
   /** Create a project and queue its first tasks. */
   createProject(input: {
+    /** Kept when a project made on this computer moves into the team. */
+    id?: string;
     accountId: string;
     name: string;
     runtime: unknown;

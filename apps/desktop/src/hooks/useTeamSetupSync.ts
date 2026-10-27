@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 
 import type { SetupProgress } from '../../../../packages/contracts/src/guide';
+import { teamSyncError } from './useAccountProjectSync';
 import type { Workspace } from './useWorkspace';
 
 /**
@@ -14,12 +15,14 @@ export function useTeamSetupSync(
   workspace: Workspace,
   view: { setup: SetupProgress } | null | undefined,
 ): void {
-  const { call, project } = workspace;
+  const { call, project, setError } = workspace;
   const next = view?.setup.next;
   const team = !!project.account;
   const projectId = project.id;
   useEffect(() => {
     if (!team || next === undefined) return;
-    void call('accountSyncSetup', { projectId }).catch(() => undefined);
-  }, [call, team, projectId, next]);
+    void call('accountSyncSetup', { projectId }).catch((error: unknown) =>
+      setError(teamSyncError(error)),
+    );
+  }, [call, team, projectId, next, setError]);
 }

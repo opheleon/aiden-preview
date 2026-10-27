@@ -10,7 +10,7 @@ import type { Engine } from '../engine.js';
 import { readProject } from '../engine-queries.js';
 import { AccountAgent, deviceName } from './agent.js';
 import { AccountsClient, AccountsError, accountsUrl, dashboardUrl } from './client.js';
-import { documentFor, materialize } from './documents.js';
+import { documentFor, localDocument, materialize } from './documents.js';
 import { InventoryProbe } from './inventory.js';
 import { TeamsSignIn } from './oidc.js';
 import { AccountSession } from './session.js';
@@ -27,6 +27,7 @@ type AccountMethod = Extract<
   | 'accountFinishTask'
   | 'accountSetPickup'
   | 'accountCreateProject'
+  | 'accountShareProject'
   | 'accountPoll'
   | 'accountSyncSetup'
   | 'accountCancelTask'
@@ -48,6 +49,7 @@ function operation<T>(
 const none = z.object({}).strict();
 const account = z.object({ accountId: z.string().min(1).max(64) }).strict();
 const task = z.object({ taskId: z.string().min(1).max(64) }).strict();
+const teamProject = account.extend({ projectId: z.string().min(1).max(64) }).strict();
 
 /** The first task of every account project: the same requirements step the solo app starts with. */
 const writeRequirements: NewAccountTask = {
@@ -57,6 +59,29 @@ const writeRequirements: NewAccountTask = {
   instructions: 'Turn the goal into requirements.',
   usesModel: true,
 };
+
+/**
+ * Why a signed-in person cannot use Teams on this machine, or null when they can. Teams are
+ * bought or joined in the dashboard, so an email that is on no team is not signed in here.
+ */
+function notOnTeam(email: string, accounts: unknown[]): string | null {
+  if (accounts.length) return null;
+  return `${email} is not on an Aiden Teams team. Accept your team's invitation in the Teams dashboard, or sign in with the email your team invited.`;
+}
+
+/**
+ * Keep a browser sign-in only for someone already on a team: the reason to refuse it, or null.
+ * The server itself refuses an email it has never seen, with a reason to show.
+ */
+async function admission(client: AccountsClient): Promise<string | null> {
+  try {
+    const me = await client.me();
+    return notOnTeam(me.user.email, me.accounts);
+  } catch (error) {
+    if (error instanceof AccountsError && error.status === 403) return error.message;
+    throw error;
+  }
+}
 
 /**
  * Queue a stopped or failed Aiden task again as a new task with the same work; the old one stays
@@ -93,6 +118,7 @@ export function accountMethods(
       fetch,
       () => signIn.invalidate(),
     );
+    signIn.admit = () => admission(client);
     const inventory = new InventoryProbe({
       diagnostics: () => runtimes.diagnostics({ usage: true }),
       connections: () => engine.integrations.list(),
@@ -104,6 +130,12 @@ export function accountMethods(
       agent: new AccountAgent(engine, session, client, inventory),
     };
     return built;
+  };
+  // Desktop tests follow the team admins' allowed app publishers whenever this machine is signed in.
+  engine.desktops.teamPublishers = async () => {
+    const { session, client } = context();
+    if (!(await session.refreshToken())) return null;
+    return (await client.me()).accounts.flatMap((team) => team.allowedPublishers ?? []);
   };
   return {
     accountStatus: operation(none, () => status(context())),
@@ -147,6 +179,7 @@ export function accountMethods(
         return readProject(engine.store, created.project.id);
       },
     ),
+    accountShareProject: operation(teamProject, (p) => shareProject(engine, context().client, p)),
     accountCancelTask: operation(task, async (p) => {
       const stopped = await context().client.cancel(p.taskId);
       // If this machine is the one running it, stop now rather than at the next heartbeat.
@@ -206,6 +239,19 @@ async function status({
     };
   try {
     const me = await client.me();
+    // A sign-in kept from before this rule, on an email with no team, ends here with the reason.
+    const refused = notOnTeam(me.user.email, me.accounts);
+    if (refused) {
+      await signIn.signOut();
+      return {
+        signedIn: false,
+        email: null,
+        userId: null,
+        accounts: [],
+        message: refused,
+        ...machine,
+      };
+    }
     await session.rememberUser(me.user);
     return {
       signedIn: true,
@@ -255,4 +301,32 @@ async function syncState(
     await materialize(engine, await client.project(project.id));
   }
   return state;
+}
+
+/**
+ * Move a project made on this computer into the team. It keeps its id, so its runs, answers, and
+ * history stay as they are; the team gets its project and requirements, and the next step is
+ * queued. A project without requirements yet gets the team's Write requirements task.
+ * Example: a project started before signing in shows up on the Teams board after this.
+ */
+export async function shareProject(
+  engine: Engine,
+  client: AccountsClient,
+  { accountId, projectId }: z.infer<typeof teamProject>,
+): Promise<WorkerResult<'accountShareProject'>> {
+  const { project, baseline } = await localDocument(engine, projectId);
+  if (project.account) throw new Error('This project is already in your team.');
+  if (engine.isBusy(projectId))
+    throw new Error('Aiden is working on this project. Sync it to your team when it finishes.');
+  const created = await client.createProject({
+    id: projectId,
+    accountId,
+    name: scopeName(project.context, baseline?.product).slice(0, 200),
+    runtime: project.runtime,
+    document: documentFor(project, baseline),
+    tasks: baseline ? [] : [writeRequirements],
+  });
+  await materialize(engine, created.project, true);
+  if (baseline) await syncSetupTasks(engine, client, projectId);
+  return readProject(engine.store, projectId);
 }

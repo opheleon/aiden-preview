@@ -53,6 +53,8 @@ function stubEngine(
       return verify();
     },
     emit: (event: RunEvent) => events.push(event),
+    // The Teams methods install the team publisher policy on desktop tests.
+    desktops: {},
   };
   const methods = createMethods(engine as unknown as Engine, {} as RuntimeControls);
   return { methods, calls, events };
@@ -170,7 +172,10 @@ void test('standalone device methods validate inputs before reaching phone contr
       return value;
     },
   };
-  const methods = createMethods({ devices } as unknown as Engine, {} as RuntimeControls);
+  const methods = createMethods(
+    { devices, desktops: {} } as unknown as Engine,
+    {} as RuntimeControls,
+  );
   const target = {
     udid: '00008110-0011223344556677',
     bundleId: 'com.example.app',
