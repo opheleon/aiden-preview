@@ -26,6 +26,27 @@ The publish job, which runs no project code, writes `SHA256SUMS.txt`, creates a 
 
 Running the workflow manually from the Actions tab is a dry run: unsigned builds uploaded as workflow artifacts, with nothing published.
 
+## Aiden Beta
+
+Every push to `main` builds **Aiden Beta** through [`.github/workflows/beta.yml`](../.github/workflows/beta.yml), which runs `release.yml` with flavor `beta`: the same quality checks, signing, notarization, packaged-app tests, checksums, and provenance as a production release.
+
+Aiden Beta is a separate app, so it installs next to Aiden instead of replacing it:
+
+|                            | Aiden                                | Aiden Beta                                     |
+| -------------------------- | ------------------------------------ | ---------------------------------------------- |
+| Bundle identifier          | `ai.opheleon.desktop`                | `ai.opheleon.desktop.beta`                     |
+| Icon                       | `build/app-icon.png`                 | `build/app-icon-beta.png` (BETA band)          |
+| Data                       | `~/.aiden`                           | `~/.aiden-beta`                                |
+| Teams server and dashboard | `api.opheleon.ai`, `app.opheleon.ai` | `api-beta.opheleon.ai`, `app-beta.opheleon.ai` |
+| Teams sign-in              | production Auth0 tenant              | beta Auth0 tenant                              |
+| Keychain service           | `com.opheleon.aiden.accounts`        | `com.opheleon.aiden-beta.accounts`             |
+| Files                      | `Aiden-<version>-...`                | `Aiden-Beta-<version>-...`                     |
+| Update channel             | `latest` (or `beta` when opted in)   | `aidenbeta`                                    |
+
+Beta versions are `<package.json version>-aidenbeta.<run number>`, for example `1.2.5-aidenbeta.42`, and publish as GitHub pre-releases tagged at the pushed commit. electron-updater treats `aidenbeta` as a custom channel: the production app, including installs that receive beta updates, never offers these builds, and Aiden Beta only offers newer `aidenbeta` builds. Its settings have no beta toggle. The packaging settings are in [`electron-builder.beta.config.ts`](../electron-builder.beta.config.ts), and the app recognizes itself from its version (`packages/contracts/src/app-flavor.ts`).
+
+Running from source (`pnpm dev`) shows `build/app-icon-local.png`, with a LOCAL band, in the Dock.
+
 ### Hosted packaged-app tests
 
 Every PR runs the shared `packaged-desktop.yml` workflow on macOS 15 ARM64, Windows Server 2025 x64, and Ubuntu 24.04 x64. Each builds an unsigned distributable with the verification browser, then runs setup, real local database login, API-key access, session credential reuse, project closure, restart, update transport, and evidence journeys. Provider output is synthetic and consumes no subscription quota. The Mac package is a ZIP; Windows runs the silently installed NSIS app; Linux runs an extracted AppImage under Xvfb with its Chromium sandbox helper enabled. Linux packaging is a CI compatibility target, not a published release asset.

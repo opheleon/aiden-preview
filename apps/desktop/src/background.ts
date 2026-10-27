@@ -107,9 +107,10 @@ export class BackgroundMode {
     this.ensureTray();
     const preferences = await readBackgroundPreferences(this.options.dataRoot);
     if (preferences.noticeShown || !Notification.isSupported()) return;
+    const name = app.getName();
     new Notification({
-      title: 'Aiden is still running',
-      body: 'It keeps picking up team work. Open or quit Aiden from its icon in the tray or menu bar.',
+      title: `${name} is still running`,
+      body: `It keeps picking up team work. Open or quit ${name} from its icon in the tray or menu bar.`,
     }).show();
     await saveBackgroundPreferences(this.options.dataRoot, { noticeShown: true });
   }
@@ -132,12 +133,14 @@ export class BackgroundMode {
     const size = process.platform === 'darwin' ? 18 : 32;
     const icon = nativeImage.createFromPath(this.options.iconPath).resize({ width: size });
     this.tray = new Tray(icon);
-    this.tray.setToolTip('Aiden is picking up team work');
+    // The app's name is Aiden or Aiden Beta, so two installed apps stay distinguishable.
+    const name = app.getName();
+    this.tray.setToolTip(`${name} is picking up team work`);
     this.tray.setContextMenu(
       Menu.buildFromTemplate([
-        { label: 'Open Aiden', click: () => this.show() },
+        { label: `Open ${name}`, click: () => this.show() },
         { type: 'separator' },
-        { label: 'Quit Aiden', click: () => app.quit() },
+        { label: `Quit ${name}`, click: () => app.quit() },
       ]),
     );
     // macOS opens the menu on click; Windows and Linux open the window.

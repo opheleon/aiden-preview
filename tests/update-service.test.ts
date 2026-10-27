@@ -12,6 +12,8 @@ import type { UpdateStatus } from '../apps/desktop/src/update-types.js';
 class Backend extends EventEmitter {
   autoDownload = true;
   allowPrerelease = false;
+  allowDowngrade = true;
+  channel: string | null = null;
   autoInstallOnAppQuit = true;
   checks = 0;
   downloads = 0;
@@ -118,6 +120,30 @@ void test('corrupt preferences recover offline and beta builds persist their upd
   } finally {
     f.service.dispose();
   }
+});
+
+void test('update channels keep Aiden Beta builds and production releases apart', async () => {
+  const routes: Array<[string, string | null, boolean]> = [];
+  for (const version of ['1.2.0', '1.2.0-beta.1', '1.2.5-aidenbeta.42']) {
+    const f = await fixture(version);
+    try {
+      await f.service.start();
+      assert.equal(f.backend.allowDowngrade, false);
+      routes.push([version, f.backend.channel, f.backend.allowPrerelease]);
+      if (version === '1.2.5-aidenbeta.42') {
+        await f.service.setPreferences({ autoDownload: true, channel: 'stable' });
+        assert.equal(f.backend.channel, 'aidenbeta');
+        assert.equal(f.backend.allowPrerelease, true);
+      }
+    } finally {
+      f.service.dispose();
+    }
+  }
+  assert.deepEqual(routes, [
+    ['1.2.0', 'latest', false],
+    ['1.2.0-beta.1', 'beta', true],
+    ['1.2.5-aidenbeta.42', 'aidenbeta', true],
+  ]);
 });
 
 void test('update lifecycle publishes detached snapshots and removes listeners on shutdown', async () => {

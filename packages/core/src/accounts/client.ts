@@ -17,13 +17,15 @@ import {
   WorkAnswerSchema,
 } from '../../../contracts/src/accounts-api.js';
 import type { AgentStatus, DeliveryCheckpoint } from '../../../contracts/src/accounts-execution.js';
+import { flavorFromEnv } from '../../../contracts/src/app-flavor.js';
 import { responseSummary, teamsDebug } from './debug.js';
 
 /**
- * Where the Accounts API lives unless AIDEN_ACCOUNTS_URL points elsewhere (beta at
- * https://api-beta.opheleon.ai, or local development).
+ * Where the Accounts API lives unless AIDEN_ACCOUNTS_URL points elsewhere (local development).
+ * Aiden Beta (`AIDEN_FLAVOR=beta`) uses the beta server.
  */
 const defaultUrl = 'https://api.opheleon.ai';
+const betaUrl = 'https://api-beta.opheleon.ai';
 /** No Accounts call should hold up the app for long. */
 const timeoutMs = 15_000;
 
@@ -47,7 +49,9 @@ export class AccountsError extends Error {
 
 /** The API base URL: HTTPS, or plain HTTP only for this machine during development. */
 export function accountsUrl(env: NodeJS.ProcessEnv = process.env): string {
-  const url = new URL(env.AIDEN_ACCOUNTS_URL || defaultUrl);
+  const url = new URL(
+    env.AIDEN_ACCOUNTS_URL || (flavorFromEnv(env) === 'beta' ? betaUrl : defaultUrl),
+  );
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && local))
     throw new Error('The Accounts server must use HTTPS.');

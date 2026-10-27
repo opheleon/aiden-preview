@@ -38,13 +38,20 @@ else if (args.some(a => a.includes('/123/assets'))) {
   const assets = fs.readFileSync(process.env.UPLOADED, 'utf8').trim().split('\\n').map(JSON.parse);
   console.log(JSON.stringify([mode === 'missing-upload' ? assets.slice(1) : assets]));
 } else {
-  const releases = mode === 'existing' ? [{ tag_name: process.env.GITHUB_REF_NAME, draft: false }] :
-    mode === 'draft' ? [{ tag_name: process.env.GITHUB_REF_NAME, draft: true }] : [];
+  const tag = 'v' + process.env.VERSION;
+  const releases = mode === 'existing' ? [{ tag_name: tag, draft: false }] :
+    mode === 'draft' ? [{ tag_name: tag, draft: true }] : [];
   console.log(JSON.stringify([[], releases]));
 }
 `;
 
-async function publishFixture(mode: string, version = '1.1.1') {
+/**
+ * Run the alias and publish steps against synthetic artifacts, the way the plan job names them.
+ * @param mode Which failure to simulate, or `success`.
+ * @param version The version the plan job computed.
+ * @param flavor `production`, or `beta` for an Aiden Beta pre-release.
+ */
+async function publishFixture(mode: string, version = '1.1.1', flavor = 'production') {
   const root = await mkdtemp(path.join(tmpdir(), 'aiden-release-policy-'));
   const calls = path.join(root, 'calls');
   const uploaded = path.join(root, 'uploaded');
@@ -54,28 +61,31 @@ async function publishFixture(mode: string, version = '1.1.1') {
   await writeFile(path.join(root, 'gh'), ghFixture, { mode: 0o755 });
   await writeFile(calls, '');
   await writeFile(uploaded, '');
-  const channel = version.includes('-') ? 'beta' : 'latest';
+  const beta = flavor === 'beta';
+  const prefix = beta ? 'Aiden-Beta' : 'Aiden';
+  const channel = beta ? 'aidenbeta' : version.includes('-') ? 'beta' : 'latest';
+  const plan = { FLAVOR: flavor, VERSION: version, PREFIX: prefix, CHANNEL: channel };
   const files = [
-    `Aiden-${version}-arm64.dmg`,
-    `Aiden-${version}-arm64.dmg.blockmap`,
-    `Aiden-${version}-arm64.zip`,
-    `Aiden-${version}-arm64.zip.blockmap`,
+    `${prefix}-${version}-arm64.dmg`,
+    `${prefix}-${version}-arm64.dmg.blockmap`,
+    `${prefix}-${version}-arm64.zip`,
+    `${prefix}-${version}-arm64.zip.blockmap`,
     `${channel}-mac.yml`,
-    `Aiden-${version}-x64.exe`,
-    `Aiden-${version}-x64.exe.blockmap`,
+    `${prefix}-${version}-x64.exe`,
+    `${prefix}-${version}-x64.exe.blockmap`,
     `${channel}.yml`,
   ];
   if (mode === 'missing-windows') files.splice(5, 3);
   for (const file of files) await writeFile(path.join(assets, file), 'synthetic artifact');
-  await exec('/bin/bash', ['-c', aliasScript], {
-    cwd: assets,
-    env: { ...process.env, GITHUB_REF_NAME: `v${version}` },
-  });
-  assert.deepEqual(
-    await readFile(path.join(assets, 'Aiden-arm64.dmg')),
-    await readFile(path.join(assets, files[0]!)),
-  );
-  files.push('Aiden-arm64.dmg');
+  // The alias step runs only for production; README download links depend on it.
+  if (!beta) {
+    await exec('/bin/bash', ['-c', aliasScript], { cwd: assets, env: { ...process.env, ...plan } });
+    assert.deepEqual(
+      await readFile(path.join(assets, 'Aiden-arm64.dmg')),
+      await readFile(path.join(assets, files[0]!)),
+    );
+    files.push('Aiden-arm64.dmg');
+  }
   if (mode === 'different-alias')
     await writeFile(path.join(assets, 'Aiden-arm64.dmg'), 'different installer');
   const { stdout } = await exec('shasum', ['-a', '256', ...files], { cwd: assets });
@@ -95,7 +105,8 @@ async function publishFixture(mode: string, version = '1.1.1') {
       env: {
         PATH: `${root}:${process.env.PATH}`,
         GITHUB_REPOSITORY: 'synthetic/aiden',
-        GITHUB_REF_NAME: `v${version}`,
+        GITHUB_SHA: 'synthetic-sha',
+        ...plan,
         MODE: mode,
         CALLS: calls,
         UPLOADED: uploaded,
@@ -134,6 +145,35 @@ void test('publishing uploads all attested files before publishing the exact cre
       '.html_url',
     ]);
   }
+});
+
+void test('Aiden Beta publishes a pre-release on its own channel, tagged at the pushed commit', async () => {
+  const version = '1.1.1-aidenbeta.42';
+  const { failed, requests } = await publishFixture('success', version, 'beta');
+  assert.equal(failed, false);
+  const uploads = requests.filter((args) =>
+    args.some((arg) => arg.startsWith('https://uploads.github.com/')),
+  );
+  assert.equal(uploads.length, 9);
+  assert.ok(!uploads.some((args) => args.some((arg) => arg.endsWith('name=Aiden-arm64.dmg'))));
+  for (const file of ['aidenbeta-mac.yml', 'aidenbeta.yml', `Aiden-Beta-${version}-arm64.zip`])
+    assert.ok(
+      uploads.some((args) => args.some((arg) => arg.endsWith(`name=${file}`))),
+      file,
+    );
+  const create = requests.find((args) => args.includes('draft=true'))!;
+  for (const field of [
+    `tag_name=v${version}`,
+    'target_commitish=synthetic-sha',
+    `name=Aiden Beta ${version}`,
+    'prerelease=true',
+  ])
+    assert.ok(create.includes(field), field);
+  // Beta tags do not exist before publishing, so there is no tag lookup.
+  assert.ok(!requests.some((args) => args.some((arg) => arg.includes('/git/ref/'))));
+  assert.ok(requests.at(-1)!.includes('draft=false'));
+  const { failed: duplicate } = await publishFixture('existing', version, 'beta');
+  assert.equal(duplicate, true);
 });
 
 void test('duplicate tags, partial uploads, and corrupt or missing artifacts cannot publish', async () => {

@@ -4,6 +4,11 @@
 #   v1.2.3         -> GitHub Release (stable installs update to it)
 #   v1.2.3-beta.1  -> GitHub pre-release (only beta installs update to it)
 #
+# beta.yml calls this workflow with flavor "beta" on every push to main. That builds Aiden Beta,
+# a separate app (its own name, data, sign-in, servers, and BETA icon), versioned
+# <package.json version>-aidenbeta.<run number> and published as a pre-release on the custom
+# "aidenbeta" update channel, which the production app never offers.
+#
 # Running it manually (Actions -> Release -> Run workflow) is a dry run: unsigned builds that
 # are kept as workflow artifacts and never published.
 #
@@ -18,25 +23,78 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
       - 'v[0-9]+.[0-9]+.[0-9]+-beta.[0-9]+'
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      flavor:
+        description: production or beta
+        type: string
+        default: production
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.flavor || 'production' }}-${{ github.ref }}
 
 jobs:
+  # Names, version, and update channel for this build, shared by every later job.
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      flavor: ${{ steps.plan.outputs.flavor }}
+      version: ${{ steps.plan.outputs.version }}
+      product: ${{ steps.plan.outputs.product }}
+      prefix: ${{ steps.plan.outputs.prefix }}
+      channel: ${{ steps.plan.outputs.channel }}
+      builder-args: ${{ steps.plan.outputs.builder-args }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - id: plan
+        env:
+          FLAVOR: ${{ inputs.flavor || 'production' }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          case "$FLAVOR" in
+            production)
+              product=Aiden prefix=Aiden builder_args='' channel=latest
+              if [[ "$version" == *-* ]]; then channel=beta; fi
+              ;;
+            beta)
+              version="$version-aidenbeta.$RUN_NUMBER"
+              product='Aiden Beta' prefix=Aiden-Beta channel=aidenbeta
+              builder_args="--config electron-builder.beta.config.ts -c.extraMetadata.version=$version"
+              ;;
+            *) echo "::error::Unknown flavor $FLAVOR."; exit 1 ;;
+          esac
+          {
+            echo "flavor=$FLAVOR"
+            echo "version=$version"
+            echo "product=$product"
+            echo "prefix=$prefix"
+            echo "channel=$channel"
+            echo "builder-args=$builder_args"
+          } >> "$GITHUB_OUTPUT"
+
   quality:
     uses: ./.github/workflows/quality.yml
     permissions:
       contents: read
       security-events: write
   build-macos:
-    needs: quality
+    needs: [plan, quality]
     runs-on: macos-15
     timeout-minutes: 60
     env:
       RELEASE: ${{ github.event_name == 'push' }}
+      FLAVOR: ${{ needs.plan.outputs.flavor }}
+      PRODUCT: ${{ needs.plan.outputs.product }}
+      BUILDER_ARGS: ${{ needs.plan.outputs.builder-args }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -52,7 +110,7 @@ jobs:
           cache: pnpm
 
       - name: Check that the tag matches package.json
-        if: env.RELEASE == 'true'
+        if: env.RELEASE == 'true' && env.FLAVOR == 'production'
         run: |
           version="v$(node -p "require('./package.json').version")"
           if [ "$version" != "$GITHUB_REF_NAME" ]; then
@@ -78,12 +136,14 @@ jobs:
           # notarytool reads the App Store Connect key from a file. RUNNER_TEMP is deleted after the job.
           export APPLE_API_KEY="$RUNNER_TEMP/apple-api-key.p8"
           printf '%s' "$APPLE_API_KEY_P8_BASE64" | base64 --decode > "$APPLE_API_KEY"
-          pnpm exec electron-builder --mac --arm64 --publish never
+          # BUILDER_ARGS is empty for production and selects Aiden Beta's identity and version.
+          # shellcheck disable=SC2086
+          pnpm exec electron-builder --mac --arm64 --publish never $BUILDER_ARGS
 
       - name: Verify signature and notarization
         if: env.RELEASE == 'true'
         run: |
-          app=release/mac/mac-arm64/Aiden.app
+          app="release/mac/mac-arm64/$PRODUCT.app"
           codesign --verify --deep --strict --verbose=2 "$app"
           xcrun stapler validate "$app"
           spctl --assess --type execute --verbose=2 "$app"
@@ -92,10 +152,13 @@ jobs:
         if: env.RELEASE != 'true'
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: pnpm exec electron-builder --mac --arm64 --publish never -c.mac.notarize=false
+        # shellcheck disable=SC2086
+        run: pnpm exec electron-builder --mac --arm64 --publish never -c.mac.notarize=false $BUILDER_ARGS
 
       - name: Test the packaged application
-        run: pnpm test:package:mac
+        run: |
+          AIDEN_PACKAGED_APP="release/mac/mac-arm64/$PRODUCT.app/Contents/MacOS/$PRODUCT" \
+            pnpm test:package:mac
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: failure()
@@ -120,11 +183,14 @@ jobs:
   # Windows has no code-signing certificate yet, so installers are unsigned and SmartScreen
   # warns on first launch. Quality runs installed-app journeys on all three operating systems.
   build-windows:
-    needs: quality
+    needs: [plan, quality]
     runs-on: windows-2025
     timeout-minutes: 60
     env:
       RELEASE: ${{ github.event_name == 'push' }}
+      FLAVOR: ${{ needs.plan.outputs.flavor }}
+      PRODUCT: ${{ needs.plan.outputs.product }}
+      BUILDER_ARGS: ${{ needs.plan.outputs.builder-args }}
     defaults:
       run:
         shell: bash
@@ -143,7 +209,7 @@ jobs:
           cache: pnpm
 
       - name: Check that the tag matches package.json
-        if: env.RELEASE == 'true'
+        if: env.RELEASE == 'true' && env.FLAVOR == 'production'
         run: |
           version="v$(node -p "require('./package.json').version")"
           if [ "$version" != "$GITHUB_REF_NAME" ]; then
@@ -160,12 +226,13 @@ jobs:
       - name: Package unsigned
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: pnpm exec electron-builder --win --x64 --publish never
+        # shellcheck disable=SC2086
+        run: pnpm exec electron-builder --win --x64 --publish never $BUILDER_ARGS
 
       - name: Check the packaged native dependencies
         run: |
           resources=release/win/win-unpacked/resources/app.asar.unpacked/node_modules
-          test -x release/win/win-unpacked/Aiden.exe
+          test -x "release/win/win-unpacked/$PRODUCT.exe"
           test -f "$resources/@anthropic-ai/claude-agent-sdk-win32-x64/claude.exe"
           ls "$resources"/@napi-rs/keyring-win32-x64-msvc/*.node
 
@@ -180,18 +247,22 @@ jobs:
           path: |
             release/win/*.exe
             release/win/*.exe.blockmap
-            release/win/latest.yml
-            release/win/beta.yml
+            release/win/${{ needs.plan.outputs.channel }}.yml
 
   publish:
     if: github.event_name == 'push'
-    needs: [build-macos, build-windows]
+    needs: [plan, build-macos, build-windows]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write # create the GitHub Release
       id-token: write # sign the provenance attestation with Sigstore
       attestations: write # store the attestation on GitHub
+    env:
+      FLAVOR: ${{ needs.plan.outputs.flavor }}
+      VERSION: ${{ needs.plan.outputs.version }}
+      PREFIX: ${{ needs.plan.outputs.prefix }}
+      CHANNEL: ${{ needs.plan.outputs.channel }}
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -203,12 +274,13 @@ jobs:
           name: windows
           path: release
 
+      # The README links to releases/latest/download/Aiden-arm64.dmg, which only stable releases serve.
       - name: Create permanent download alias
+        if: env.FLAVOR == 'production'
         working-directory: release
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          cp -- "Aiden-$version-arm64.dmg" Aiden-arm64.dmg
+          cp -- "Aiden-$VERSION-arm64.dmg" Aiden-arm64.dmg
 
       - name: Write SHA-256 checksums
         working-directory: release
@@ -227,35 +299,39 @@ jobs:
         run: |
           set -euo pipefail
           endpoint="repos/$GITHUB_REPOSITORY/releases"
-          version="${GITHUB_REF_NAME#v}"
+          tag="v$VERSION"
           prerelease=false
-          channel=latest
-          if [[ "$version" == *-* ]]; then
-            prerelease=true
-            channel=beta
-          fi
-          expected=$(printf '%s\n' "Aiden-$version-arm64.dmg" "Aiden-$version-arm64.dmg.blockmap" \
-            "Aiden-$version-arm64.zip" "Aiden-$version-arm64.zip.blockmap" "$channel-mac.yml" \
-            "Aiden-$version-x64.exe" "Aiden-$version-x64.exe.blockmap" "$channel.yml" \
-            Aiden-arm64.dmg SHA256SUMS.txt | jq -R . | jq -s sort)
+          if [[ "$VERSION" == *-* ]]; then prerelease=true; fi
+          names=("$PREFIX-$VERSION-arm64.dmg" "$PREFIX-$VERSION-arm64.dmg.blockmap" \
+            "$PREFIX-$VERSION-arm64.zip" "$PREFIX-$VERSION-arm64.zip.blockmap" "$CHANNEL-mac.yml" \
+            "$PREFIX-$VERSION-x64.exe" "$PREFIX-$VERSION-x64.exe.blockmap" "$CHANNEL.yml" SHA256SUMS.txt)
+          if [[ "$FLAVOR" == production ]]; then names+=(Aiden-arm64.dmg); fi
+          expected=$(printf '%s\n' "${names[@]}" | jq -R . | jq -s sort)
           actual=$(printf '%s\n' * | jq -R . | jq -s sort)
           if [[ "$actual" != "$expected" ]]; then
             echo "::error::Release artifact set is incomplete or contains unexpected files."
             exit 1
           fi
           sha256sum --check SHA256SUMS.txt
-          cmp -- "Aiden-$version-arm64.dmg" Aiden-arm64.dmg
+          if [[ "$FLAVOR" == production ]]; then cmp -- "Aiden-$VERSION-arm64.dmg" Aiden-arm64.dmg; fi
           # Refuse duplicates and leave prior drafts untouched for explicit recovery.
           existing=$(gh api "$endpoint?per_page=100" --paginate --slurp | \
-            jq --arg tag "$GITHUB_REF_NAME" '[.[][] | select(.tag_name == $tag)] | length')
+            jq --arg tag "$tag" '[.[][] | select(.tag_name == $tag)] | length')
           if [[ "$existing" != 0 ]]; then
             echo "::error::This tag already has a release. Inspect it before retrying; use a new version for changed binaries."
             exit 1
           fi
-          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME" > /dev/null
+          if [[ "$FLAVOR" == production ]]; then
+            # Production releases come from a pushed tag, which must already exist.
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" > /dev/null
+            name="$tag"
+          else
+            # Aiden Beta tags the pushed commit when the release is published.
+            name="Aiden Beta $VERSION"
+          fi
           # Capture the created ID: resolving by tag can select a different release.
           release_id=$(gh api --method POST "$endpoint" \
-            -f tag_name="$GITHUB_REF_NAME" -f name="$GITHUB_REF_NAME" \
+            -f tag_name="$tag" -f target_commitish="$GITHUB_SHA" -f name="$name" \
             -F draft=true -F prerelease="$prerelease" -F generate_release_notes=true --jq .id)
           [[ "$release_id" =~ ^[0-9]+$ ]]
           for asset in *; do

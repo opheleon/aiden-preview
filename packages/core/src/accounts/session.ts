@@ -3,13 +3,23 @@ import path from 'node:path';
 
 import { z } from 'zod/v3';
 
+import { flavorFromEnv } from '../../../contracts/src/app-flavor.js';
 import { credentialEntry } from '../../../integrations/src/credential-store.js';
 import { type CredentialEntry, SecretVault } from '../../../integrations/src/credentials.js';
 import { atomic, optionalJson, type Store } from '../storage.js';
 
-/** Credential entries for the Accounts session; replaced in tests so no real keychain is touched. */
+/**
+ * Credential entries for the Accounts session; replaced in tests so no real keychain is touched.
+ * Aiden Beta signs in to a different tenant, so it keeps its own entries.
+ */
 export const accountSessionEntries = {
-  create: (id: string): CredentialEntry => credentialEntry('com.opheleon.aiden.accounts', id),
+  create: (id: string): CredentialEntry =>
+    credentialEntry(
+      flavorFromEnv(process.env) === 'beta'
+        ? 'com.opheleon.aiden-beta.accounts'
+        : 'com.opheleon.aiden.accounts',
+      id,
+    ),
 };
 const vault = new SecretVault(true, (id) => accountSessionEntries.create(id));
 
