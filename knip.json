@@ -24,7 +24,7 @@
       "project": ["src/**/*.{ts,tsx,cts}", "vite.config.ts"]
     },
     "apps/cli": {
-      "entry": ["src/index.ts"],
+      "entry": ["src/main.ts"],
       "project": ["src/**/*.ts"]
     },
     "packages/*": {

@@ -4,6 +4,7 @@ import type {
   WorkerResult,
 } from '../../../packages/contracts/src/api.js';
 import type { RunEvent } from '../../../packages/contracts/src/index.js';
+import type { BackgroundSettings } from './background.js';
 import type { FirstUseState } from './first-use.js';
 import type { UpdatePreferences, UpdateStatus } from './updater.js';
 /** Narrow preload API; privileged operations are validated again in the main process and worker. */
@@ -36,6 +37,9 @@ export type DesktopBridge = {
   checkForUpdates: () => Promise<UpdateStatus>;
   downloadUpdate: () => Promise<UpdateStatus>;
   installUpdate: () => Promise<UpdateStatus>;
+  /** Whether Aiden opens at login, and whether this build can register a login item. */
+  getBackgroundSettings: () => Promise<BackgroundSettings>;
+  setBackgroundSettings: (settings: { openAtLogin: boolean }) => Promise<BackgroundSettings>;
   onUpdateStatus: (callback: (status: UpdateStatus) => void) => () => void;
   onEvent: (callback: (event: RunEvent) => void) => () => void;
 };

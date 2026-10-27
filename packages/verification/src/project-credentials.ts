@@ -2,13 +2,12 @@ import { createHash, randomUUID } from 'node:crypto';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 
-import { AsyncEntry } from '@napi-rs/keyring';
-
 import {
   type VerificationConfig,
   VerificationConfigSchema,
 } from '../../contracts/src/verification.js';
 import { atomic, optionalJson } from '../../core/src/storage.js';
+import { credentialEntry } from '../../integrations/src/credential-store.js';
 import { type CredentialEntry, SecretVault } from '../../integrations/src/credentials.js';
 
 const secretsSchema = VerificationConfigSchema.pick({
@@ -21,7 +20,7 @@ const secretsSchema = VerificationConfigSchema.pick({
 export const projectCredentialEntries = {
   /** Isolate project secrets from shared tracker connections. */
   create(id: string): CredentialEntry {
-    return new AsyncEntry('Aiden project credentials', id);
+    return credentialEntry('Aiden project credentials', id);
   },
 };
 const vault = new SecretVault(true, (id) => projectCredentialEntries.create(id));
