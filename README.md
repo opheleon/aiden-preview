@@ -27,7 +27,7 @@ _A demo project on the opheleon-demo calendar repositories._
 - **Keeps tickets connected.** Optionally publishes the delivery plan to Linear and keeps it in sync while preserving human edits.
 - **Records your review.** Accept an outcome with a note, or close a project to pause monitoring and reopen it later.
 
-Aiden monitors projects while the app is open. Code assessments, app checks, and ticket status remain separate evidence; accepting an outcome preserves any failed or unverified checks. Experimental coding-agent dispatch is available by opt-in. Aiden does not merge or deploy code.
+Aiden monitors projects while the app is open. While you are signed in to Teams with pickup on, closing the window keeps Aiden running in the tray (the menu bar on a Mac) so team work continues, and the installed app opens at login; change that in **Settings → Desktop app**. Code assessments, app checks, and ticket status remain separate evidence; accepting an outcome preserves any failed or unverified checks. Experimental coding-agent dispatch is available by opt-in. Aiden does not merge or deploy code.
 
 ## Install
 
