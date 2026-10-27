@@ -466,6 +466,12 @@ export function appFixture() {
     getUpdatePreferences: vi.fn().mockResolvedValue({ autoDownload: true, channel: 'stable' }),
     setUpdatePreferences: vi.fn().mockImplementation((value: unknown) => Promise.resolve(value)),
     onUpdateStatus: () => () => {},
+    getBackgroundSettings: vi.fn().mockResolvedValue({ openAtLogin: true, available: false }),
+    setBackgroundSettings: vi
+      .fn()
+      .mockImplementation((value: { openAtLogin: boolean }) =>
+        Promise.resolve({ ...value, available: true }),
+      ),
     chooseProjectFolder: vi.fn().mockResolvedValue('/synthetic'),
     openExternal: vi.fn().mockResolvedValue(undefined),
     saveExport: vi.fn().mockResolvedValue(true),

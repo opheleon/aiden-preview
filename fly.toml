@@ -1,0 +1,29 @@
+# Aiden Teams worker on Fly.io: one always-on machine that picks up your team's work.
+# See docs/linux-fly.md. Deploy with your own app name:
+#
+#   fly deploy --app <your-app>
+#
+# There is no [http_service]: the worker only makes outbound requests, so it has no public
+# address and Fly never stops it for being idle.
+
+app = "aiden-teams-worker"
+primary_region = "iad"
+# Give a running task time to save its checkpoint before the machine stops.
+kill_signal = "SIGTERM"
+kill_timeout = 60
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  AIDEN_DEVICE_NAME = "Fly.io worker"
+
+# Sign-ins, provider credentials, project copies, and checkpoints live here.
+[[mounts]]
+  source = "aiden_data"
+  destination = "/data"
+  initial_size = "10gb"
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "4gb"

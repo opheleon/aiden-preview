@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { AccountPoller } from '../apps/desktop/src/account-poller.js';
+import { AccountPoller } from '../packages/core/src/accounts/poller.js';
 
 void test('polling stays within one minute even when idle, disabled, or recovering from an error', async (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });

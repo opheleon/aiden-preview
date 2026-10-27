@@ -17,6 +17,7 @@ import type { DesktopBridge } from '../bridge';
 import { CredentialStorageNote } from '../components/CredentialStorageNote';
 import type { Area, SettingsTab } from '../hooks/useWorkspaceState';
 import type { UpdatePreferences, UpdateStatus } from '../updater';
+import { BackgroundSettingsCard } from '../views/BackgroundSettings';
 import { DesktopUpdateSettings } from '../views/DesktopUpdateSettings';
 import { IntegrationConnectionCard } from '../views/IntegrationConnectionCard';
 
@@ -147,14 +148,17 @@ export function SettingsView(props: SettingsViewProps): React.JSX.Element {
       )}
       <PreferenceSettings {...props} />
       {settingsTab === 'desktop' && (
-        <DesktopUpdateSettings
-          updateStatus={updateStatus}
-          updatePreferences={updatePreferences}
-          saveUpdatePreferences={saveUpdatePreferences}
-          api={api}
-          setUpdateStatus={setUpdateStatus}
-          busy={busy}
-        />
+        <>
+          <DesktopUpdateSettings
+            updateStatus={updateStatus}
+            updatePreferences={updatePreferences}
+            saveUpdatePreferences={saveUpdatePreferences}
+            api={api}
+            setUpdateStatus={setUpdateStatus}
+            busy={busy}
+          />
+          <BackgroundSettingsCard api={api} />
+        </>
       )}
     </div>
   );

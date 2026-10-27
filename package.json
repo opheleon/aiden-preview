@@ -18,7 +18,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/desktop/tsconfig.json --noEmit && tsc -p tsconfig.verification.json",
     "test": "node --import tsx --import ./tests/setup.ts --test tests/*.test.ts",
     "dev": "pnpm run build && electron dist/apps/desktop/src/main.js",
-    "cli": "node --import tsx apps/cli/src/index.ts",
+    "cli": "node --import tsx apps/cli/src/main.ts",
     "worker": "node --import tsx packages/core/src/worker.ts",
     "smoke": "node --import tsx scripts/live-smoke.ts",
     "eval:behavior": "node --import tsx scripts/behavior-eval.ts",

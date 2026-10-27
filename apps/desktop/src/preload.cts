@@ -23,6 +23,8 @@ const bridge: DesktopBridge = {
   checkForUpdates: () => ipcRenderer.invoke('updates:check'),
   downloadUpdate: () => ipcRenderer.invoke('updates:download'),
   installUpdate: () => ipcRenderer.invoke('updates:install'),
+  getBackgroundSettings: () => ipcRenderer.invoke('background:get-settings'),
+  setBackgroundSettings: (settings) => ipcRenderer.invoke('background:set-settings', settings),
   onUpdateStatus: (callback) => {
     /** Forward only the event payload; Electron event objects stay in the isolated preload. */
     const listener = (
