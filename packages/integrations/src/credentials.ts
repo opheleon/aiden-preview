@@ -3,8 +3,10 @@ import {
   OAuthClientInformationSchema,
   OAuthTokensSchema,
 } from '@modelcontextprotocol/sdk/shared/auth.js';
-import { AsyncEntry } from '@napi-rs/keyring';
+import type { AsyncEntry } from '@napi-rs/keyring';
 import { z } from 'zod';
+
+import { credentialEntry } from './credential-store.js';
 
 const secretSchema = z
   .object({
@@ -32,7 +34,7 @@ export class SecretVault {
   constructor(
     private allowKeyring = true,
     private createEntry: (id: string) => CredentialEntry = (id) =>
-      new AsyncEntry('com.opheleon.aiden.mcp', id),
+      credentialEntry('com.opheleon.aiden.mcp', id),
   ) {}
 
   /** Return validated credentials, treating missing, corrupt, or inaccessible entries as signed out. */

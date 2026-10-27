@@ -33,7 +33,9 @@ Aiden monitors projects while the app is open. Code assessments, app checks, and
 
 [Download the latest Apple Silicon macOS DMG](https://github.com/opheleon/aiden-preview/releases/latest/download/Aiden-arm64.dmg), open it, and drag Aiden into Applications. Older versions and checksums are on [GitHub Releases](https://github.com/opheleon/aiden-preview/releases). You'll need Git, a supported provider runtime, and for private repositories the [GitHub CLI](https://cli.github.com) signed in (`gh auth login`).
 
-An early, unsigned Windows x64 installer (`Aiden-VERSION-x64.exe`) is on the same release page. Follow the [Windows setup guide](docs/windows-setup.md) to install it and connect your subscription and GitHub from PowerShell. Linux and Intel Macs are outside the current preview scope.
+An early, unsigned Windows x64 installer (`Aiden-VERSION-x64.exe`) is on the same release page. Follow the [Windows setup guide](docs/windows-setup.md) to install it and connect your subscription and GitHub from PowerShell. There is no Linux desktop app or Intel Mac build in this preview.
+
+Teams members can also run a headless Linux worker that picks up team work on their Claude subscription, for example on [Fly.io](https://fly.io). The repository's `Dockerfile` and `fly.toml` build and deploy it; follow the [Linux and Fly.io guide](docs/linux-fly.md).
 
 To verify a download, get `SHA256SUMS.txt` from the same release and run these commands, replacing the example DMG filename:
 

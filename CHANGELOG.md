@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add a headless Linux Teams worker that runs on [Fly.io](https://fly.io) or any Docker host: `aiden-teams serve` picks up team work on your Claude subscription with no desktop app, `aiden-teams sign-in` signs the server in to Teams from a browser on your own computer, and `aiden-teams status` shows the sign-in and current task. The repository includes a `Dockerfile` (Claude Code, Git, GitHub CLI, and Chromium) and a `fly.toml` for one always-on machine with a volume. Servers without an OS keychain keep credentials in owner-only files when `AIDEN_CREDENTIAL_STORE=file`. See the [Linux and Fly.io guide](docs/linux-fly.md).
 - Code checks read large projects more closely: more than eight requirements are checked in parts that follow the delivery plan, and every clause of a requirement needs its own evidence, including defaults, limits, copy, failure paths, and behavior shared across people or machines.
 - When a linked Notion page cannot be read, Aiden says why (for example, its tools changed and need review in Settings, Integrations) and waits for the page instead of writing placeholder requirements. Settings, Integrations shows each connection's current status when it opens.
 - A goal or spec that names a branch for a repository, such as "the server is on branch release-2", connects that repository on that branch before the first code check. In Project settings, Branch monitoring saves each repository's branch, and Check these branches runs one check for all of them.

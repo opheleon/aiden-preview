@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, dialog, powerMonitor } from 'electron';
 
 import type { RunEvent } from '../../../packages/contracts/src/index.js';
+import { AccountPoller } from '../../../packages/core/src/accounts/poller.js';
 import { WorkerClient } from '../../../packages/core/src/client.js';
-import { AccountPoller } from './account-poller.js';
 import { registerFileIpc, registerPreferenceIpc } from './desktop-ipc.js';
 import { LocalDiagnostics } from './diagnostics.js';
 import { registerFirstUseIpc } from './first-use-ipc.js';

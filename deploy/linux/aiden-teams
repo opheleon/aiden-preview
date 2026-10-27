@@ -1,0 +1,9 @@
+#!/bin/sh
+# Run the Aiden Teams worker command as the aiden user, even from a root shell such as
+# `fly ssh console`, so every file it writes stays readable by the running worker.
+set -eu
+export AIDEN_CREDENTIAL_STORE="${AIDEN_CREDENTIAL_STORE:-file}"
+if [ "$(id -u)" = 0 ]; then
+  exec setpriv --reuid=aiden --regid=aiden --init-groups env HOME=/data/home USER=aiden "$0" "$@"
+fi
+exec node /app/dist/apps/cli/src/teams.js "$@"

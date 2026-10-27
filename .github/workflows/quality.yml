@@ -63,6 +63,31 @@ jobs:
             test-results/
             playwright-report/
           retention-days: 14
+  linux-worker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Build the Linux Teams worker image
+        run: docker build -t aiden-teams-worker .
+      - name: Start the worker and check that it waits for a Teams sign-in
+        run: |
+          docker run -d --init --name aiden-worker -v aiden-data:/data aiden-teams-worker
+          for attempt in $(seq 1 30); do
+            docker exec aiden-worker aiden-teams status > status.txt 2>&1 && grep -q 'signed out' status.txt && break
+            sleep 2
+          done
+          cat status.txt
+          grep -q 'signed out' status.txt
+          docker exec aiden-worker sh -c 'git --version && gh --version && claude --version'
+          docker exec aiden-worker sh -c 'test -d "$PLAYWRIGHT_BROWSERS_PATH"'
+          docker stop -t 30 aiden-worker
+          test "$(docker inspect aiden-worker --format '{{.State.ExitCode}}')" = 0
+      - name: Show worker logs
+        if: always()
+        run: docker logs aiden-worker || true
   packaged:
     uses: ./.github/workflows/packaged-desktop.yml
   security:
@@ -72,13 +97,14 @@ jobs:
       security-events: write
   quality:
     if: always()
-    needs: [checks, desktop, packaged, security]
+    needs: [checks, desktop, linux-worker, packaged, security]
     runs-on: ubuntu-latest
     steps:
       - name: Require every quality job
         env:
           CHECKS: ${{ needs.checks.result }}
           DESKTOP: ${{ needs.desktop.result }}
+          LINUX_WORKER: ${{ needs.linux-worker.result }}
           PACKAGED: ${{ needs.packaged.result }}
           SECURITY: ${{ needs.security.result }}
-        run: test "$CHECKS" = success && test "$DESKTOP" = success && test "$PACKAGED" = success && test "$SECURITY" = success
+        run: test "$CHECKS" = success && test "$DESKTOP" = success && test "$LINUX_WORKER" = success && test "$PACKAGED" = success && test "$SECURITY" = success
