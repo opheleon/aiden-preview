@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Projects appear in the sidebar right away when Aiden opens. The list used to wait about a second for the Codex and Claude connection checks; those now run at the same time as each other and no longer hold up projects.
 - Teams: a Mac no longer stays "Busy with local work" after its checks finish. The worker now reports busy from the work it is actually running, so a log line written to a finished check (such as the browser check asking where the app runs) cannot keep the machine from picking up team builds, and updates and automatic checks are no longer held back by it.
 - Answering a Guide question while a check is running no longer drops the answer. Aiden saves it right away, says it will update the requirements when the current work finishes, and then does so without asking again.
 - Aiden Beta: every change merged to main now ships as a signed Aiden Beta pre-release, a separate app with a BETA band on its icon that installs next to Aiden. It uses the beta Teams server and sign-in, keeps its data in `~/.aiden-beta`, and only updates to newer Aiden Beta builds. Aiden itself never offers Aiden Beta builds, even with beta updates on. Running Aiden from source shows a LOCAL band on the Dock icon.
