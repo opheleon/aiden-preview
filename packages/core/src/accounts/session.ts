@@ -1,20 +1,20 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
-import { AsyncEntry } from '@napi-rs/keyring';
 import { z } from 'zod/v3';
 
 import { flavorFromEnv } from '../../../contracts/src/app-flavor.js';
-import { SecretVault } from '../../../integrations/src/credentials.js';
+import { credentialEntry } from '../../../integrations/src/credential-store.js';
+import { type CredentialEntry, SecretVault } from '../../../integrations/src/credentials.js';
 import { atomic, optionalJson, type Store } from '../storage.js';
 
 /**
- * OS credential entries for the Accounts session; replaced in tests so no real keychain is
- * touched. Aiden Beta signs in to a different tenant, so it keeps its own entries.
+ * Credential entries for the Accounts session; replaced in tests so no real keychain is touched.
+ * Aiden Beta signs in to a different tenant, so it keeps its own entries.
  */
 export const accountSessionEntries = {
-  create: (id: string): AsyncEntry =>
-    new AsyncEntry(
+  create: (id: string): CredentialEntry =>
+    credentialEntry(
       flavorFromEnv(process.env) === 'beta'
         ? 'com.opheleon.aiden-beta.accounts'
         : 'com.opheleon.aiden.accounts',
@@ -47,8 +47,9 @@ const defaults = (): AccountPreferences => ({
 });
 
 /**
- * The Teams sign-in on this machine. The session token lives only in the OS keychain (or
- * session memory when the keychain is unavailable); preferences hold nothing secret.
+ * The Teams sign-in on this machine. The session token lives only in the OS keychain, an
+ * owner-only credential file on headless Linux (`AIDEN_CREDENTIAL_STORE=file`), or session memory
+ * when neither is available; preferences hold nothing secret.
  */
 export class AccountSession {
   private readonly file: string;

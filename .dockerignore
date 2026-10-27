@@ -1,0 +1,15 @@
+.git
+.github
+.claude
+**/node_modules
+dist
+release
+coverage
+test-results
+playwright-report
+.pnpm-store
+.aiden
+.env
+.env.*
+*.log
+docs/screenshots

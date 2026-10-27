@@ -6,8 +6,9 @@ import { app, BrowserWindow, dialog, powerMonitor } from 'electron';
 
 import { appFlavor } from '../../../packages/contracts/src/app-flavor.js';
 import type { RunEvent } from '../../../packages/contracts/src/index.js';
+import { AccountPoller } from '../../../packages/core/src/accounts/poller.js';
 import { WorkerClient } from '../../../packages/core/src/client.js';
-import { AccountPoller } from './account-poller.js';
+import { BackgroundMode, registerBackgroundIpc } from './background.js';
 import { registerFileIpc, registerPreferenceIpc } from './desktop-ipc.js';
 import { LocalDiagnostics } from './diagnostics.js';
 import { registerFirstUseIpc } from './first-use-ipc.js';
@@ -32,11 +33,14 @@ mkdirSync(path.join(dataRoot, 'desktop'), { recursive: true, mode: 0o700 });
 app.setPath('userData', path.join(dataRoot, 'desktop'));
 const ownsInstance = app.requestSingleInstanceLock();
 if (!ownsInstance) app.quit();
+// Started by the login item: no window until Aiden knows whether it should stay in the tray.
+const atLogin = !headless && BackgroundMode.launchedAtLogin();
 app.on('second-instance', () => {
-  if (!headless && window && !window.isDestroyed()) {
-    window.restore();
-    window.focus();
-  }
+  if (!headless) background?.show();
+});
+// macOS: opening Aiden again from Finder or the Dock brings back a window hidden in the menu bar.
+app.on('activate', () => {
+  if (!headless) background?.show();
 });
 let watcher: ProjectWatcher;
 let poller: AccountPoller;
@@ -44,6 +48,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 let worker: WorkerClient;
 let window: BrowserWindow;
 let updater: DesktopUpdater;
+let background: BackgroundMode | undefined;
 let quitting = false;
 let quitReady = false;
 const activeRuns = new Set<string>();
@@ -66,6 +71,8 @@ function observeDesktop(): void {
     void diagnostics.record({ component: 'worker', code: 'worker_stopped' });
     watcher.stop();
     poller.stop();
+    // Bring a window hidden in the tray back, so the person sees that work stopped.
+    background?.show();
     if (!window.isDestroyed())
       window.webContents.send('aiden:event', {
         type: 'failed',
@@ -106,7 +113,7 @@ app
       minWidth: 950,
       minHeight: 680,
       title: appName,
-      show: !headless,
+      show: !headless && !atLogin,
       focusable: !headless,
       skipTaskbar: headless,
       paintWhenInitiallyHidden: true,
@@ -144,10 +151,22 @@ app
     registerFirstUseIpc(authorized, dataRoot);
     registerWorkerIpc(authorized, worker, () => poller.nudge());
     registerFileIpc(authorized, window, worker);
+    registerBackgroundIpc(authorized, dataRoot);
     observeDesktop();
+    if (!headless) {
+      background = new BackgroundMode({
+        dataRoot,
+        window,
+        worker,
+        isQuitting: () => quitting,
+        iconPath: path.resolve(here, '../../../icons/app-icon.png'),
+      });
+      await background.start();
+    }
     await watcher.start();
     poller.start();
     await window.loadFile(path.resolve(here, '../../../desktop/index.html'));
+    if (atLogin) await background?.leave();
     await updater.start();
   })
   .catch(async () => {
@@ -168,6 +187,7 @@ app.on('before-quit', (event) => {
   watcher?.stop();
   poller?.stop();
   updater?.dispose();
+  background?.dispose();
   if (worker) {
     void worker.close().then(() => {
       quitReady = true;
