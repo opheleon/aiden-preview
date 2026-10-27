@@ -76,7 +76,7 @@ jobs:
         run: |
           docker run -d --init --name aiden-worker -v aiden-data:/data aiden-teams-worker
           for attempt in $(seq 1 30); do
-            docker exec aiden-worker aiden-teams status > status.txt 2>&1 && grep -q 'signed out' status.txt && break
+            docker exec aiden-worker aiden status > status.txt 2>&1 && grep -q 'signed out' status.txt && break
             sleep 2
           done
           cat status.txt

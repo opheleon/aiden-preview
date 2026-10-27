@@ -9,7 +9,7 @@ import { AccountPoller } from '../../../packages/core/src/accounts/poller.js';
 import type { WorkerClient } from '../../../packages/core/src/client.js';
 import { atomic, optionalJson } from '../../../packages/core/src/storage.js';
 
-/** What the headless worker shares with `aiden-teams status` and `sign-in`; never a token. */
+/** What the headless worker shares with `aiden status` and `aiden sign-in`; never a token. */
 const HostStatusSchema = z
   .object({
     updatedAt: z.string(),
@@ -187,7 +187,7 @@ export class TeamsHost {
       'account',
       status.signedIn
         ? `Signed in to Aiden Teams as ${status.email ?? 'an unknown address'} on ${status.deviceName}.`
-        : 'Signed out of Aiden Teams. Run aiden-teams sign-in on this machine to sign in.',
+        : 'Signed out of Aiden Teams. Run aiden sign-in on this machine to sign in.',
     );
     if (status.message) this.note('message', status.message);
     if (status.signInUrl) this.note('signIn', `Teams sign-in waiting: ${status.signInUrl}`);

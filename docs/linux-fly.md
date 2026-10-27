@@ -59,7 +59,7 @@ fly ssh console --app dana-aiden-worker --user aiden -C "git config --global use
 ## Step 4: Sign in to Aiden Teams
 
 ```sh
-fly ssh console --app dana-aiden-worker --pty -C "aiden-teams sign-in"
+fly ssh console --app dana-aiden-worker --pty -C "aiden sign-in"
 ```
 
 1. Open the address it prints in a browser on your own computer and sign in with your Teams email.
@@ -71,7 +71,7 @@ The command forwards that address to the worker and says **Signed in as** your e
 ## Step 5: Check that it works
 
 ```sh
-fly ssh console --app dana-aiden-worker -C "aiden-teams status"
+fly ssh console --app dana-aiden-worker -C "aiden status"
 fly logs --app dana-aiden-worker
 ```
 
@@ -89,8 +89,19 @@ Run one machine per volume. Each machine is its own Teams machine with its own s
 
 - The worker has no OS keychain, so it keeps the Teams sign-in and any integration credentials in owner-only files under `/data/home/.aiden/credentials` (`AIDEN_CREDENTIAL_STORE=file`). Claude Code and the GitHub CLI keep their own sign-ins in their usual files under `/data/home`. Fly.io encrypts volumes at rest.
 - Anyone who can run `fly ssh console` on the app can read those files and act as you on this machine. Give Fly.io access to the app only to people you would hand your laptop to.
-- The worker runs as the unprivileged `aiden` user. `aiden-teams` switches to that user even from a root shell, so its files stay readable by the worker.
+- The worker runs as the unprivileged `aiden` user. `aiden` switches to that user even from a root shell, so its files stay readable by the worker.
 - Repositories are copied read-only for code checks, as on the desktop. See [trust boundaries](architecture.md#trust-boundaries).
+
+## Run it from a terminal
+
+The worker does not need Fly.io or Docker. On any computer with this repository, Node, Git, the GitHub CLI, and Claude Code signed in, run:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm cli serve
+```
+
+Leave that running, and in a second terminal run `pnpm cli sign-in`. It keeps picking up team work until you stop it with Ctrl+C. On a server with no OS keychain, start it with `AIDEN_CREDENTIAL_STORE=file pnpm cli serve` so the sign-in survives a restart. Do not run it alongside the desktop app on the same computer: both would use the same Aiden data folder.
 
 ## Run it elsewhere with Docker
 
@@ -98,14 +109,14 @@ Run one machine per volume. Each machine is its own Teams machine with its own s
 docker build -t aiden-teams-worker .
 docker run --init -d --name aiden-worker -e AIDEN_DEVICE_NAME="Build server" -v aiden-data:/data aiden-teams-worker
 docker exec -it -u aiden aiden-worker claude auth login --claudeai
-docker exec -it aiden-worker aiden-teams sign-in
+docker exec -it aiden-worker aiden sign-in
 ```
 
 Sign in to GitHub the same way as in Step 3, with `docker exec -it -u aiden aiden-worker` in place of `fly ssh console`. Build with `--build-arg WITH_BROWSER=false` to leave out Chromium for a smaller image; the team then sends browser checks to other machines.
 
 ## Troubleshooting
 
-- **`aiden-teams sign-in` says the worker has not started.** Check `fly logs`. The first start after a deploy takes a few seconds.
+- **`aiden sign-in` says the worker has not started.** Check `fly logs`. The first start after a deploy takes a few seconds.
 - **The pasted address is refused.** Paste the address from the browser after signing in. It starts with `http://127.0.0.1:53682/oauth/callback` (or port 53683) and contains `state=`.
-- **The team never assigns work.** Run `aiden-teams status`. The last answer gives the team's reason, such as Claude not being signed in, the usage cap being reached, or the team's subscription having lapsed.
+- **The team never assigns work.** Run `aiden status`. The last answer gives the team's reason, such as Claude not being signed in, the usage cap being reached, or the team's subscription having lapsed.
 - **Claude says to sign in again.** Repeat Step 2. Claude subscription sign-ins can end when you sign out everywhere from claude.ai.

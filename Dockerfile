@@ -19,7 +19,7 @@ RUN pnpm install --frozen-lockfile && pnpm exec tsc -p tsconfig.json
 
 FROM node:${NODE_VERSION}-bookworm-slim
 ARG WITH_BROWSER=true
-# The aiden-teams wrapper also selects file credentials, since a server has no OS keychain.
+# The aiden wrapper also selects file credentials, since a server has no OS keychain.
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 CI=true LANG=C.UTF-8 \
     PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 RUN apt-get update \
@@ -51,8 +51,8 @@ RUN pnpm install --prod --frozen-lockfile \
 COPY --from=build /app/dist ./dist
 COPY workflows ./workflows
 COPY LICENSE NOTICE THIRD_PARTY_NOTICES.md ./
-COPY deploy/linux/aiden-teams deploy/linux/entrypoint.sh /usr/local/bin/
-RUN chmod 0755 /usr/local/bin/aiden-teams /usr/local/bin/entrypoint.sh
+COPY deploy/linux/aiden deploy/linux/entrypoint.sh /usr/local/bin/
+RUN chmod 0755 /usr/local/bin/aiden /usr/local/bin/entrypoint.sh
 VOLUME /data
 ENTRYPOINT ["entrypoint.sh"]
 CMD ["serve"]

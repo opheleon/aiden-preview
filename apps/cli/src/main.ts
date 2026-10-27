@@ -10,13 +10,6 @@ import { teamsAuth } from '../../../packages/contracts/src/teams-auth.js';
 import { WorkerClient } from '../../../packages/core/src/client.js';
 import { loopbackCallback, readStatus, TeamsHost } from './teams-host.js';
 
-const usage = `Aiden Teams worker for Linux servers
-
-  aiden-teams serve      Pick up team work on this machine until stopped
-  aiden-teams sign-in    Sign this machine in to Aiden Teams (needs serve running)
-  aiden-teams status     Show sign-in and the current team task
-`;
-
 /** Write one timestamped line to the service log. */
 function log(line: string): void {
   process.stdout.write(`${new Date().toISOString()} ${line}\n`);
@@ -72,7 +65,7 @@ async function signIn(root: string): Promise<void> {
   const status = await readStatus(root);
   if (!status)
     throw new Error(
-      'The Teams worker has not started on this machine yet. Start aiden-teams serve, then try again.',
+      'The Teams worker has not started on this machine yet. Start aiden serve, then try again.',
     );
   if (status.signedIn) {
     process.stdout.write(`Already signed in as ${status.email ?? 'an unknown address'}.\n`);
@@ -82,7 +75,7 @@ async function signIn(root: string): Promise<void> {
     throw new Error('The Teams worker has no sign-in waiting yet. Try again in a few seconds.');
   if (!process.stdin.isTTY)
     throw new Error(
-      'Sign-in needs an interactive terminal. On Fly.io run: fly ssh console --pty -C "aiden-teams sign-in"',
+      'Sign-in needs an interactive terminal. On Fly.io run: fly ssh console --pty -C "aiden sign-in"',
     );
   process.stdout.write(
     `1. Open this address in a browser on your own computer and sign in to Aiden Teams:\n\n${status.signInUrl}\n\n` +
@@ -97,7 +90,7 @@ async function signIn(root: string): Promise<void> {
   const response = await fetch(callback, { signal: AbortSignal.timeout(15_000) }).catch(() => null);
   if (!response?.ok)
     throw new Error(
-      'That sign-in is no longer waiting. Each one lasts five minutes. Run aiden-teams sign-in again.',
+      'That sign-in is no longer waiting. Each one lasts five minutes. Run aiden sign-in again.',
     );
   for (let attempt = 0; attempt < 20; attempt++) {
     await sleep(3_000);
@@ -109,10 +102,10 @@ async function signIn(root: string): Promise<void> {
       return;
     }
     if (next && next.signInUrl !== status.signInUrl)
-      throw new Error(next.message ?? 'Sign-in did not finish. Run aiden-teams sign-in again.');
+      throw new Error(next.message ?? 'Sign-in did not finish. Run aiden sign-in again.');
   }
   throw new Error(
-    'The browser sign-in was received but the worker has not confirmed it yet. Check aiden-teams status in a minute.',
+    'The browser sign-in was received but the worker has not confirmed it yet. Check aiden status in a minute.',
   );
 }
 
@@ -122,7 +115,7 @@ async function printStatus(root: string): Promise<void> {
   if (!status) throw new Error('The Teams worker has not started on this machine yet.');
   const lines = [
     `Machine: ${status.deviceName}`,
-    `Teams: ${status.signedIn ? `signed in as ${status.email ?? 'an unknown address'}` : 'signed out (run aiden-teams sign-in)'}`,
+    `Teams: ${status.signedIn ? `signed in as ${status.email ?? 'an unknown address'}` : 'signed out (run aiden sign-in)'}`,
     `Task: ${status.running ? status.running.title : 'none'}`,
     ...(status.last ? [`Last answer: ${status.last.type}, ${status.last.reason}`] : []),
     ...(status.message ? [`Note: ${status.message}`] : []),
@@ -131,17 +124,17 @@ async function printStatus(root: string): Promise<void> {
   process.stdout.write(lines.join('\n') + '\n');
 }
 
+// The `aiden` command: the Teams worker commands run here without starting a second worker
+// process; every other command, and the help text, comes from the project CLI.
 const root = path.resolve(process.env.AIDEN_HOME || path.join(homedir(), '.aiden'));
 const command = process.argv[2];
-try {
-  if (command === 'serve') serve(root);
-  else if (command === 'sign-in') await signIn(root);
-  else if (command === 'status') await printStatus(root);
-  else {
-    process.stdout.write(usage);
-    if (command && command !== 'help' && command !== '--help') process.exitCode = 1;
+if (command === 'serve' || command === 'sign-in' || command === 'status') {
+  try {
+    if (command === 'serve') serve(root);
+    else if (command === 'sign-in') await signIn(root);
+    else await printStatus(root);
+  } catch (error) {
+    process.stderr.write((error instanceof Error ? error.message : 'Command failed.') + '\n');
+    process.exitCode = 1;
   }
-} catch (error) {
-  process.stderr.write((error instanceof Error ? error.message : 'Command failed.') + '\n');
-  process.exitCode = 1;
-}
+} else await import('./index.js');

@@ -6,4 +6,4 @@ if [ "$(id -u)" = 0 ]; then
   install -d -o aiden -g aiden -m 0700 /data/home
   chown aiden:aiden /data
 fi
-exec aiden-teams "$@"
+exec aiden "$@"
