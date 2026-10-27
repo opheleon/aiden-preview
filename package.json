@@ -13,7 +13,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && vite build --config apps/desktop/vite.config.ts && node --import tsx scripts/copy-assets.ts",
+    "build": "tsc -p tsconfig.json && vite build --config apps/desktop/vite.config.ts && node --import tsx scripts/copy-assets.ts && pnpm native:build",
+    "native:build": "node --import tsx scripts/build-native.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/desktop/tsconfig.json --noEmit && tsc -p tsconfig.verification.json",
     "test": "node --import tsx --import ./tests/setup.ts --test tests/*.test.ts",
     "dev": "pnpm run build && electron dist/apps/desktop/src/main.js",
@@ -162,6 +163,10 @@
       ]
     },
     "extraResources": [
+      {
+        "from": "dist/native",
+        "to": "native"
+      },
       {
         "from": "release/browser-runtime",
         "to": "playwright",

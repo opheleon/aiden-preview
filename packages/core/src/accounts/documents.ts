@@ -40,10 +40,19 @@ export function documentFor(project: Project, baseline: Baseline | null): Accoun
  * Keep only repositories cloned from GitHub, placed under this machine's project code folder.
  * A teammate's document can never point this machine at another local folder: entries without a
  * GitHub source are dropped, and the clone path comes from the repository name, not the document.
+ * A repository this machine already had keeps this machine's own folder, so a project synced
+ * from this computer still reads the code it read before.
  */
-function localRepositories(engine: Engine, project: Project): Project['repositories'] {
+function localRepositories(
+  engine: Engine,
+  project: Project,
+  local: Project | null | undefined,
+): Project['repositories'] {
   const codeRoot = path.join(engine.store.project(project.id), 'code');
+  const mine = new Map((local?.repositories ?? []).map((repo) => [repo.id, repo.path]));
   return project.repositories.flatMap((repo) => {
+    const own = mine.get(repo.id);
+    if (own) return [{ ...repo, path: own }];
     const github = repo.source ? parseGithubRepository(repo.source.name) : null;
     if (!github) return [];
     return [{ ...repo, path: path.join(codeRoot, 'github', github.owner, github.name) }];
@@ -72,7 +81,7 @@ export async function materialize(
     id: server.id,
     account: { accountId: server.accountId, revision: server.revision },
   };
-  project.repositories = localRepositories(engine, project);
+  project.repositories = localRepositories(engine, project, local);
   delete project.lifecycle;
   await atomic(path.join(folder, 'project.json'), ProjectSchema.parse(project));
   if (parsed.data.baseline) await atomic(path.join(folder, 'baseline.json'), parsed.data.baseline);

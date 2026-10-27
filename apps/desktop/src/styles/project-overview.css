@@ -13,9 +13,16 @@
 
 .starter-content {
   display: flex;
+  flex-direction: column;
   max-width: none;
   min-height: calc(100vh - 44px);
   padding: 0;
+}
+
+/* An error or notice sits above the start form at its width, not beside it as a column. */
+.starter-content > .callout {
+  width: min(712px, calc(100% - 48px));
+  margin: 24px auto 0;
 }
 
 .goal-starter {

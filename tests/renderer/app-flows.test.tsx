@@ -62,6 +62,20 @@ test('setting the intent is one screen, and Aiden starts with only the intent', 
   expect(screen.queryByRole('button', { name: /Approve/ })).toBeNull();
 });
 
+test('signed in but unable to reach the team, a new project is refused with the reason', async () => {
+  f.setTeamUnreachable();
+  render(<App />);
+  // Created at once, before any background team check has finished.
+  await userEvent.click(await screen.findByRole('button', { name: 'Create project' }));
+  await userEvent.type(screen.getByLabelText('What are you building?'), 'List books');
+  await userEvent.click(screen.getByRole('button', { name: /Hand it to Aiden/ }));
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Synthetic team server is unreachable. The project was not created.',
+  );
+  expect(f.request).not.toHaveBeenCalledWith('prepare', expect.anything());
+  expect(f.request).not.toHaveBeenCalledWith('accountCreateProject', expect.anything());
+});
+
 test('starting needs a connected model, and Connect opens its sign-in controls', async () => {
   const original = f.request.getMockImplementation()!;
   f.request.mockImplementation((method: string, p?: unknown) =>
