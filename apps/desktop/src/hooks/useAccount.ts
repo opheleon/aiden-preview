@@ -27,6 +27,8 @@ export interface AccountView {
   take: (taskId: string) => Promise<void>;
   finish: (taskId: string, answer?: string) => Promise<void>;
   setPickup: (change: { pickupEnabled?: boolean; usageCapPct?: number }) => Promise<void>;
+  /** Move a project made on this computer into the team; a failure shows in `error`. */
+  share: (projectId: string) => Promise<void>;
 }
 
 /** The Teams screen's data and actions. The session token never reaches this window. */
@@ -98,5 +100,10 @@ export function useAccount(call: DesktopBridge['request']): AccountView {
       act(() => call('accountFinishTask', answer ? { taskId, answer } : { taskId })),
     setPickup: (change: { pickupEnabled?: boolean; usageCapPct?: number }) =>
       act(() => call('accountSetPickup', change)),
+    share: (projectId: string) =>
+      act(async () => {
+        if (!(await call('accountShareProject', { accountId, projectId })))
+          throw new Error('The team could not read this project. Update Aiden and try again.');
+      }),
   };
 }

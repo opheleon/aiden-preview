@@ -72,6 +72,12 @@ async function start(state: WorkspaceState, call: Call): Promise<void> {
       );
     const project = { ...state.project, name: scopeName(state.project.context) };
     const saved = state.projects.some((p) => p.id === project.id);
+    // Signed in, a new project belongs to the team; when the team cannot be reached, say so
+    // instead of keeping it on this computer where teammates would never see it.
+    if (state.teamProblem && !saved)
+      throw new Error(
+        `${state.teamProblem} The project was not created. Try again when Aiden can reach your team.`,
+      );
     // Only a project that does not exist yet goes to the team; a saved project (for example after
     // its code changed) rewrites its own requirements and must never be copied into a new one.
     if (state.accountScope && !saved) {

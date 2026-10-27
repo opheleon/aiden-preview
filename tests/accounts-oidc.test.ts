@@ -105,6 +105,20 @@ void test('a cancelled sign-in says so and stores nothing', async () => {
   assert.equal(await f.session.refreshToken(), undefined);
 });
 
+void test('a sign-in for an email on no team is refused in the browser and stores nothing', async () => {
+  const f = await setup([39877, 39878]);
+  const reason = 'dana@example.com is not on an Aiden Teams team.';
+  f.signIn.admit = async () => ((await f.signIn.accessToken()) === 'access-1' ? reason : null);
+  const { authUrl } = await f.signIn.begin();
+  const url = new URL(authUrl);
+  assert.equal(url.searchParams.get('prompt'), 'login', 'always asks which email to use');
+  const page = await redirect(authUrl, { code: 'abc', state: url.searchParams.get('state') ?? '' });
+  assert.match(await page.text(), /dana@example\.com is not on an Aiden Teams team\./);
+  await settled(f.signIn);
+  assert.deepEqual(f.signIn.progress(), { waiting: false, failure: reason });
+  assert.equal(await f.session.refreshToken(), undefined);
+});
+
 void test('the second registered port is used when the first is busy', async () => {
   const blocker = createServer();
   await new Promise<void>((resolve) => blocker.listen(39875, '127.0.0.1', resolve));

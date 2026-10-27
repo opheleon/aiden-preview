@@ -113,6 +113,7 @@ export type WorkerAPI = {
   };
   /** Create a project in an account; its first task is writing requirements on whichever machine the account picks. */
   accountCreateProject: { params: { accountId: string; project: Project }; result: Project | null };
+  accountShareProject: { params: { accountId: string; projectId: string }; result: Project | null };
   /** Stop a team task that has not finished; a machine running it stops at its next heartbeat. */
   accountCancelTask: { params: { taskId: string }; result: AccountTask };
   /** Queue a stopped or failed Aiden task again, as a new task with the same work. */

@@ -100,9 +100,13 @@ function usePreferenceState() {
   const [integrationTools, setIntegrationTools] = useState<Record<string, McpTool[]>>({});
   /** The team a new project goes to; empty when the person is not in a team. */
   const [accountScope, setAccountScope] = useState('');
+  /** Why new projects cannot reach the person's team right now; empty when they can or are solo. */
+  const [teamProblem, setTeamProblem] = useState('');
   return {
     accountScope,
     setAccountScope,
+    teamProblem,
+    setTeamProblem,
     area,
     setArea,
     settingsTab,

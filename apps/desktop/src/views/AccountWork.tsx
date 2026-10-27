@@ -1,20 +1,26 @@
 import { type JSX, useEffect } from 'react';
 
 import { AccountTeam } from '../components/AccountBoard';
+import { AccountLocalProjects } from '../components/AccountLocalProjects';
 import { AccountMachine } from '../components/AccountMachine';
-import { AccountNoTeam, AccountSignIn } from '../components/AccountSignIn';
+import { AccountSignIn } from '../components/AccountSignIn';
 import { useAccount } from '../hooks/useAccount';
+import { teamTarget } from '../hooks/useTeamScope';
 import type { Workspace } from '../hooks/useWorkspace';
 
 /** Teams settings: sign in once, then the team, its machines, and how this machine helps. */
 export function AccountWork({ workspace }: { workspace: Workspace }): JSX.Element {
   const account = useAccount(workspace.call);
   const { status, state } = account;
-  const { setAccountScope } = workspace;
-  // Signing in or out, creating, or joining here changes the header tabs without a screen change.
+  const { setAccountScope, setTeamProblem, projects, setProjects, call } = workspace;
+  const team = status?.accounts.find((a) => a.id === account.accountId)?.name ?? 'your team';
+  // Signing in or out here changes the header tabs without a screen change.
   useEffect(() => {
-    if (status) setAccountScope(status.signedIn ? (status.accounts[0]?.id ?? '') : '');
-  }, [status, setAccountScope]);
+    if (!status) return;
+    const target = teamTarget(status);
+    setAccountScope(target.scope);
+    setTeamProblem(target.problem);
+  }, [status, setAccountScope, setTeamProblem]);
   return (
     <div className="content account-view">
       {account.error && (
@@ -22,17 +28,33 @@ export function AccountWork({ workspace }: { workspace: Workspace }): JSX.Elemen
           {account.error}
         </p>
       )}
-      {status?.message && <p className="account-muted">{status.message}</p>}
+      {status?.message && (
+        <p className="error" role="alert">
+          {status.message}
+        </p>
+      )}
       {status?.signedIn && <AccountProfile account={account} />}
       {!status ? (
         <p className="account-muted">Loading your team…</p>
       ) : !status.signedIn ? (
         <AccountSignIn account={account} />
       ) : !status.accounts.length ? (
-        <AccountNoTeam account={account} />
+        // Signed in but the team did not answer; status.message above says why.
+        <button disabled={account.working} onClick={() => void account.reload()}>
+          Try again
+        </button>
       ) : (
         <>
           {state && <AccountTeam state={state} />}
+          <AccountLocalProjects
+            projects={projects}
+            team={team}
+            working={account.working}
+            onSync={async (projectId) => {
+              await account.share(projectId);
+              setProjects(await call('projects'));
+            }}
+          />
           <AccountMachine account={account} />
           <p className="account-muted">
             Signed in as {status.email}.{' '}

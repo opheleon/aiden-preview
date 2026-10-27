@@ -32,8 +32,10 @@ function status(overrides: Partial<AccountStatus> = {}): AccountStatus {
 }
 
 /** A worker bridge that answers the account methods. */
-function fixture(current: AccountStatus, teamState: object = state) {
+function fixture(current: AccountStatus, teamState: object = state, projects: object[] = []) {
   const call = vi.fn((method: string) => {
+    if (method === 'accountShareProject') return Promise.resolve({ id: 'synced' });
+    if (method === 'projects') return Promise.resolve(projects);
     if (method === 'accountStatus' || method === 'accountSetPickup')
       return Promise.resolve(current);
     if (method === 'accountState') return Promise.resolve(teamState);
@@ -49,7 +51,17 @@ function fixture(current: AccountStatus, teamState: object = state) {
   const load = vi.fn(() => Promise.resolve());
   const setArea = vi.fn();
   const setAccountScope = vi.fn();
-  const workspace = { call, load, setArea, setAccountScope } as unknown as Workspace;
+  const setTeamProblem = vi.fn();
+  const setProjects = vi.fn();
+  const workspace = {
+    call,
+    load,
+    setArea,
+    setAccountScope,
+    setTeamProblem,
+    projects,
+    setProjects,
+  } as unknown as Workspace;
   return { call, load, setArea, workspace };
 }
 
@@ -68,20 +80,39 @@ test('signed out, one button opens the browser; while it waits the screen says s
   expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
 });
 
-test('signed in without a team, it sends the person to the Teams dashboard to create or join', async () => {
-  const openExternal = vi.fn(async () => {});
-  const original = window.aiden;
-  window.aiden = { ...original, openExternal } as NonNullable<typeof window.aiden>;
-  try {
-    const f = fixture(status({ accounts: [], settingsUrl: 'https://teams.example.com' }));
-    render(<AccountWork workspace={f.workspace} />);
-    await userEvent.click(await screen.findByRole('button', { name: /Open the Teams dashboard/ }));
-    expect(openExternal).toHaveBeenCalledWith('https://teams.example.com');
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-  } finally {
-    if (original) window.aiden = original;
-    else delete window.aiden;
-  }
+test('a sign-in for an email on no team is refused with the reason, and nothing here joins or creates a team', async () => {
+  const reason =
+    'dana@example.com is not on an Aiden Teams team. Accept your team’s invitation in the Teams dashboard, or sign in with the email your team invited.';
+  const f = fixture(
+    status({ signedIn: false, email: null, userId: null, accounts: [], message: reason }),
+  );
+  render(<AccountWork workspace={f.workspace} />);
+  expect(await screen.findByRole('alert')).toHaveTextContent(reason);
+  expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+  expect(screen.queryByText(/create your account/i)).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /join|create|dashboard/i })).not.toBeInTheDocument();
+});
+
+test('projects made on this computer sync into the team one at a time, by choice', async () => {
+  const local = { id: 'local-1', name: 'Zoom calendar' };
+  const shared = {
+    id: 'team-1',
+    name: 'Books',
+    account: { accountId: state.account.id, revision: 2 },
+  };
+  const f = fixture(status(), state, [local, shared]);
+  render(<AccountWork workspace={f.workspace} />);
+  const card = await screen.findByRole('region', { name: 'Projects on this Mac' });
+  expect(card).toHaveTextContent('Zoom calendar');
+  expect(card).not.toHaveTextContent('Books');
+  await userEvent.click(
+    within(card).getByRole('button', { name: `Sync to ${state.account.name}` }),
+  );
+  expect(f.call).toHaveBeenCalledWith('accountShareProject', {
+    accountId: state.account.id,
+    projectId: 'local-1',
+  });
+  expect(f.call).toHaveBeenCalledWith('projects');
 });
 
 test('My work puts Aiden’s question in its own card and answers it in place', async () => {

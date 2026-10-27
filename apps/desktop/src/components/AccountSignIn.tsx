@@ -3,7 +3,10 @@ import type { JSX } from 'react';
 
 import type { AccountView } from '../hooks/useAccount';
 
-/** Signed out: one button that opens the browser, where the person signs in or creates an account. */
+/**
+ * Signed out: one button that opens the browser to sign in to an existing Teams account. Accounts
+ * come from a team invitation or a Teams purchase in the dashboard, never from this app.
+ */
 export function AccountSignIn({ account }: { account: AccountView }): JSX.Element {
   const waiting = !!account.status?.signingIn;
   return (
@@ -27,31 +30,9 @@ export function AccountSignIn({ account }: { account: AccountView }): JSX.Elemen
         </button>
       )}
       <p className="account-muted">
-        Sign in or create your account in your browser. Without signing in, Aiden keeps working on
-        this computer as it does now.
+        Sign in with the email your team invited, or the one you bought Teams with. Without signing
+        in, Aiden keeps working on this computer as it does now.
       </p>
-    </section>
-  );
-}
-
-/**
- * Signed in with no team yet. Teams are created and joined in the Teams dashboard, so this only
- * opens it; an invitation link from a teammate opens the dashboard's join page directly.
- */
-export function AccountNoTeam({ account }: { account: AccountView }): JSX.Element {
-  const dashboard = account.status?.settingsUrl ?? 'https://app.opheleon.ai';
-  return (
-    <section className="card account-intro" aria-label="Join a team">
-      <h1>
-        Join a <span className="serif">team</span>
-      </h1>
-      <p>
-        Create a team or join one in the Teams dashboard. To join, open the invitation link a
-        teammate sent you. This page updates once you are in a team.
-      </p>
-      <button className="primary" onClick={() => void window.aiden?.openExternal(dashboard)}>
-        Open the Teams dashboard <ArrowRight size={14} aria-hidden="true" />
-      </button>
     </section>
   );
 }
