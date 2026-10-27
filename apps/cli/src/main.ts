@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { teamsAuth } from '../../../packages/contracts/src/teams-auth.js';
 import { WorkerClient } from '../../../packages/core/src/client.js';
 import { loopbackCallback, readStatus, TeamsHost } from './teams-host.js';
+import { wakeSecret, wakeSettings } from './wake.js';
 
 /** Write one timestamped line to the service log. */
 function log(line: string): void {
@@ -29,7 +30,19 @@ function appVersion(): string {
   }
 }
 
-/** Run the Teams worker until SIGINT or SIGTERM; exit non-zero if the worker dies, so it restarts. */
+/**
+ * Minutes with no team work before a woken worker stops itself (`AIDEN_IDLE_STOP_MINUTES`), or
+ * zero to stay on. It only applies when wakes are on, so the team can start the machine again.
+ */
+function idleStopMs(env: NodeJS.ProcessEnv): number {
+  const minutes = Number(env.AIDEN_IDLE_STOP_MINUTES ?? 0);
+  return Number.isFinite(minutes) && minutes > 0 ? Math.max(1, minutes) * 60_000 : 0;
+}
+
+/**
+ * Run the Teams worker until SIGINT, SIGTERM, or a quiet spell with wakes on; exit non-zero if the
+ * worker dies, so it restarts, and zero otherwise, so a stopped Fly.io machine stays stopped.
+ */
 function serve(root: string): void {
   if (process.platform === 'linux' && !process.env.AIDEN_CREDENTIAL_STORE)
     log(
@@ -40,22 +53,33 @@ function serve(root: string): void {
     AIDEN_HOME: root,
     AIDEN_APP_VERSION: process.env.AIDEN_APP_VERSION || appVersion(),
   });
-  const host = new TeamsHost({ worker, root, log });
+  const wake = wakeSettings();
+  const idleMs = wake ? idleStopMs(process.env) : 0;
   let stopping = false;
+  /** Checkpoint running work, then exit cleanly with a reason for the log. */
+  const stop = (reason: string): void => {
+    if (stopping) return;
+    stopping = true;
+    log(reason);
+    void host.stop().finally(() => process.exit(0));
+  };
+  const host = new TeamsHost({
+    worker,
+    root,
+    log,
+    ...(wake ? { wake: { ...wake, secret: wakeSecret() } } : {}),
+    ...(idleMs ? { idleStopMs: idleMs, onIdle: () => stop('Shutting down.') } : {}),
+  });
   worker.on('workerStopped', () => {
     if (stopping) return;
     log('The Aiden worker stopped unexpectedly. Exiting so the machine restarts it.');
     process.exit(1);
   });
-  /** Checkpoint running work, then exit. */
-  const stop = (): void => {
-    if (stopping) return;
-    stopping = true;
-    log('Stopping. A running task saves its checkpoint, and the team can hand it out again.');
-    void host.stop().finally(() => process.exit(0));
-  };
-  process.on('SIGTERM', stop);
-  process.on('SIGINT', stop);
+  /** Stop on a signal; a running task saves its checkpoint first. */
+  const signalled = (): void =>
+    stop('Stopping. A running task saves its checkpoint, and the team can hand it out again.');
+  process.on('SIGTERM', signalled);
+  process.on('SIGINT', signalled);
   log(`Aiden Teams worker ${process.env.AIDEN_APP_VERSION || appVersion()} using ${root}.`);
   host.start();
 }
@@ -117,6 +141,7 @@ async function printStatus(root: string): Promise<void> {
     `Machine: ${status.deviceName}`,
     `Teams: ${status.signedIn ? `signed in as ${status.email ?? 'an unknown address'}` : 'signed out (run aiden sign-in)'}`,
     `Task: ${status.running ? status.running.title : 'none'}`,
+    `Wakes: ${status.wakeUrl ?? 'off (stays on)'}`,
     ...(status.last ? [`Last answer: ${status.last.type}, ${status.last.reason}`] : []),
     ...(status.message ? [`Note: ${status.message}`] : []),
     `Updated: ${status.updatedAt}`,

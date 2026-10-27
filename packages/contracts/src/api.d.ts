@@ -125,6 +125,14 @@ export type WorkerAPI = {
     params: { idleSeconds: number; onBattery: boolean; busy: boolean };
     result: { pollAfterSeconds: number };
   };
+  /**
+   * Register where the team wakes this machine between tasks (the headless worker calls this);
+   * a null address stops the wakes. Needs a sign-in and one earlier poll.
+   */
+  accountRegisterWake: {
+    params: { url: string | null; secret?: string };
+    result: { deviceId: string; url: string | null };
+  };
   phoneSetup: { params: Record<string, never>; result: PhoneReadiness };
   savePhoneSetup: { params: PhoneSetup; result: PhoneSetup };
   phoneApps: { params: { udid: string }; result: PhoneApp[] };

@@ -36,3 +36,34 @@ void test('polling stays within one minute even when idle, disabled, or recoveri
   await tick(180000);
   assert.equal(calls, 4);
 });
+
+void test('settling waits for a request already on its way, and start resumes polling', async (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  let calls = 0;
+  let answer: (value: { pollAfterSeconds: number }) => void = () => {};
+  const request = () => {
+    calls++;
+    return new Promise<{ pollAfterSeconds: number }>((resolve) => (answer = resolve));
+  };
+  const poller = new AccountPoller({
+    worker: { request },
+    isBusy: () => false,
+    idleSeconds: () => 600,
+    onBattery: () => false,
+  });
+  poller.nudge();
+  context.mock.timers.tick(0);
+  assert.equal(calls, 1);
+  let settled = false;
+  const settling = poller.settle().then(() => (settled = true));
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(settled, false, 'the request in flight is still waiting');
+  answer({ pollAfterSeconds: 15 });
+  await settling;
+  context.mock.timers.tick(60000);
+  assert.equal(calls, 1, 'a settled poller asks no more');
+  poller.start();
+  context.mock.timers.tick(5000);
+  assert.equal(calls, 2);
+  poller.stop();
+});

@@ -139,6 +139,11 @@ export const WorkAnswerSchema = z
   })
   .strict();
 
+/** Where the team wakes this machine when it sleeps between tasks; null once it stopped asking. */
+export const WakeHookSchema = z
+  .object({ deviceId: z.string(), url: z.string().url().nullable() })
+  .strict();
+
 /** A project plus the tasks queued with it. */
 export const ProjectCreatedSchema = z
   .object({ project: AccountProjectSchema, tasks: z.array(AccountTaskSchema) })
@@ -200,6 +205,8 @@ export type Me = z.infer<typeof MeSchema>;
 export type ProjectCreated = z.infer<typeof ProjectCreatedSchema>;
 /** Answer to a work poll. */
 export type WorkAnswer = z.infer<typeof WorkAnswerSchema>;
+/** A machine's registered wake address. */
+export type WakeHook = z.infer<typeof WakeHookSchema>;
 
 /** A task in an account's queue. */
 export type AccountTask = z.infer<typeof AccountTaskSchema>;

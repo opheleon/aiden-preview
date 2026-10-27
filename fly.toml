@@ -1,10 +1,12 @@
-# Aiden Teams worker on Fly.io: one always-on machine that picks up your team's work.
-# See docs/linux-fly.md. Deploy with your own app name:
+# Aiden Teams worker on Fly.io: one machine that picks up your team's work and sleeps between
+# tasks. See docs/linux-fly.md. Deploy with your own app name:
 #
 #   fly deploy --app <your-app>
 #
-# There is no [http_service]: the worker only makes outbound requests, so it has no public
-# address and Fly never stops it for being idle.
+# The worker stops itself after AIDEN_IDLE_STOP_MINUTES with no team work. When the team queues
+# work it can do, Aiden Teams posts a signed wake to https://<your-app>.fly.dev/wake; Fly's proxy
+# starts the stopped machine for that request, and the worker asks for work at once. Remove
+# AIDEN_IDLE_STOP_MINUTES to keep the machine on all the time.
 
 app = "aiden-teams-worker"
 primary_region = "iad"
@@ -17,6 +19,22 @@ kill_timeout = 60
 
 [env]
   AIDEN_DEVICE_NAME = "Fly.io worker"
+  # Where the worker listens for wakes. The public address comes from FLY_APP_NAME.
+  AIDEN_WAKE_PORT = "8080"
+  AIDEN_IDLE_STOP_MINUTES = "15"
+
+# Only wakes come in. The proxy never stops the machine; the worker stops itself when idle.
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_start_machines = true
+  auto_stop_machines = "off"
+  min_machines_running = 0
+
+# A clean exit (idle, or fly machine stop) leaves the machine stopped; a crash restarts it.
+[[restart]]
+  policy = "on-failure"
+  retries = 10
 
 # Sign-ins, provider credentials, project copies, and checkpoints live here.
 [[mounts]]

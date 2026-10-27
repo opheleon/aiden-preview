@@ -32,6 +32,7 @@ type AccountMethod = Extract<
   | 'accountSyncSetup'
   | 'accountCancelTask'
   | 'accountRetryTask'
+  | 'accountRegisterWake'
 >;
 
 /** Validate unknown worker inputs before dispatching a typed account operation. */
@@ -50,6 +51,16 @@ const none = z.object({}).strict();
 const account = z.object({ accountId: z.string().min(1).max(64) }).strict();
 const task = z.object({ taskId: z.string().min(1).max(64) }).strict();
 const teamProject = account.extend({ projectId: z.string().min(1).max(64) }).strict();
+/** A wake address and the key wakes are signed with: at least 32 random bytes, base64url. */
+const wakeRequest = z
+  .object({
+    url: z.string().url().max(500).nullable(),
+    secret: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{43,128}$/)
+      .optional(),
+  })
+  .strict();
 
 /** The first task of every account project: the same requirements step the solo app starts with. */
 const writeRequirements: NewAccountTask = {
@@ -201,7 +212,18 @@ export function accountMethods(
         .strict(),
       (p) => context().agent.poll(p),
     ),
+    accountRegisterWake: operation(wakeRequest, (p) => registerWake(context(), p)),
   };
+}
+
+/** Tell the team where to wake this machine, as the device it signed in as. */
+async function registerWake(
+  { session, client }: Context,
+  params: z.infer<typeof wakeRequest>,
+): Promise<WorkerResult<'accountRegisterWake'>> {
+  if (!(await session.refreshToken())) throw new Error('Sign in to Aiden Teams first.');
+  const { deviceId } = await session.preferences();
+  return client.wake({ deviceId, ...params });
 }
 
 /** Everything the account methods share, built on first use. */

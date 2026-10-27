@@ -14,6 +14,7 @@ const maximumSeconds = 60;
 export class AccountPoller {
   private timer?: ReturnType<typeof setTimeout>;
   private closed = false;
+  private asking: Promise<void> | undefined;
 
   /** Bind the worker and the machine signals without starting the timer. */
   constructor(
@@ -25,8 +26,9 @@ export class AccountPoller {
     },
   ) {}
 
-  /** Ask once now, then keep asking. */
+  /** Ask once now, then keep asking; also resumes a poller that was stopped. */
   start(): void {
+    this.closed = false;
     this.schedule(5);
   }
 
@@ -39,7 +41,9 @@ export class AccountPoller {
   private schedule(seconds: number): void {
     if (this.closed) return;
     if (this.timer) clearTimeout(this.timer);
-    this.timer = setTimeout(() => void this.tick(), seconds * 1000);
+    this.timer = setTimeout(() => {
+      this.asking = this.tick().finally(() => (this.asking = undefined));
+    }, seconds * 1000);
     this.timer.unref();
   }
 
@@ -63,5 +67,14 @@ export class AccountPoller {
   stop(): void {
     this.closed = true;
     if (this.timer) clearTimeout(this.timer);
+  }
+
+  /**
+   * Stop asking and wait for a request already on its way, so the caller knows whether that last
+   * answer started a task before it shuts the machine down.
+   */
+  async settle(): Promise<void> {
+    this.stop();
+    await this.asking;
   }
 }

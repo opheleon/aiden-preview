@@ -13,6 +13,8 @@ import {
   type NewAccountTask,
   type ProjectCreated,
   ProjectCreatedSchema,
+  type WakeHook,
+  WakeHookSchema,
   type WorkAnswer,
   WorkAnswerSchema,
 } from '../../../contracts/src/accounts-api.js';
@@ -198,6 +200,18 @@ export class AccountsClient {
   /** Ask what this machine should do next, sending its telemetry. */
   next(body: { deviceId: string; deviceName: string; sample: unknown }): Promise<WorkAnswer> {
     return this.call('POST', '/work/next', WorkAnswerSchema, { ...body, executionProtocol: 1 });
+  }
+
+  /**
+   * Tell the team where to wake this machine when it sleeps between tasks, with the key it checks
+   * wake requests against; a null address stops the wakes. The key is sent once and never logged.
+   */
+  wake(body: {
+    deviceId: string;
+    url: string | null;
+    secret?: string | undefined;
+  }): Promise<WakeHook> {
+    return this.call('PUT', '/work/wake', WakeHookSchema, body);
   }
 
   /** Extend the lease and report progress. */

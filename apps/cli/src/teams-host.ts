@@ -1,3 +1,4 @@
+import type { Server } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -8,6 +9,7 @@ import type { RunEvent } from '../../../packages/contracts/src/index.js';
 import { AccountPoller } from '../../../packages/core/src/accounts/poller.js';
 import type { WorkerClient } from '../../../packages/core/src/client.js';
 import { atomic, optionalJson } from '../../../packages/core/src/storage.js';
+import { listenForWakes, type WakeSettings } from './wake.js';
 
 /** What the headless worker shares with `aiden status` and `aiden sign-in`; never a token. */
 const HostStatusSchema = z
@@ -30,6 +32,8 @@ const HostStatusSchema = z
     last: z
       .object({ type: z.enum(['assign', 'hold']), reason: z.string(), at: z.string() })
       .nullable(),
+    /** Where the team wakes this machine once it is registered; absent or null otherwise. */
+    wakeUrl: z.string().nullable().optional(),
   })
   .strict();
 
@@ -96,6 +100,12 @@ export class TeamsHost {
   private signInUrl: string | null = null;
   private logged = new Map<string, string>();
   private closed = false;
+  /** This run's wake key once the team has it; wakes are refused until then. */
+  private wakeKey: { secret: string; deviceId: string } | null = null;
+  private wakeServer?: Server;
+  /** When this machine last had work, a wake, or a reason to stay up. */
+  private activeAt: number;
+  private sleeping = false;
 
   /**
    * Bind the worker and outputs without starting timers.
@@ -104,6 +114,9 @@ export class TeamsHost {
    * @param options.root Aiden data folder, where the status file is written.
    * @param options.log Writes one line to the service log.
    * @param options.now Clock, injectable for tests.
+   * @param options.wake Where to listen for wakes, the public address, and this run's signing key.
+   * @param options.idleStopMs Stop after this long with no team work, once wakes are registered.
+   * @param options.onIdle Shuts the machine down; called once, after the poller has settled.
    */
   constructor(
     private readonly options: {
@@ -111,8 +124,12 @@ export class TeamsHost {
       root: string;
       log: (line: string) => void;
       now?: () => Date;
+      wake?: WakeSettings & { secret: string };
+      idleStopMs?: number;
+      onIdle?: () => void;
     },
   ) {
+    this.activeAt = this.clock();
     this.poller = new AccountPoller({
       worker: options.worker,
       isBusy: () => this.runs.size > 0 || this.codingJobs.size > 0,
@@ -122,11 +139,96 @@ export class TeamsHost {
     });
   }
 
-  /** Follow worker activity, start asking for work, and start the status loop. */
+  /** Follow worker activity, listen for wakes, start asking for work, and start the status loop. */
   start(): void {
     this.options.worker.on('event', (event: RunEvent) => this.observe(event));
+    void this.listen();
     this.poller.start();
     void this.loop();
+  }
+
+  /** The current time in milliseconds. */
+  private clock(): number {
+    return (this.options.now?.() ?? new Date()).getTime();
+  }
+
+  /** Accept wakes on the configured port; a verified wake asks for work at once. */
+  private async listen(): Promise<void> {
+    const wake = this.options.wake;
+    if (!wake) return;
+    try {
+      this.wakeServer = await listenForWakes({
+        port: wake.port,
+        key: () => this.wakeKey,
+        onWake: () => {
+          this.activeAt = this.clock();
+          this.poller.nudge();
+        },
+        ...(this.options.now ? { now: this.options.now } : {}),
+      });
+      if (this.closed) this.wakeServer.close();
+    } catch (error) {
+      this.note('wake', `Could not listen for wakes on port ${wake.port}: ${String(error)}`);
+    }
+  }
+
+  /** Tell the team where to wake this machine; until it accepts, the machine never sleeps. */
+  private async registerWake(): Promise<void> {
+    const wake = this.options.wake;
+    if (!wake || this.wakeKey) return;
+    try {
+      const saved = await this.options.worker.request('accountRegisterWake', {
+        url: wake.url,
+        secret: wake.secret,
+      });
+      this.wakeKey = { secret: wake.secret, deviceId: saved.deviceId };
+      this.note(
+        'wake',
+        this.options.idleStopMs
+          ? `The team wakes this machine at ${wake.url}. It stops after ${Math.round(this.options.idleStopMs / 60_000)} minutes with no team work.`
+          : `The team wakes this machine at ${wake.url}.`,
+      );
+    } catch (error) {
+      this.note(
+        'wake',
+        `The team could not save this machine's wake address yet, so it stays on: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    }
+  }
+
+  /**
+   * Shut down after a quiet spell, but only when the team can wake this machine again. The poller
+   * settles first, so a task its last answer started keeps the machine up.
+   */
+  private async sleepIfIdle(status: AccountStatus): Promise<void> {
+    const limit = this.options.idleStopMs;
+    const now = this.clock();
+    const busy = this.runs.size > 0 || this.codingJobs.size > 0 || status.running !== null;
+    if (!limit || !this.wakeKey || !status.signedIn || busy) {
+      this.activeAt = now;
+      return;
+    }
+    if (this.sleeping || now - this.activeAt < limit) return;
+    this.sleeping = true;
+    const quietSince = this.activeAt;
+    await this.poller.settle();
+    const after = await this.options.worker.request('accountStatus');
+    // A task the last answer started, or a wake that arrived meanwhile, keeps the machine up.
+    if (
+      after.running ||
+      this.runs.size > 0 ||
+      this.codingJobs.size > 0 ||
+      this.activeAt !== quietSince
+    ) {
+      this.sleeping = false;
+      this.activeAt = this.clock();
+      this.poller.start();
+      return;
+    }
+    this.options.log(
+      `No team work for ${Math.round(limit / 60_000)} minutes. Stopping until the team wakes this machine.`,
+    );
+    this.options.onIdle?.();
   }
 
   /** Track running work the same way the desktop does, so the server is told when this machine is busy. */
@@ -161,9 +263,12 @@ export class TeamsHost {
       this.signInUrl = (await worker.request('accountSignIn')).authUrl;
       status = { ...status, signingIn: true };
     }
+    // The team knows this machine once it has asked for work, which is when it has a last answer.
+    if (status.signedIn && status.last) await this.registerWake();
     const published = this.view(status);
     await atomic(statusFile(root), published);
     this.report(published);
+    await this.sleepIfIdle(status);
     return published;
   }
 
@@ -178,6 +283,7 @@ export class TeamsHost {
       message: status.message,
       running: status.running,
       last: status.last,
+      wakeUrl: this.wakeKey ? (this.options.wake?.url ?? null) : null,
     };
   }
 
@@ -210,6 +316,7 @@ export class TeamsHost {
     this.closed = true;
     clearTimeout(this.timer);
     this.poller.stop();
+    this.wakeServer?.close();
     await this.options.worker.close();
   }
 }

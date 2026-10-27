@@ -16,6 +16,7 @@ import {
   MeSchema,
   ProjectCreatedSchema,
   TaskEventSchema,
+  WakeHookSchema,
   WorkAnswerSchema,
 } from '../packages/contracts/src/accounts-api.js';
 
@@ -39,6 +40,7 @@ const schemas: Record<string, z.ZodTypeAny> = {
   'task-needs-human.json': AccountTaskSchema,
   'work-assign.json': WorkAnswerSchema,
   'work-hold.json': WorkAnswerSchema,
+  'work-wake.json': WakeHookSchema,
 };
 
 void test('every Accounts API fixture parses with the vendored contract', async () => {
