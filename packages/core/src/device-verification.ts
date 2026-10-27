@@ -262,6 +262,10 @@ export class DeviceVerification {
   isBusy(projectId: string): boolean {
     return [...this.active.values()].some((run) => run.projectId === projectId);
   }
+  /** Whether this worker is driving any phone check, for any project or none. */
+  hasActive(): boolean {
+    return this.active.size > 0;
+  }
   /** Cancel only an owned device run, allowing cleanup to complete asynchronously. */
   cancel(id: string): { cancelled: boolean } {
     const active = this.active.get(id);

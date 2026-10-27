@@ -13,7 +13,6 @@ void test('polling stays within one minute even when idle, disabled, or recoveri
   };
   const poller = new AccountPoller({
     worker: { request },
-    isBusy: () => false,
     idleSeconds: () => 600,
     onBattery: () => false,
   });

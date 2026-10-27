@@ -235,6 +235,10 @@ export class DesktopVerification {
   async wait(id: string): Promise<void> {
     await this.active.get(id)?.done;
   }
+  /** Whether this worker is driving any desktop app check. */
+  hasActive(): boolean {
+    return this.active.size > 0;
+  }
   /** Cancel an owned run; the app stays open. */
   cancel(id: string): { cancelled: boolean } {
     const active = this.active.get(id);

@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { EventEmitter } from 'node:events';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -31,7 +30,6 @@ function fakeWorker(initial: Partial<AccountStatus> = {}) {
   };
   const calls: string[] = [];
   let closed = false;
-  const events = new EventEmitter();
   const worker = {
     request: (method: string) => {
       calls.push(method);
@@ -42,7 +40,6 @@ function fakeWorker(initial: Partial<AccountStatus> = {}) {
       }
       return Promise.resolve({ pollAfterSeconds: 60 });
     },
-    on: (name: string, listener: (...args: unknown[]) => void) => events.on(name, listener),
     close: () => {
       closed = true;
       return Promise.resolve();

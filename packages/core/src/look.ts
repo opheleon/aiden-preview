@@ -53,6 +53,26 @@ const lookedFile = (engine: Engine, projectId: string): string =>
 /** Projects with a scope answer that arrived while Aiden was busy, per worker engine. */
 const waitingAnswers = new WeakMap<Engine, Set<string>>();
 
+/** Look chains still deciding or running their next step, per worker engine and project. */
+const chains = new WeakMap<Engine, Map<string, number>>();
+
+/** Count a chain step in (+1) or out (-1); a project with no steps left is dropped. */
+function trackChain(engine: Engine, projectId: string, step: 1 | -1): void {
+  const counts = chains.get(engine) ?? new Map<string, number>();
+  chains.set(engine, counts);
+  const next = (counts.get(projectId) ?? 0) + step;
+  if (next > 0) counts.set(projectId, next);
+  else counts.delete(projectId);
+}
+
+/**
+ * Whether a look chain on the project may still start more work, such as sizing after a code
+ * check. Between two runs of a chain nothing is running, yet the project is not free.
+ */
+export function lookInProgress(engine: Engine, projectId: string): boolean {
+  return (chains.get(engine)?.get(projectId) ?? 0) > 0;
+}
+
 /** Whether a scope answer is waiting on the project, clearing it so it is used once. */
 function takeWaitingAnswer(engine: Engine, projectId: string): boolean {
   return waitingAnswers.get(engine)?.delete(projectId) ?? false;
@@ -91,6 +111,8 @@ function afterRun(
   next: (run: RunManifest) => Promise<boolean>,
   failure: string,
 ): void {
+  // A next step registers itself before this one is counted out, so the chain never looks done.
+  trackChain(engine, projectId, 1);
   void (async () => {
     // The run releases its project lock before wait() settles, so the next run can take it.
     await engine.wait(runId);
@@ -98,10 +120,12 @@ function afterRun(
     const run = (await engine.state(projectId)).runs.find((r) => r.id === runId);
     const continued = run?.status === 'completed' && (await next(run));
     if (!continued) chainEnded(engine, projectId, runId);
-  })().catch((e: unknown) => {
-    engine.emit({ type: 'failed', runId, projectId, message: `${failure} ${publicError(e)}` });
-    chainEnded(engine, projectId, runId);
-  });
+  })()
+    .catch((e: unknown) => {
+      engine.emit({ type: 'failed', runId, projectId, message: `${failure} ${publicError(e)}` });
+      chainEnded(engine, projectId, runId);
+    })
+    .finally(() => trackChain(engine, projectId, -1));
 }
 
 /** The chain ends when this run does, whatever its outcome. */

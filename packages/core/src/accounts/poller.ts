@@ -8,7 +8,8 @@ const maximumSeconds = 60;
 /**
  * Ask the account for work on the schedule the server suggests. The host process owns this timer
  * because only it can read idle time and power state (Electron main on a desktop, the headless
- * Teams worker on a server); the worker does the asking and the work.
+ * Teams worker on a server); the worker does the asking and the work, and reports whether it is
+ * busy from the work it is actually running.
  * Signed out, the worker answers immediately with a long interval and makes no network call.
  */
 export class AccountPoller {
@@ -19,7 +20,6 @@ export class AccountPoller {
   constructor(
     private readonly options: {
       worker: Pick<WorkerClient, 'request'>;
-      isBusy: () => boolean;
       idleSeconds: () => number;
       onBattery: () => boolean;
     },
@@ -50,7 +50,6 @@ export class AccountPoller {
       const answer = await this.options.worker.request('accountPoll', {
         idleSeconds: this.options.idleSeconds(),
         onBattery: this.options.onBattery(),
-        busy: this.options.isBusy(),
       });
       wait = Math.min(maximumSeconds, Math.max(minimumSeconds, answer.pollAfterSeconds));
     } catch {

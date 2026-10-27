@@ -29,6 +29,7 @@ type AccountMethod = Extract<
   | 'accountCreateProject'
   | 'accountShareProject'
   | 'accountPoll'
+  | 'activeWork'
   | 'accountSyncSetup'
   | 'accountCancelTask'
   | 'accountRetryTask'
@@ -50,6 +51,10 @@ const none = z.object({}).strict();
 const account = z.object({ accountId: z.string().min(1).max(64) }).strict();
 const task = z.object({ taskId: z.string().min(1).max(64) }).strict();
 const teamProject = account.extend({ projectId: z.string().min(1).max(64) }).strict();
+/** Machine signals a host sends with each poll; a host-sent `busy` is accepted but ignored. */
+const pollInput = z
+  .object({ idleSeconds: z.number().min(0), onBattery: z.boolean(), busy: z.boolean().optional() })
+  .strict();
 
 /** The first task of every account project: the same requirements step the solo app starts with. */
 const writeRequirements: NewAccountTask = {
@@ -131,6 +136,12 @@ export function accountMethods(
     };
     return built;
   };
+  /**
+   * Whether this machine is doing work, read from what the worker is actually running: engine
+   * work or a Teams task it leased. Never from the host's view of run events, which a log line
+   * arriving after a run finished could leave stuck on busy.
+   */
+  const busy = (): boolean => engine.hasActiveWork() || !!built?.agent.status().running;
   // Desktop tests follow the team admins' allowed app publishers whenever this machine is signed in.
   engine.desktops.teamPublishers = async () => {
     const { session, client } = context();
@@ -195,12 +206,8 @@ export function accountMethods(
         return null;
       },
     ),
-    accountPoll: operation(
-      z
-        .object({ idleSeconds: z.number().min(0), onBattery: z.boolean(), busy: z.boolean() })
-        .strict(),
-      (p) => context().agent.poll(p),
-    ),
+    accountPoll: operation(pollInput, (p) => context().agent.poll({ ...p, busy: busy() })),
+    activeWork: operation(none, () => ({ busy: busy() })),
   };
 }
 
