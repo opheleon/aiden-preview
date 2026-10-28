@@ -55,8 +55,8 @@ function instructionsFor(
 }
 
 /**
- * Once a team project's setup is complete, hand what the code check found missing to Claude Code
- * as vertical slices: one build task per delivery-plan feature with unfinished requirements. Each
+ * Once a team project's setup is complete, hand what the code check found missing to the project's
+ * coding agent (Claude Code or Codex, as its model is set) as vertical slices: one build task per delivery-plan feature with unfinished requirements. Each
  * task can change every repository the feature needs and ends with one PR per changed repository,
  * and separate features can go to separate machines at the same time. Without a delivery plan,
  * everything missing is one slice. Queued once per version of the requirements and feature.
@@ -99,8 +99,10 @@ export async function queueBuild(
       title: `Build: ${feature.title}`.slice(0, 200),
       instructions: instructionsFor(feature, mine, baseline, repositories),
       requirementIds: mine.map((gap) => gap.requirementId),
-      tools: ['git', 'gh', 'claude'],
-      usesModel: false,
+      // Only machines with the project's own coding agent, signed in with its exact billing mode
+      // and under the member's usage cap, may take a build.
+      tools: ['git', 'gh', project.runtime.provider],
+      usesModel: true,
       dedupeKey: `build:${project.id}:${baseline.id}:${feature.id}`,
     });
   }
