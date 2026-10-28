@@ -59,11 +59,13 @@ A parallel job on a GitHub-hosted Windows runner builds an NSIS installer, `Aide
 
 Windows builds are unsigned because no code-signing certificate is configured, so SmartScreen warns on first launch. Signing carries an ongoing cost (for example, Azure Trusted Signing or an OV certificate). Required quality checks install the Windows NSIS package into an isolated directory and run the same desktop journeys as macOS. Native executable fixtures keep provider authentication synthetic without enabling shell execution in the app.
 
-### Permanent installer link
+### Permanent installer links
 
-Each release also includes `Aiden-arm64.dmg`, an exact copy of its signed and notarized versioned DMG. The alias is included in the checksums and provenance, and publication verifies that the two files match. Versioned installers and automatic-update manifests keep their existing names.
+Each stable release also includes `Aiden-arm64.dmg` and `Aiden-x64.exe`, exact copies of its versioned macOS DMG and Windows installer. The aliases are included in the checksums and provenance, and publication verifies that each matches its versioned file. Versioned installers and automatic-update manifests keep their existing names.
 
-The marketing site can use `https://github.com/opheleon/aiden-preview/releases/latest/download/Aiden-arm64.dmg` to download the latest stable Apple Silicon installer without updating its URL for every release. GitHub excludes pre-releases from `latest`. Before switching the site, publish a stable release containing the alias and verify that the permanent link downloads it; older releases do not contain this filename.
+The marketing site and the Teams dashboard can use `https://github.com/opheleon/aiden-preview/releases/latest/download/Aiden-arm64.dmg` and `.../Aiden-x64.exe` to download the latest stable installers without updating their URLs for every release. GitHub excludes pre-releases from `latest`. Older releases do not contain these filenames; `Aiden-x64.exe` first appears in the release after v1.2.5.
+
+Aiden Beta keeps its own fixed addresses on one pre-release tagged `aiden-beta`, named "Aiden Beta (newest build)": `https://github.com/opheleon/aiden-preview/releases/download/aiden-beta/Aiden-Beta-arm64.dmg` and `.../Aiden-Beta-x64.exe`. Every beta publish moves the tag to the pushed commit and replaces both files with that build's installers, uploading each new file before removing the old one. The tag is not a version, so neither app's updater offers it, and as a pre-release it is never `latest`. Checksums and provenance stay on the versioned release, and the files are byte-for-byte copies of it.
 
 ### Repository secrets
 

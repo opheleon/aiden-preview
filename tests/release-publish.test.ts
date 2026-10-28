@@ -16,7 +16,10 @@ const script = workflow.jobs.publish.steps.find(
   (step) => step.name === 'Publish GitHub Release',
 )!.run!;
 const aliasScript = workflow.jobs.publish.steps.find(
-  (step) => step.name === 'Create permanent download alias',
+  (step) => step.name === 'Create permanent download aliases',
+)!.run!;
+const fixedBetaScript = workflow.jobs.publish.steps.find(
+  (step) => step.name === 'Point the fixed Aiden Beta downloads at this build',
 )!.run!;
 
 // This CLI substitute records mutations. It never contacts GitHub or sees a real token.
@@ -77,14 +80,28 @@ async function publishFixture(mode: string, version = '1.1.1', flavor = 'product
   ];
   if (mode === 'missing-windows') files.splice(5, 3);
   for (const file of files) await writeFile(path.join(assets, file), 'synthetic artifact');
-  // The alias step runs only for production; README download links depend on it.
+  // The alias step runs only for production; README and Teams download links depend on it.
   if (!beta) {
-    await exec('/bin/bash', ['-c', aliasScript], { cwd: assets, env: { ...process.env, ...plan } });
+    const alias = exec('/bin/bash', ['-c', aliasScript], {
+      cwd: assets,
+      env: { ...process.env, ...plan },
+    });
+    // Without the Windows installer there is nothing to alias, so the job stops before publishing.
+    if (mode === 'missing-windows') {
+      await assert.rejects(alias);
+      await rm(root, { recursive: true, force: true });
+      return { failed: true, requests: [] as string[][] };
+    }
+    await alias;
     assert.deepEqual(
       await readFile(path.join(assets, 'Aiden-arm64.dmg')),
       await readFile(path.join(assets, files[0]!)),
     );
-    files.push('Aiden-arm64.dmg');
+    assert.deepEqual(
+      await readFile(path.join(assets, 'Aiden-x64.exe')),
+      await readFile(path.join(assets, `${prefix}-${version}-x64.exe`)),
+    );
+    files.push('Aiden-arm64.dmg', 'Aiden-x64.exe');
   }
   if (mode === 'different-alias')
     await writeFile(path.join(assets, 'Aiden-arm64.dmg'), 'different installer');
@@ -92,6 +109,8 @@ async function publishFixture(mode: string, version = '1.1.1', flavor = 'product
   await writeFile(path.join(assets, 'SHA256SUMS.txt'), stdout);
   if (mode === 'missing-local') await rm(path.join(assets, files[0]!));
   if (mode === 'missing-alias') await rm(path.join(assets, 'Aiden-arm64.dmg'));
+  if (mode === 'different-windows-alias')
+    await writeFile(path.join(assets, 'Aiden-x64.exe'), 'different installer');
   if (mode === 'corrupt')
     await writeFile(path.join(assets, files[0]!), 'changed after attestation');
   // macOS ships shasum rather than GNU sha256sum. Keep the real checksum verification.
@@ -131,8 +150,9 @@ void test('publishing uploads all attested files before publishing the exact cre
     const uploads = requests.filter((args) =>
       args.some((arg) => arg.startsWith('https://uploads.github.com/')),
     );
-    assert.equal(uploads.length, 10);
+    assert.equal(uploads.length, 11);
     assert.ok(uploads.some((args) => args.includes('Aiden-arm64.dmg')));
+    assert.ok(uploads.some((args) => args.includes('Aiden-x64.exe')));
     assert.ok(requests.some((args) => args.includes(`prerelease=${version.includes('-')}`)));
     assert.deepEqual(requests.at(-1), [
       'api',
@@ -186,6 +206,7 @@ void test('duplicate tags, partial uploads, and corrupt or missing artifacts can
     'missing-windows',
     'missing-alias',
     'different-alias',
+    'different-windows-alias',
     'corrupt',
   ]) {
     const { failed, requests } = await publishFixture(mode);
@@ -199,10 +220,116 @@ void test('duplicate tags, partial uploads, and corrupt or missing artifacts can
         'missing-windows',
         'missing-alias',
         'different-alias',
+        'different-windows-alias',
         'corrupt',
       ].includes(mode)
     ) {
       assert.ok(!requests.some((args) => args.includes('POST')), mode);
     }
   }
+});
+
+// This CLI substitute answers the fixed Aiden Beta step: no fixed release yet, or one that already
+// holds the previous build's files. It records every call and never contacts GitHub.
+const fixedGhFixture = `#!${process.execPath}
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.CALLS, JSON.stringify(args) + '\\n');
+const existing = process.env.MODE === 'existing';
+const url = args.find((a) => a.startsWith('repos/') || a.startsWith('https://'));
+if (args.includes('POST') && url.startsWith('https://uploads.github.com/')) {
+  console.log(url.includes('next-Aiden-Beta-arm64.dmg') ? '501' : '502');
+} else if (args.includes('POST')) { console.log('900'); }
+else if (args.includes('PATCH') || args.includes('DELETE')) { console.log('ok'); }
+else if (url.endsWith('/assets?per_page=100')) {
+  console.log(JSON.stringify([existing ? [
+    { id: 11, name: 'Aiden-Beta-arm64.dmg' },
+    { id: 12, name: 'Aiden-Beta-x64.exe' },
+    { id: 13, name: 'next-Aiden-Beta-x64.exe' },
+  ] : []]));
+} else {
+  console.log(JSON.stringify([[{ tag_name: 'v1.1.1-aidenbeta.41', id: 7 }].concat(
+    existing ? [{ tag_name: 'aiden-beta', id: 900 }] : [])]));
+}
+`;
+
+/**
+ * Run the fixed Aiden Beta step against a substitute GitHub CLI.
+ * @param mode `new` when no fixed release exists yet, or `existing`.
+ */
+async function fixedBetaFixture(mode: 'new' | 'existing') {
+  const root = await mkdtemp(path.join(tmpdir(), 'aiden-fixed-beta-'));
+  const calls = path.join(root, 'calls');
+  const version = '1.1.1-aidenbeta.42';
+  await writeFile(path.join(root, 'gh'), fixedGhFixture, { mode: 0o755 });
+  await writeFile(calls, '');
+  for (const file of [`Aiden-Beta-${version}-arm64.dmg`, `Aiden-Beta-${version}-x64.exe`])
+    await writeFile(path.join(root, file), 'synthetic artifact');
+  await exec('/bin/bash', ['-c', fixedBetaScript], {
+    cwd: root,
+    env: {
+      PATH: `${root}:${process.env.PATH}`,
+      GITHUB_REPOSITORY: 'synthetic/aiden',
+      GITHUB_SHA: 'synthetic-sha',
+      VERSION: version,
+      MODE: mode,
+      CALLS: calls,
+    },
+  });
+  const requests = (await readFile(calls, 'utf8'))
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line) as string[]);
+  await rm(root, { recursive: true, force: true });
+  return requests;
+}
+
+void test('the first Aiden Beta creates a never-latest pre-release with fixed file names', async () => {
+  const requests = await fixedBetaFixture('new');
+  const create = requests.find(
+    (args) => args.includes('POST') && args.includes('repos/synthetic/aiden/releases'),
+  )!;
+  for (const field of [
+    'tag_name=aiden-beta',
+    'target_commitish=synthetic-sha',
+    'prerelease=true',
+    'draft=false',
+    'make_latest=false',
+  ])
+    assert.ok(create.includes(field), field);
+  assert.ok(!requests.some((args) => args.includes('DELETE')));
+  const renames = requests.filter((args) => args.some((a) => a.includes('/releases/assets/')));
+  assert.deepEqual(
+    renames.map((args) => [args.find((a) => a.includes('/releases/assets/')), args.at(-3)]),
+    [
+      ['repos/synthetic/aiden/releases/assets/501', 'name=Aiden-Beta-arm64.dmg'],
+      ['repos/synthetic/aiden/releases/assets/502', 'name=Aiden-Beta-x64.exe'],
+    ],
+  );
+});
+
+void test('later Aiden Betas move the tag and replace the fixed files only after uploading', async () => {
+  const requests = await fixedBetaFixture('existing');
+  assert.ok(
+    !requests.some(
+      (args) => args.includes('POST') && args.includes('repos/synthetic/aiden/releases'),
+    ),
+  );
+  const index = (match: (args: string[]) => boolean) => requests.findIndex(match);
+  const tagMove = index((args) => args.includes('repos/synthetic/aiden/git/refs/tags/aiden-beta'));
+  assert.ok(requests[tagMove]!.includes('sha=synthetic-sha'));
+  assert.ok(requests[tagMove]!.includes('force=true'));
+  const edit = requests.find((args) => args.includes('repos/synthetic/aiden/releases/900'))!;
+  assert.ok(edit.includes('make_latest=false'));
+  const upload = (name: string) =>
+    index((args) => args.some((a) => a.endsWith(`assets?name=next-${name}`)));
+  const remove = (id: number) =>
+    index(
+      (args) =>
+        args.includes('DELETE') && args.includes(`repos/synthetic/aiden/releases/assets/${id}`),
+    );
+  // The old file goes only once its replacement is uploaded; a leftover temporary upload goes first.
+  assert.ok(upload('Aiden-Beta-arm64.dmg') < remove(11));
+  assert.ok(remove(13) < upload('Aiden-Beta-x64.exe'));
+  assert.ok(upload('Aiden-Beta-x64.exe') < remove(12));
 });
