@@ -128,7 +128,7 @@ export function Agents({ workspace }: { workspace: Workspace }): JSX.Element {
     void workspace.load(projectId).then(() => workspace.setArea('projects'));
   const lede = !agents.length
     ? 'No machines are picking up work. Work waits until someone opens Aiden.'
-    : `${working === 1 ? 'One agent is' : `${working || 'No'} agents are`} working on your team’s Macs.${
+    : `${working === 1 ? 'One agent is' : `${working || 'No'} agents are`} working on your team’s machines.${
         waitingOnYou
           ? ` ${waitingOnYou === 1 ? 'One is' : `${waitingOnYou} are`} waiting on you.`
           : ''
@@ -166,7 +166,7 @@ export function Agents({ workspace }: { workspace: Workspace }): JSX.Element {
                     </span>
                   }
                   title={doing}
-                  sub={`${owner}’s agent · ${word}`}
+                  sub={`${device.name} · ${owner}’s agent · ${word}`}
                   meta={task ? projectName(state, task) : `Seen ${when(device.lastSeenAt)}`}
                   open={open === device.deviceId}
                   onToggle={() => setOpen(toggle(open, device.deviceId))}
@@ -187,7 +187,7 @@ export function Agents({ workspace }: { workspace: Workspace }): JSX.Element {
                 key={task.id}
                 lead={<WorkDot dot="quiet" />}
                 title={task.title}
-                sub={task.waiting ?? 'The next machine with room picks it up'}
+                sub={task.waiting ?? task.progress ?? 'The next machine with room picks it up'}
                 meta={projectName(state, task)}
                 open={open === task.id}
                 onToggle={() => setOpen(toggle(open, task.id))}
