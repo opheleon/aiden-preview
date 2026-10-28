@@ -82,6 +82,19 @@ function codingFollowUp(job: CodingJob, pullRequests: string[], verdict: string[
   };
 }
 
+/**
+ * What the team must answer before a stopped build can continue: the agent's blocking questions,
+ * or its summary when it stopped without asking one.
+ * Example: blocking questions "Which Zoom app?" and "Who owns OAuth?" become a numbered list of both.
+ */
+function blockingQuestions(job: CodingJob): string {
+  const blocking = (job.openQuestions ?? []).filter((item) => item.blocking);
+  const text = blocking.length
+    ? blocking.map((item, index) => `${index + 1}. ${item.question}`).join('\n')
+    : job.message;
+  return text.slice(0, 5000);
+}
+
 /** Hand the change to the project's coding agent on this machine and report its PR, or why it stopped. */
 async function build(
   engine: Engine,
@@ -103,7 +116,7 @@ async function build(
   );
   if (job.status === 'failed' || job.status === 'interrupted') throw new Error(job.message);
   if (job.status === 'needs_input' && controls.block) {
-    await controls.block('Coding needs a human answer', job.message);
+    await controls.block('Coding needs a human answer', blockingQuestions(job));
     controls.signal.throwIfAborted();
   }
   return {
