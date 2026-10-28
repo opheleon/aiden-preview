@@ -228,19 +228,23 @@ void test('setup saves a project configuration and automatic checks use it witho
   assert.equal((await readAppUrl(engine, f.project.id)).phone?.target.udid, config.target.udid);
   assert.deepEqual(await readAppUrl(engine, 'another-project'), { url: null });
   await startLook(engine, f.project.id, 'morning');
-  await until(async () =>
-    (await engine.history(f.project.id)).some(
-      (r) => r.kind === 'estimate' && r.status === 'completed',
-    ),
+  // A run is saved as completed just before it releases the project, so also wait until the
+  // engine has let go of it; starting the next check sooner is refused as a second operation.
+  await until(
+    async () =>
+      (await engine.history(f.project.id)).some(
+        (r) => r.kind === 'estimate' && r.status === 'completed',
+      ) && !engine.isBusy(f.project.id),
   );
   assert.equal((await devices.list()).length, 1);
   await saveVerificationSettings(engine, f.project.id, { trigger: 'manual' });
   const next = await startLook(engine, f.project.id, 'you');
-  await until(async () =>
-    (await engine.history(f.project.id)).some(
-      (r) =>
-        'estimateReportId' in r && r.estimateReportId === next.runId && r.status === 'completed',
-    ),
+  await until(
+    async () =>
+      (await engine.history(f.project.id)).some(
+        (r) =>
+          'estimateReportId' in r && r.estimateReportId === next.runId && r.status === 'completed',
+      ) && !engine.isBusy(f.project.id),
   );
   assert.equal((await devices.list()).length, 1, 'manual mode does not touch the phone');
   const forced = await startLook(engine, f.project.id, 'you', undefined, true);
@@ -272,11 +276,12 @@ void test('browser/API configuration is dispatched after assessment and preserve
     return Promise.resolve({ runId: 'synthetic-browser-run' });
   });
   const next = await startLook(engine, f.project.id, 'you');
-  await until(async () =>
-    (await engine.history(f.project.id)).some(
-      (r) =>
-        'estimateReportId' in r && r.estimateReportId === next.runId && r.status === 'completed',
-    ),
+  await until(
+    async () =>
+      (await engine.history(f.project.id)).some(
+        (r) =>
+          'estimateReportId' in r && r.estimateReportId === next.runId && r.status === 'completed',
+      ) && !engine.isBusy(f.project.id),
   );
   assert.deepEqual(started, [f.project.id]);
   const file = path.join(store.project(f.project.id), 'verification.json');

@@ -6,15 +6,20 @@ import { promisify } from 'node:util';
 import { z } from 'zod/v3';
 
 import { git, type Repository, validateRepository } from './git.js';
+import { githubCliEnv } from './github-accounts.js';
 const exec = promisify(execFile);
 const name = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
-/** Read-only GitHub commands use argument arrays and never reveal provider error output. */
+/**
+ * Read-only GitHub commands use argument arrays and never reveal provider error output. They run
+ * with the GitHub tools' PATH, so an app opened from Finder, whose PATH lacks Homebrew, still
+ * finds the same `gh` its readiness check found.
+ */
 export async function github(args: string[]): Promise<unknown> {
   try {
     const { stdout } = await exec('gh', args, {
       timeout: 30000,
       maxBuffer: 1024 * 1024,
-      env: { ...process.env, GH_PROMPT_DISABLED: '1' },
+      env: githubCliEnv(),
     });
     return JSON.parse(stdout);
   } catch {
@@ -197,7 +202,7 @@ export async function publishJobBranch(input: PublicationInput): Promise<string>
         '--body',
         input.body.slice(0, 60000),
       ]),
-      { timeout: 60000, signal: input.signal, env: { ...process.env, GH_PROMPT_DISABLED: '1' } },
+      { timeout: 60000, signal: input.signal, env: githubCliEnv() },
     );
     const url = stdout.trim().split('\n').pop() ?? '';
     if (!/^https:\/\/github\.com\/\S+\/pull\/\d+$/.test(url)) throw new Error(url);
