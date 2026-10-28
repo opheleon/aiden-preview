@@ -8,6 +8,7 @@ import {
   BetaSettingsSchema,
   type CodingJob,
   CodingJobSchema,
+  CodingOutputSchema,
   CodingResultSchema,
 } from '../../contracts/src/index.js';
 import { publicError } from '../../runtimes/src/index.js';
@@ -309,7 +310,7 @@ function codingRequest(
     config: job.runtime,
     cwd: job.worktree,
     prompt,
-    schema: zodToJsonSchema(CodingResultSchema),
+    schema: zodToJsonSchema(CodingOutputSchema),
     tools: controls?.tools ?? { url: '', token: '' },
     ...(controls?.activity ? { activity: controls.activity } : {}),
     signal,

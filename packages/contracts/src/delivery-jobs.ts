@@ -70,13 +70,54 @@ export const BetaSettingsSchema = z
   .strict();
 /** Per-project schedule for verifying the deployed beta after merge. */
 export type BetaSettings = z.infer<typeof BetaSettingsSchema>;
-/** Claude's report is a delivery claim, independently checked against GitHub before scheduling beta. */
+const resultFields = {
+  outcome: z.enum(['ready', 'needs_input']),
+  summary: z.string().min(1).max(3000),
+  pullRequestUrl: z.string().nullable(),
+  localChecks: z.array(z.string().max(500)).max(30),
+};
+/**
+ * What the coding agent is asked to return. Every field is required, with empty lists and null
+ * for nothing, because Codex's structured output (strict mode) rejects optional fields.
+ */
+export const CodingOutputSchema = z
+  .object({
+    decisions: z.array(z.string().max(1000)).max(30),
+    assumptions: z.array(z.string().max(1000)).max(30),
+    openQuestions: z
+      .array(
+        z
+          .object({
+            question: z.string().min(1).max(2000),
+            assigneeUserId: z.string().max(64).nullable(),
+            blocking: z.boolean(),
+          })
+          .strict(),
+      )
+      .max(20),
+    ...resultFields,
+  })
+  .strict();
+/**
+ * The agent's report as Aiden reads it: a delivery claim, independently checked against GitHub
+ * before scheduling beta. Missing lists read as empty and a null assignee as none.
+ */
 export const CodingResultSchema = z
   .object({
-    ...decisionFields,
-    outcome: z.enum(['ready', 'needs_input']),
-    summary: z.string().min(1).max(3000),
-    pullRequestUrl: z.string().nullable(),
-    localChecks: z.array(z.string().max(500)).max(30),
+    decisions: z.array(z.string().max(1000)).max(30).default([]),
+    assumptions: z.array(z.string().max(1000)).max(30).default([]),
+    openQuestions: z
+      .array(
+        CodingQuestionSchema.extend({
+          assigneeUserId: z
+            .string()
+            .max(64)
+            .nullish()
+            .transform((id) => id ?? undefined),
+        }),
+      )
+      .max(20)
+      .default([]),
+    ...resultFields,
   })
   .strict();
