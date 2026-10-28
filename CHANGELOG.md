@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Team builds and coding jobs no longer fail with "Could not read GitHub" when Aiden was opened from Finder, the Dock, or a restart to update. Those launches do not include Homebrew's folder in the app's PATH, so the build could not find the GitHub CLI that Aiden's own readiness check had found.
 - Teams: a build now goes only to a machine with the project's own coding agent (Claude Code or Codex) signed in with the project's billing mode, and counts against that member's usage cap like other model work. Builds used to require Claude Code even on Codex projects, never checked the Codex sign-in, and ignored the usage cap.
 - Coding works with Codex as well as Claude Code. A team build, or a coding job sent from the project page, runs in whichever one the project's model is set to. Codex works in the job's own worktrees with no approvals, can write only those worktrees, their Git folder, and temporary folders, and reports progress the same way Claude Code does. Builds on Codex projects used to fail three times with "External coding currently requires Claude Code."
 - Teams: the daily Morning check now runs. It checks the latest code against the requirements, like Run the check now; it used to fail three times with "This version of Aiden cannot do 'Morning check' yet." Each machine also tells the team which kinds of work its version can do, so work it cannot do waits for a machine that can, with "Needs a newer version of Aiden", instead of failing there.
