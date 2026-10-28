@@ -8,7 +8,7 @@ import { teamsDebug } from './debug.js';
 import { documentFor, localDocument, materialize } from './documents.js';
 import { type InventoryProbe, machineState } from './inventory.js';
 import { type CompletionReceipt, flushReceipts, saveReceipt, sendReceipt } from './receipts.js';
-import { runAccountTask, type TaskControls } from './runner.js';
+import { runAccountTask, supportedTaskKinds, type TaskControls } from './runner.js';
 import type { AccountSession } from './session.js';
 import { syncSetupTasks } from './setup-tasks.js';
 import { superviseAttempt } from './supervisor.js';
@@ -114,6 +114,7 @@ export class AccountAgent {
       usageCapPct: preferences.usageCapPct,
       appVersion: (process.env.AIDEN_APP_VERSION ?? 'dev').slice(0, 40),
       os: process.platform,
+      taskKinds: [...supportedTaskKinds],
     };
   }
 

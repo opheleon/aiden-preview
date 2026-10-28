@@ -12,7 +12,9 @@ import type { RuntimeConfig } from '../../contracts/src/index.js';
 import { claudeDiagnostics, claudeModels, claudeUsage, runClaude } from './claude.js';
 import { openClaudeSignIn } from './claude-login.js';
 import { loadCodexModels, runCodex } from './codex.js';
+import { runCodexCoding } from './codex-coding.js';
 import { accountSchema, loginSchema } from './codex-schemas.js';
+import { superviseCoding } from './coding-supervision.js';
 import { cleanEnvironment } from './environment.js';
 import { codexPlanUsage, unknownUsage } from './plan-usage.js';
 import { RpcClient } from './rpc.js';
@@ -55,14 +57,21 @@ export class Runtimes implements AgentRuntime {
       process.env[provider === 'claude' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY']
     );
   }
-  /** Initialize a fresh Codex process and close it on cancellation or initialization failure. */
+  /**
+   * Initialize a fresh Codex process and close it on cancellation or initialization failure.
+   * @param auth Billing mode; API-key turns use their own Codex home so sign-ins never mix.
+   * @param overrides `-c` configuration overrides for this process.
+   * @param signal Cancels startup.
+   * @param base Starting environment; coding adds Git and cache settings to the clean default.
+   */
   private async client(
     auth: 'subscription' | 'apiKey',
     overrides: string[] = [],
     signal?: AbortSignal,
+    base: NodeJS.ProcessEnv = cleanEnvironment(),
   ): Promise<RpcClient> {
     await mkdir(this.home, { recursive: true, mode: 0o700 });
-    const env = cleanEnvironment();
+    const env = { ...base };
     if (auth === 'apiKey') {
       env.CODEX_HOME = path.join(this.home, 'codex-api');
       await mkdir(env.CODEX_HOME, { recursive: true, mode: 0o700 });
@@ -192,10 +201,19 @@ export class Runtimes implements AgentRuntime {
   /** Dispatch one turn to the selected provider; cancellation is checked before any provider work. */
   async run(r: RuntimeRequest): Promise<RuntimeResult> {
     r.signal.throwIfAborted();
-    if (r.coding && r.config.provider !== 'claude')
-      throw new Error('External coding jobs currently require Claude Code.');
     if (r.config.provider === 'claude') return this.claude(r);
+    if (r.coding) return this.codexCoding(r);
     return this.codex(r);
+  }
+  /** Code with Codex in the job's worktrees under the same time limits as Claude Code. */
+  private async codexCoding(r: RuntimeRequest): Promise<RuntimeResult> {
+    return superviseCoding(r, (bounded) =>
+      runCodexCoding(
+        bounded,
+        (overrides, env) => this.client(bounded.config.auth, overrides, bounded.signal, env),
+        this.key('codex'),
+      ),
+    );
   }
   /** Use the Claude adapter with the session key and pinned SDK identity. */
   private async claude(r: RuntimeRequest): Promise<RuntimeResult> {

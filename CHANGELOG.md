@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Coding works with Codex as well as Claude Code. A team build, or a coding job sent from the project page, runs in whichever one the project's model is set to. Codex works in the job's own worktrees with no approvals, can write only those worktrees, their Git folder, and temporary folders, and reports progress the same way Claude Code does. Builds on Codex projects used to fail three times with "External coding currently requires Claude Code."
+- Teams: the daily Morning check now runs. It checks the latest code against the requirements, like Run the check now; it used to fail three times with "This version of Aiden cannot do 'Morning check' yet." Each machine also tells the team which kinds of work its version can do, so work it cannot do waits for a machine that can, with "Needs a newer version of Aiden", instead of failing there.
 - Teams: a Mac no longer stays "Busy with local work" after its checks finish. The worker now reports busy from the work it is actually running, so a log line written to a finished check (such as the browser check asking where the app runs) cannot keep the machine from picking up team builds, and updates and automatic checks are no longer held back by it.
 - Restart to update works right after a check finishes. It was refused for up to five seconds after a check ended, with "Finish or cancel the active assessment before restarting to update", because the app still counted the finished check as running.
 - Answering a Guide question while a check is running no longer drops the answer. Aiden saves it right away, says it will update the requirements when the current work finishes, and then does so without asking again.

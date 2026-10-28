@@ -142,10 +142,12 @@ void test('a hold is reported with its reason and the suggested wait, with verif
       at,
     });
     const body = calls[0]?.args[0] as {
-      sample: { tools: Record<string, unknown>; usageCapPct: number };
+      sample: { tools: Record<string, unknown>; usageCapPct: number; taskKinds: string[] };
     };
     assert.deepEqual(body.sample.tools.gh, { installed: true, signedIn: true });
     assert.equal(body.sample.usageCapPct, 70);
+    // The team only assigns kinds this version runs, such as the daily Morning check.
+    assert.deepEqual(body.sample.taskKinds, ['write-requirements', 'check-code', 'build']);
   } finally {
     await engine.dispose();
   }
@@ -187,6 +189,43 @@ void test('a leased Write requirements task runs here, uploads the baseline, and
     ) as { account: unknown };
     assert.deepEqual(local.account, { accountId: 'acct-1', revision: 2 });
     assert.equal(agent.status().running, null);
+  } finally {
+    await engine.dispose();
+  }
+});
+
+void test('a leased Morning check runs a morning code check here instead of being refused', async () => {
+  const { agent, calls, script, session, engine, store, project } = await setup();
+  try {
+    await session.saveRefresh('refresh-token');
+    await materialize(engine, serverProject(project), true);
+    const prepared = await engine.prepare(project, { autoAccept: true });
+    await engine.wait(prepared.runId);
+    const baseline = JSON.parse(
+      await readFile(path.join(store.project(project.id), 'baseline.json'), 'utf8'),
+    ) as Parameters<typeof documentFor>[1];
+    script.next = () => ({
+      decision: { type: 'assign', reason: 'Best fit for this machine' },
+      task: leased('check-code'),
+      project: { ...serverProject(project), document: documentFor(project, baseline) },
+    });
+    await agent.poll(poll);
+    await agent.idle();
+    // A team project keeps only GitHub clones, so this fixture's check has no code to read and
+    // ends unfinished; what matters here is that the kind runs as a check, not a refusal.
+    const failed = calls.find((c) => c.method === 'fail')?.args[1] as
+      { error?: string } | undefined;
+    assert.doesNotMatch(failed?.error ?? '', /cannot do/);
+    const runs = await engine.history(project.id);
+    assert.ok(
+      runs.some((run) => run.kind === 'report' && run.reason === 'morning'),
+      'a morning code check ran on this machine',
+    );
+    assert.equal(
+      calls.some((c) => c.method === 'replaceDocument'),
+      false,
+      'a check leaves the shared document unchanged',
+    );
   } finally {
     await engine.dispose();
   }
