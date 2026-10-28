@@ -5,7 +5,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
+import { zodToJsonSchema } from 'zod-to-json-schema';
+
 import type { ExecutionActivity } from '../packages/contracts/src/accounts-execution.js';
+import { CodingOutputSchema, CodingResultSchema } from '../packages/contracts/src/index.js';
 import { codexActivity, codexStep, writableRoots } from '../packages/runtimes/src/codex-coding.js';
 import { Runtimes } from '../packages/runtimes/src/index.js';
 import type { RuntimeRequest } from '../packages/runtimes/src/types.js';
@@ -213,4 +216,32 @@ void test('writable roots cover every worktree of a multi-repository build and f
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+void test('the coding answer schema meets Codex strict output, and older answers still read', () => {
+  // Codex's structured output rejects a schema unless every object lists all of its properties
+  // as required and allows no others; optional fields fail the whole run before any coding.
+  const problems: string[] = [];
+  const walk = (node: unknown, at: string): void => {
+    if (!node || typeof node !== 'object') return;
+    const n = node as { properties?: object; required?: string[]; additionalProperties?: unknown };
+    if (n.properties) {
+      for (const key of Object.keys(n.properties))
+        if (!n.required?.includes(key)) problems.push(`${at}.${key} is optional`);
+      if (n.additionalProperties !== false) problems.push(`${at} allows extra properties`);
+    }
+    for (const [key, value] of Object.entries(node)) walk(value, `${at}/${key}`);
+  };
+  walk(zodToJsonSchema(CodingOutputSchema), '#');
+  assert.deepEqual(problems, []);
+  const read = CodingResultSchema.parse({
+    outcome: 'ready',
+    summary: 'Done',
+    pullRequestUrl: null,
+    localChecks: [],
+    openQuestions: [{ question: 'Which label?', assigneeUserId: null, blocking: false }],
+  });
+  assert.deepEqual(read.decisions, []);
+  assert.equal(read.openQuestions[0]!.question, 'Which label?');
+  assert.equal(read.openQuestions[0]!.assigneeUserId, undefined, 'null reads as no assignee');
 });
