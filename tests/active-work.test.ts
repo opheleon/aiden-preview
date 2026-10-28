@@ -24,7 +24,8 @@ async function until(check: () => Promise<boolean> | boolean, what: string): Pro
 
 /**
  * An engine with approved requirements, the worker's account methods over it, and Electron
- * main's busy mirror wired the way main.ts wires it: every worker event refreshes the mirror.
+ * main's busy mirror wired the way main.ts wires it: every worker event, and the worker's note
+ * that a run has fully finished, refreshes the mirror.
  */
 async function setup() {
   const f = await fixture();
@@ -36,6 +37,7 @@ async function setup() {
     events.push(event);
     void holder.mirror?.refresh();
   });
+  engine.onWorkChanged = () => void holder.mirror?.refresh();
   // Nothing answers on localhost, so the browser check has to ask where the app runs.
   engine.discover = { fetch: () => Promise.reject(new Error('connection refused')) };
   const methods = accountMethods(engine, {
@@ -121,6 +123,22 @@ void test('a check whose surface follow-up only logs, with no terminal event, en
     assert.equal(await s.busy(), false);
     await s.mirror.refresh();
     assert.equal(s.mirror.isBusy(), false);
+  } finally {
+    await s.close();
+  }
+});
+
+void test('the busy mirror goes idle on its own once a finished run leaves the worker', async () => {
+  const s = await setup();
+  try {
+    // No manual refresh and no timer: only worker events and the finished-run note move it.
+    const started = await s.engine.report(s.f.project.id);
+    await until(() => s.mirror.isBusy(), 'the mirror to see the check running');
+    await s.engine.wait(started.runId);
+    await s.settled(1, 'the check');
+    // The completed event arrives while the run still holds its lock, so a read on that event
+    // alone says busy; a restart to update would then be refused until the next timer read.
+    await until(() => !s.mirror.isBusy(), 'the mirror to see the worker idle');
   } finally {
     await s.close();
   }

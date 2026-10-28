@@ -60,6 +60,12 @@ export class Engine {
   readonly desktops: DesktopVerification;
   /** How Aiden probes localhost for a running app; tests replace `fetch` so no socket opens. */
   discover: DiscoverOptions = {};
+  /**
+   * Called once a run has left the active set, after its terminal event. A run announces that it
+   * finished before it releases its lock, so a host that reads `hasActiveWork` on that event still
+   * sees it running; this second signal lets the host read again once it is really gone.
+   */
+  onWorkChanged: () => void = () => {};
   /** Bind storage, provider, and integration dependencies without starting provider execution. */
   constructor(
     public store = new Store(),
@@ -437,6 +443,11 @@ export class Engine {
   private launch(run: RunManifest, release: () => Promise<void>): void {
     if (this.closing) throw new Error('Aiden is shutting down.');
     launchRun(this.workflowContext(), run, release, this.active);
+    // `done` settles only after the run is removed from the active set.
+    void this.active
+      .get(run.id)
+      ?.done.finally(() => this.onWorkChanged())
+      .catch(() => {});
   }
   /** Cancel and await active runs before clearing provider keys and closing integration sessions. */
   async dispose(): Promise<void> {
