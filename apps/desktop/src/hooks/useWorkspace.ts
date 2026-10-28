@@ -27,9 +27,13 @@ export function useWorkspace(): Workspace {
   );
   const { setDiagnostics, setProjects, setIntegrations, setError } = state;
   const refresh = useCallback(async () => {
-    setDiagnostics(await call('diagnostics'));
-    setProjects(await call('projects'));
-    setIntegrations(await call('integrations'));
+    // Projects are local files, but the provider check starts the Codex and Claude CLIs and takes
+    // about a second, so each list shows as soon as it arrives instead of waiting on the others.
+    await Promise.all([
+      call('projects').then(setProjects),
+      call('integrations').then(setIntegrations),
+      call('diagnostics').then(setDiagnostics),
+    ]);
   }, [call, setDiagnostics, setProjects, setIntegrations]);
   useEffect(() => {
     if (api)

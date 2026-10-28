@@ -97,6 +97,22 @@ export class Runtimes implements AgentRuntime {
    * Teams polls also ask for subscription plan usage, which is null whenever it cannot be read.
    */
   async diagnostics(options: { usage?: boolean } = {}): Promise<RuntimeDiagnostic[]> {
+    // Each check starts its own CLI, so they run side by side instead of one after the other.
+    return Promise.all([
+      this.codexDiagnostics(options),
+      claudeDiagnostics(this.home, this.key('claude'), claudeVersion).then(async (claude) => {
+        if (options.usage && claude.subscription) claude.usage = await claudeUsage(this.home);
+        return claude;
+      }),
+    ]);
+  }
+
+  /**
+   * Check that the Codex CLI is installed and read its account through the app server.
+   * @param options What to read besides installation and sign-in.
+   * @param options.usage Also read subscription plan usage, as Teams polls ask for.
+   */
+  private async codexDiagnostics(options: { usage?: boolean }): Promise<RuntimeDiagnostic> {
     const codex: RuntimeDiagnostic = {
       provider: 'codex',
       installed: false,
@@ -130,9 +146,7 @@ export class Runtimes implements AgentRuntime {
         ? 'Codex is installed but its connection check failed. Check your connection, then retry.'
         : 'Install the Codex CLI, then restart Aiden and check connection. The Codex desktop app alone is not sufficient.';
     }
-    const claude = await claudeDiagnostics(this.home, this.key('claude'), claudeVersion);
-    if (options.usage && claude.subscription) claude.usage = await claudeUsage(this.home);
-    return [codex, claude];
+    return codex;
   }
 
   /** Start subscription login and expire its process after ten minutes; never change billing mode. */
