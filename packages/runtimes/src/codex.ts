@@ -75,7 +75,7 @@ async function isolatedConfig(
 }
 
 /** Authenticate only the selected billing mode and select the provider-advertised default if needed. */
-async function selectModel(
+export async function selectModel(
   client: RpcClient,
   request: RuntimeRequest,
   key?: string,
@@ -125,7 +125,7 @@ async function verifyTools(client: RpcClient, threadId: string, toolFree: boolea
 }
 
 /** Await one thread’s final JSON, removing its listener on completion, malformed events, or exit. */
-function completion(client: RpcClient, threadId: string): Promise<unknown> {
+export function completion(client: RpcClient, threadId: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let final = '';
     /** Release the observer before settling so duplicate provider events cannot retain a turn. */

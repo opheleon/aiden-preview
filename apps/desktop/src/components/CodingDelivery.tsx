@@ -5,7 +5,15 @@ import { isBlocking } from '../../../../packages/reporting/src/blockers';
 import type { CodingDeliveryState } from '../hooks/useCodingDelivery';
 import type { Workspace } from '../hooks/useWorkspace';
 
-/** External Claude Code delivery, with status distinct from requirement completion. */
+/**
+ * The coding agent a model setting runs, as people see it.
+ * Example: a project set to Codex shows "Codex".
+ */
+function agentName(runtime: Pick<CodingJob['runtime'], 'provider'>): string {
+  return runtime.provider === 'claude' ? 'Claude Code' : 'Codex';
+}
+
+/** External coding delivery in Claude Code or Codex, with status distinct from requirement completion. */
 export function CodingDelivery({
   workspace,
   delivery,
@@ -15,6 +23,7 @@ export function CodingDelivery({
 }): JSX.Element {
   const { project, call, action, busy } = workspace;
   const { jobs, setJobs } = delivery;
+  const agent = agentName(project.runtime);
   const [repositoryId, setRepositoryId] = useState(
     project.repositories.length === 1 ? project.repositories[0]!.id : '',
   );
@@ -35,15 +44,15 @@ export function CodingDelivery({
     <section className="brief-card" aria-label="External coding agent">
       <h3>External coding agent · Beta</h3>
       <p>
-        Claude Code implements the change and runs local tests in its own worktree. Aiden tracks the
-        PR and verifies beta after merge. Nothing is merged or deployed automatically.
+        {agent} implements the change and runs local tests in its own worktree. Aiden tracks the PR
+        and verifies beta after merge. Nothing is merged or deployed automatically.
       </p>
       {blocked && (
         <p role="status">Resolve blocking scope decisions before dispatching a coding job.</p>
       )}
       {delivery.enabled && (
         <details>
-          <summary>Send work to Claude Code</summary>
+          <summary>Send work to {agent}</summary>
           <label>
             Repository
             <select
@@ -69,21 +78,14 @@ export function CodingDelivery({
             />
           </label>
           <p>
-            Uses this project's Claude model, effort, and billing selection. Claude Code's automatic
-            permission checks remain enabled.
+            Uses this project's model, effort, and billing selection.{' '}
+            {project.runtime.provider === 'claude'
+              ? "Claude Code's automatic permission checks remain enabled."
+              : "Codex runs in its sandbox, which can change only this job's worktree."}
           </p>
-          {project.runtime.provider !== 'claude' && (
-            <p>Select Claude Code in Model settings to dispatch work.</p>
-          )}
           <button
             disabled={
-              busy ||
-              starting ||
-              blocked ||
-              unfinished ||
-              !repositoryId ||
-              !instruction.trim() ||
-              project.runtime.provider !== 'claude'
+              busy || starting || blocked || unfinished || !repositoryId || !instruction.trim()
             }
             onClick={() => {
               setStarting(true);
@@ -98,7 +100,7 @@ export function CodingDelivery({
               }).finally(() => setStarting(false));
             }}
           >
-            Start Claude Code
+            Start {agent}
           </button>
         </details>
       )}
@@ -138,7 +140,7 @@ function CodingJobRow({
       )}
       {job.checks.length > 0 && (
         <details>
-          <summary>Local checks reported by Claude Code</summary>
+          <summary>Local checks reported by {agentName(job.runtime)}</summary>
           <ul>
             {job.checks.map((check, i) => (
               <li key={i}>{check}</li>
@@ -150,7 +152,7 @@ function CodingJobRow({
         <summary>Job details</summary>
         <p>Worktree: {job.worktree}</p>
         <p>Branch: {job.branch}</p>
-        <p>Claude session: {job.sessionId}</p>
+        <p>Session: {job.sessionId}</p>
       </details>
       {job.status === 'running' && (
         <button
@@ -161,7 +163,7 @@ function CodingJobRow({
             })
           }
         >
-          Stop Claude Code
+          Stop {agentName(job.runtime)}
         </button>
       )}
       {job.verificationRunId && (
