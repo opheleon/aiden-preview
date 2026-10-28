@@ -25,6 +25,15 @@ const guards = [
   '-c',
   'protocol.ext.allow=never',
 ];
+/**
+ * PATH with Homebrew's folders added. Apps opened from Finder, the Dock, or a restart to update
+ * get only `/usr/bin:/bin:/usr/sbin:/sbin`, so Git could not run the GitHub CLI credential helper
+ * (`gh auth git-credential`) that publishing uses, and every push failed.
+ */
+function toolPath(current = process.env.PATH): string {
+  const inherited = (current ?? '/usr/bin:/bin').split(':').filter(Boolean);
+  return [...new Set([...inherited, '/opt/homebrew/bin', '/usr/local/bin'])].join(':');
+}
 /** Execute Git without hooks, external diff commands, or interactive prompts; errors expose only a coarse message and exit code. */
 export async function git(repo: string, args: string[], signal?: AbortSignal): Promise<string> {
   try {
@@ -34,7 +43,13 @@ export async function git(repo: string, args: string[], signal?: AbortSignal): P
       maxBuffer: 16 * 1024 * 1024,
       timeout: 60000,
       signal,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0', GIT_PAGER: 'cat' },
+      env: {
+        ...process.env,
+        PATH: toolPath(),
+        GIT_TERMINAL_PROMPT: '0',
+        GIT_OPTIONAL_LOCKS: '0',
+        GIT_PAGER: 'cat',
+      },
     });
     return stdout;
   } catch (error) {

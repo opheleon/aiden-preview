@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Team builds and coding jobs can push their branches when Aiden was opened from Finder, the Dock, or a restart to update; the push could not find the GitHub CLI that signs it in. Coding agents also treat browser and screenshot checks of the running app as Aiden's job after merge, so a browser that cannot start (as in Codex's sandbox) is noted as not run instead of stopping the build. Commits Aiden makes for Codex are titled with the feature, for example "Aiden: Reach help from the footer".
 - Teams: finished, tested coding work now goes out for review even when the coding agent has only non-blocking questions. Those questions are listed in the pull request and become follow-ups for the team. Before, an agent that answered "needs input" over non-blocking questions held back committed work with no pull request.
 - Teams: work shows up faster. A machine now asks for team work at least every 20 seconds (it was up to a minute), and right away after you retry a task, finish a setup step, or answer a question. Agents and My work refresh every 5 seconds while agent work is waiting or running.
 - Team builds and coding jobs no longer fail with "Could not read GitHub" when Aiden was opened from Finder, the Dock, or a restart to update. Those launches do not include Homebrew's folder in the app's PATH, so the build could not find the GitHub CLI that Aiden's own readiness check had found.
