@@ -7,15 +7,15 @@ The repository includes a `Dockerfile` for the worker and a `fly.toml` for [Fly.
 ## What it does and does not do
 
 - It does **team work only**: writing requirements, code checks, estimates, coding tasks, and browser checks that your team's queue hands to it. You still create projects, review requirements, and answer questions in the desktop app or the Teams dashboard.
-- It uses **Claude** with a paid Claude plan. Codex is not installed in the image.
+- It uses **Claude** with a paid Claude plan, **Codex** with a ChatGPT plan, or both. The team only sends it work for a model it is signed in to.
 - It picks up work with the desktop defaults: pickup on, stopping at 70% of your plan's usage window.
-- It never merges or deploys code, and it has no public address. It only makes outbound requests to Aiden Teams, Auth0, GitHub, and Anthropic.
+- It never merges or deploys code, and it has no public address. It only makes outbound requests to Aiden Teams, Auth0, GitHub, Anthropic, and OpenAI.
 - iPhone checks need a Mac, so the team gives them to other machines.
 
 ## What you need
 
 - A member account in an Aiden Teams team.
-- A **paid Claude plan**. The worker counts against the same plan limits as your desktop.
+- A **paid Claude plan**, a **ChatGPT plan with Codex**, or both. The worker counts against the same plan limits as your desktop.
 - A **GitHub account** that can see the team's repositories.
 - A [Fly.io account](https://fly.io/docs/getting-started/) and the [`fly` command](https://fly.io/docs/flyctl/install/), signed in with `fly auth login`.
 - A checkout of this repository.
@@ -34,13 +34,23 @@ The volume holds everything the worker keeps: sign-ins, project copies, and chec
 
 To give the machine a clearer name in Teams, change `AIDEN_DEVICE_NAME` in `fly.toml` before deploying.
 
-## Step 2: Sign in to Claude
+## Step 2: Sign in to Claude, Codex, or both
+
+For Claude:
 
 ```sh
 fly ssh console --app dana-aiden-worker --pty --user aiden -C "claude auth login --claudeai"
 ```
 
 Open the link it prints in a browser on your own computer, sign in with your paid Claude account, and paste the code back into the terminal. Claude Code saves the sign-in on the volume.
+
+For Codex:
+
+```sh
+fly ssh console --app dana-aiden-worker --pty --user aiden -C "codex login --device-auth"
+```
+
+It prints a link and a one-time code. Open the link on your own computer, sign in with your ChatGPT account, and enter the code. Codex saves the sign-in on the volume.
 
 ## Step 3: Sign in to GitHub
 
@@ -75,7 +85,7 @@ fly ssh console --app dana-aiden-worker -C "aiden status"
 fly logs --app dana-aiden-worker
 ```
 
-`status` shows the machine name, the Teams sign-in, the current task, and the team's last answer, for example a hold because no work is waiting. In the desktop app, **Teams** in the sidebar lists the server among your machines. The worker reports Claude, GitHub, Git, and the browser as verified tools, so the team only sends it work it can do.
+`status` shows the machine name, the Teams sign-in, the current task, and the team's last answer, for example a hold because no work is waiting. In the desktop app, **Teams** in the sidebar lists the server among your machines. The worker reports Claude, Codex, GitHub, Git, and the browser as verified tools when each is installed and signed in, so the team only sends it work it can do.
 
 ## Update, stop, and remove
 
@@ -118,5 +128,6 @@ Sign in to GitHub the same way as in Step 3, with `docker exec -it -u aiden aide
 
 - **`aiden sign-in` says the worker has not started.** Check `fly logs`. The first start after a deploy takes a few seconds.
 - **The pasted address is refused.** Paste the address from the browser after signing in. It starts with `http://127.0.0.1:53682/oauth/callback` (or port 53683) and contains `state=`.
-- **The team never assigns work.** Run `aiden status`. The last answer gives the team's reason, such as Claude not being signed in, the usage cap being reached, or the team's subscription having lapsed.
+- **The team never assigns work.** Run `aiden status`. The last answer gives the team's reason, such as Claude or Codex not being signed in, the usage cap being reached, or the team's subscription having lapsed.
 - **Claude says to sign in again.** Repeat Step 2. Claude subscription sign-ins can end when you sign out everywhere from claude.ai.
+- **Codex says to sign in again.** Repeat the Codex command in Step 2.

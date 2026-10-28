@@ -13,6 +13,7 @@ import type {
 } from '../../../contracts/src/accounts-execution.js';
 import type { Baseline, CodingJob, Project, RunManifest } from '../../../contracts/src/index.js';
 import type { LocalToolServer } from '../../../tools/src/mcp.js';
+import { codingAgent } from '../coding-jobs.js';
 import type { Engine } from '../engine.js';
 import { connectGithubCode } from '../github-code.js';
 import { json, optionalJson } from '../storage.js';
@@ -52,7 +53,7 @@ export interface TaskControls {
 }
 
 /**
- * The person's next step after a Claude Code session: review its PRs, or answer what it needs.
+ * The person's next step after a coding session: review its PRs, or answer what it needs.
  * Example: PRs in acme/api and acme/ui become "Review and merge 2 pull requests" listing both.
  */
 function codingFollowUp(job: CodingJob, pullRequests: string[], verdict: string[]): NewAccountTask {
@@ -66,19 +67,22 @@ function codingFollowUp(job: CodingJob, pullRequests: string[], verdict: string[
           : `Review and merge ${pullRequests.length} pull requests`,
       instructions: [...verdict, ...pullRequests, '', job.message].join('\n').slice(0, 4000),
     };
+  const takeOver =
+    job.runtime.provider === 'claude'
+      ? `run claude --resume ${job.sessionId} in ${job.worktree}`
+      : `open ${job.worktree}`;
   return {
     actor: 'human',
     kind: 'coding-question',
-    title: 'Answer Claude Code',
-    instructions:
-      `${job.message}\nTo take over, run claude --resume ${job.sessionId} in ${job.worktree} on the machine that ran it.`.slice(
-        0,
-        4000,
-      ),
+    title: `Answer ${codingAgent(job.runtime)}`,
+    instructions: `${job.message}\nTo take over, ${takeOver} on the machine that ran it.`.slice(
+      0,
+      4000,
+    ),
   };
 }
 
-/** Hand the change to Claude Code on this machine and report its PR, or why it stopped. */
+/** Hand the change to the project's coding agent on this machine and report its PR, or why it stopped. */
 async function build(
   engine: Engine,
   task: AccountTask,
@@ -166,6 +170,42 @@ async function ensureCode(engine: Engine, project: Project): Promise<Project> {
 }
 
 /**
+ * Check the latest code against the requirements, the same check as Run the check now, and report
+ * how many requirements it found met. The report stays on this machine like a solo check's.
+ * Example: the team's Morning check on a project with 3 requirements returns `{ met: 1, total: 3 }`.
+ */
+async function checkCode(
+  engine: Engine,
+  project: Project,
+  controls: TaskControls,
+): Promise<TaskOutput> {
+  controls.activity?.({ type: 'tool-start', id: 'check-code' });
+  const { runId } = await engine.report(project.id, 'morning');
+  /** Stop the check when the team stops the task. */
+  const stop = (): void => {
+    engine.cancel(runId);
+  };
+  controls.signal.addEventListener('abort', stop, { once: true });
+  await finish(engine, project.id, runId, 'The code check').finally(() =>
+    controls.signal.removeEventListener('abort', stop),
+  );
+  controls.activity?.({ type: 'tool-end', id: 'check-code' });
+  controls.signal.throwIfAborted();
+  const report = await engine.getReport(project.id, runId);
+  return {
+    result: {
+      runId,
+      met: report.assessments.filter((a) => a.status === 'implemented').length,
+      total: report.assessments.length,
+    },
+    documentChanged: false,
+  };
+}
+
+/** Task kinds `runAccountTask` can run; sent with every poll so the team only assigns these. */
+export const supportedTaskKinds = ['write-requirements', 'check-code', 'build'] as const;
+
+/**
  * Run one account task on this machine through the existing engine, with the project's own
  * provider and billing mode. Each kind maps to an operation the solo app already performs.
  */
@@ -202,6 +242,8 @@ export async function runAccountTask(
         documentChanged: true,
       };
     }
+    case 'check-code':
+      return checkCode(engine, project, controls);
     case 'build':
       return build(engine, task, project, controls);
     default:

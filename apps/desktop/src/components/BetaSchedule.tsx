@@ -45,10 +45,10 @@ export function BetaSchedule({
           </label>
           <p>
             Off by default. Aiden prepares and tracks delivery tickets. Enable this to explicitly
-            send work to Claude Code from the project page. It can edit an isolated worktree, run
-            local tests, and create a PR using your selected billing mode. Blocking decisions still
-            pause dispatch. Turning this off prevents new jobs; existing jobs remain visible and can
-            be stopped.
+            send work to Claude Code or Codex from the project page. It can edit an isolated
+            worktree, run local tests, and create a PR using your selected billing mode. Blocking
+            decisions still pause dispatch. Turning this off prevents new jobs; existing jobs remain
+            visible and can be stopped.
           </p>
         </>
       )}

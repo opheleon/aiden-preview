@@ -3,7 +3,7 @@ import type { JSX } from 'react';
 import type { CodingJob } from '../../../../packages/contracts/src/index';
 
 const summaries: Record<CodingJob['status'], string> = {
-  running: 'Claude Code is working. Local tests belong to the coding agent.',
+  running: 'The coding agent is working. Local tests belong to the coding agent.',
   awaiting_merge: 'Coding finished. PR open, awaiting review or merge. Beta verification pending.',
   awaiting_deployment: 'PR merged. Waiting for beta deployment and its verification schedule.',
   verifying: 'PR merged. Beta verification is running.',
