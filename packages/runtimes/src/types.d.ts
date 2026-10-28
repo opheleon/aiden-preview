@@ -3,8 +3,10 @@ import type { RuntimeConfig } from '../../contracts/src/index.js';
 
 /** One isolated provider turn; cancellation must interrupt execution without retrying paid work. */
 export type RuntimeRequest = {
-  /** External Claude Code owns tools and its coding loop when explicitly dispatched. */
-  /** A coding session; `directories` are further worktrees it may also work in. */
+  /**
+   * A coding session in Claude Code or Codex, which owns its tools and coding loop;
+   * `directories` are further worktrees it may also work in.
+   */
   coding?: { sessionId: string; directories?: string[]; limits?: ExecutionLimits };
   config: RuntimeConfig;
   prompt: string;

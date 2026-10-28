@@ -60,6 +60,8 @@ function observeDesktop(): void {
     void activeWork.refresh();
     if (!window.isDestroyed()) window.webContents.send('aiden:event', event);
   });
+  // A run announces it finished before it is gone; read again once the worker says it is.
+  worker.on('activeWork', () => void activeWork.refresh());
   worker.on('workerStopped', () => {
     if (quitting) return;
     void diagnostics.record({ component: 'worker', code: 'worker_stopped' });
@@ -145,7 +147,7 @@ app
       dataRoot,
       isRunActive: () => activeWork.isBusy(),
     });
-    registerPreferenceIpc(authorized, updater);
+    registerPreferenceIpc(authorized, updater, () => activeWork.refresh());
     registerFirstUseIpc(authorized, dataRoot);
     registerWorkerIpc(authorized, worker, () => poller.nudge());
     registerFileIpc(authorized, window, worker);

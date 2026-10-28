@@ -30,7 +30,7 @@ const commands: [RegExp, string][] = [
  * Examples: `cat > tests/test_auth.py <<'EOF'` is "Writing test_auth.py"; `python3 -m pytest -q` is
  * "Running tests"; an unknown `make lint` is "Running make".
  */
-function shellStep(command: string): string {
+export function shellStep(command: string): string {
   // Claude Code often prefixes commands with "cd <repo> &&"; the step is what follows.
   const first = command.split('\n')[0]!.replace(/^\s*(cd\s+\S+\s*(&&|;)\s*)+/, '');
   const target = [...first.matchAll(/(?:^|[^\d&>])>{1,2}\s*([\w./-]+)/g)]

@@ -182,6 +182,58 @@ void test('external completion persists a job and PR without running any Aiden v
   }
 });
 
+void test('a Codex job leaves its work uncommitted, and Aiden commits it, pushes, and opens the PR', async (t) => {
+  const { f, engine, job, close } = await setup();
+  try {
+    await engine.updateRuntime(f.project.id, { provider: 'codex', auth: 'subscription' });
+    t.mock.method(codingServices, 'worktree', () =>
+      Promise.resolve({ repository: job.repository, baseBranch: 'main' }),
+    );
+    let head = 'start-commit';
+    t.mock.method(codingServices, 'head', () => Promise.resolve(head));
+    const commits: { worktree: string; summary: string }[] = [];
+    t.mock.method(codingServices, 'commit', (worktree: string, summary: string) => {
+      commits.push({ worktree, summary });
+      head = 'aiden-commit';
+      return Promise.resolve(true);
+    });
+    const published: { commit?: string; title: string }[] = [];
+    t.mock.method(codingServices, 'publish', (input: { commit?: string; title: string }) => {
+      published.push(input);
+      return Promise.resolve(job.pullRequestUrl!);
+    });
+    engine.runtime = {
+      run: async (request) => {
+        await Promise.resolve();
+        assert.equal(request.config.provider, 'codex');
+        // Codex's sandbox keeps .git read-only, so it is told to leave the change uncommitted.
+        assert.match(request.prompt, /Leave the finished, checked change uncommitted/);
+        return {
+          value: {
+            outcome: 'ready',
+            summary: 'Add a help link\nThe footer links to /help.',
+            pullRequestUrl: null,
+            localChecks: ['pnpm test passed'],
+          },
+          version: 'fixture',
+          model: 'gpt-fixture',
+        };
+      },
+    };
+    await startCodingJob(engine, f.project.id, job.repositoryId, 'Add a help link');
+    const finished = await waitJob(engine, f.project.id);
+    assert.equal(finished.status, 'awaiting_merge');
+    assert.equal(finished.pullRequestUrl, job.pullRequestUrl);
+    assert.equal(commits.length, 1);
+    assert.equal(commits[0]!.summary, 'Add a help link\nThe footer links to /help.');
+    assert.equal(published[0]!.commit, 'aiden-commit');
+    assert.equal(published[0]!.title, 'Aiden: Add a help link');
+    assert.match(finished.message, /The footer links to \/help/);
+  } finally {
+    await close();
+  }
+});
+
 void test('a completed agent with a legacy tracking failure recovers its PR without rerunning code', async (t) => {
   const { f, engine, job, close } = await setup();
   try {

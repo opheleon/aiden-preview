@@ -54,8 +54,18 @@ async function readVerificationMedia(
 
 /** Reject IPC originating outside the trusted top-level desktop renderer. */
 export type IpcAuthorization = (event: Electron.IpcMainInvokeEvent) => void;
-/** Register preference operations; mutable inputs are validated before reaching local services. */
-export function registerPreferenceIpc(authorized: IpcAuthorization, updater: DesktopUpdater): void {
+/**
+ * Register preference operations; mutable inputs are validated before reaching local services.
+ * @param authorized Rejects IPC from anything but the trusted renderer.
+ * @param updater The app's update lifecycle.
+ * @param readActiveWork Reads the worker's running work fresh, so a restart to update is never
+ * refused on a busy answer from a run that already finished.
+ */
+export function registerPreferenceIpc(
+  authorized: IpcAuthorization,
+  updater: DesktopUpdater,
+  readActiveWork: () => Promise<void> = () => Promise.resolve(),
+): void {
   ipcMain.handle('app:get-version', (event) => {
     authorized(event);
     return app.getVersion();
@@ -85,8 +95,9 @@ export function registerPreferenceIpc(authorized: IpcAuthorization, updater: Des
     authorized(event);
     return updater.download();
   });
-  ipcMain.handle('updates:install', (event) => {
+  ipcMain.handle('updates:install', async (event) => {
     authorized(event);
+    await readActiveWork();
     return updater.install();
   });
 }

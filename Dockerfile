@@ -19,6 +19,9 @@ RUN pnpm install --frozen-lockfile && pnpm exec tsc -p tsconfig.json
 
 FROM node:${NODE_VERSION}-bookworm-slim
 ARG WITH_BROWSER=true
+# Exact Codex CLI release, at least 14 days old like every other dependency. Its package has no
+# install scripts; npm adds only this platform's binary.
+ARG CODEX_VERSION=0.162.1
 # The aiden wrapper also selects file credentials, since a server has no OS keychain.
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 CI=true LANG=C.UTF-8 \
     PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
@@ -44,6 +47,8 @@ RUN pnpm install --prod --frozen-lockfile \
  && arch=$(dpkg --print-architecture | sed 's/amd64/x64/') \
  && ln -s "/app/node_modules/@anthropic-ai/claude-agent-sdk-linux-$arch/claude" /usr/local/bin/claude \
  && claude --version \
+ && npm install -g --ignore-scripts "@openai/codex@$CODEX_VERSION" \
+ && codex --version \
  && if [ "$WITH_BROWSER" = true ]; then \
       node node_modules/playwright/cli.js install --with-deps chromium \
       && rm -rf /var/lib/apt/lists/*; \

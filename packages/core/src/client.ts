@@ -42,6 +42,8 @@ const eventSchema = z
     verification: VerificationSummarySchema.optional(),
   })
   .strict();
+/** The worker's note that its running work changed, sent after a run fully finishes. */
+const activeWorkSchema = z.object({ busy: z.boolean() }).strict();
 const responseSchema = z
   .object({
     id: z.number().int(),
@@ -111,6 +113,10 @@ export class WorkerClient extends EventEmitter {
       const value: unknown = JSON.parse(line);
       if (value && typeof value === 'object' && 'event' in value) {
         this.emit('event', eventSchema.parse(value.event));
+        return;
+      }
+      if (value && typeof value === 'object' && 'activeWork' in value) {
+        this.emit('activeWork', activeWorkSchema.parse(value.activeWork));
         return;
       }
       const response = responseSchema.parse(value);

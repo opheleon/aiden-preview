@@ -17,7 +17,7 @@ function fixture() {
     status: 'awaiting_merge',
     message: 'Waiting for review',
     model: 'claude-opus-5-5',
-    runtime: { model: 'opus', effort: 'high' },
+    runtime: { provider: 'claude', auth: 'subscription', model: 'opus', effort: 'high' },
     worktree: '/fixture/job',
     branch: 'aiden/job',
     sessionId: 'session',
