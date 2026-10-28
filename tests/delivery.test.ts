@@ -3,7 +3,11 @@ import { mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 
-import type { CodingJob, RuntimeConfig } from '../packages/contracts/src/index.js';
+import {
+  type CodingJob,
+  CodingResultSchema,
+  type RuntimeConfig,
+} from '../packages/contracts/src/index.js';
 import {
   betaSettings,
   deliveryServices,
@@ -17,6 +21,7 @@ import {
   codingJobs,
   codingServices,
   jobFile,
+  shipsWork,
   startCodingJob,
 } from '../packages/core/src/coding-jobs.js';
 import { Engine } from '../packages/core/src/engine.js';
@@ -554,4 +559,21 @@ void test('closed projects retain delivery jobs without polling GitHub or starti
   } finally {
     await close();
   }
+});
+
+void test('finished work ships when its open questions are non-blocking, and waits on a blocking one', () => {
+  const answer = (outcome: 'ready' | 'needs_input', blocking: boolean[]) =>
+    CodingResultSchema.parse({
+      outcome,
+      summary: 'Added Zoom connections',
+      pullRequestUrl: null,
+      localChecks: ['pytest: 13 passed'],
+      openQuestions: blocking.map((b, i) => ({ question: `Question ${i}`, blocking: b })),
+    });
+  assert.equal(shipsWork(answer('ready', [])), true);
+  // Claude Code reported needs_input with two non-blocking questions after committing and
+  // testing the work; that work now goes out for review with the questions as follow-ups.
+  assert.equal(shipsWork(answer('needs_input', [false, false])), true);
+  assert.equal(shipsWork(answer('needs_input', [false, true])), false);
+  assert.equal(shipsWork(answer('needs_input', [])), false, 'stuck with no question waits');
 });

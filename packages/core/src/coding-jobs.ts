@@ -50,6 +50,17 @@ async function commitAgentWork(worktree: string, summary: string): Promise<boole
   await git(worktree, ['commit', '-m', subject, '-m', summary]);
   return true;
 }
+/**
+ * Whether the agent's finished work goes out for review. A ready answer does, and so does
+ * needs_input whose open questions are all non-blocking: those questions travel with the pull
+ * request and become follow-ups instead of holding back committed, checked work. A needs_input
+ * answer with no questions, or with a blocking one, waits for a person.
+ * Example: "who sets up the Zoom app in beta?" marked non-blocking still ships the PR.
+ */
+export function shipsWork(output: CodingResult): boolean {
+  if (output.outcome === 'ready') return true;
+  return output.openQuestions.length > 0 && !output.openQuestions.some((q) => q.blocking);
+}
 /** Injectable external boundaries for deterministic lifecycle tests. */
 export const codingServices = {
   worktree: codingWorktree,
@@ -100,7 +111,7 @@ function codingPrompt(
   instruction: string,
 ): string {
   const success = aidenCommits(job.runtime)
-    ? `Implement the requested change on branch ${job.branch} and run the repository's appropriate local checks. Leave the finished, checked change uncommitted in the worktree: this sandbox cannot write Git metadata, so Aiden commits it, pushes the branch, and opens a pull request to ${job.repository}:${job.baseBranch} after you finish. Return outcome ready with pullRequestUrl null, and the local check results. Write the summary as the pull request description for reviewers. Leave merging and deployment to the maintainer.`
+    ? `Implement the requested change on branch ${job.branch} and run the repository's appropriate local checks. Leave the finished, checked change uncommitted in the worktree: this sandbox cannot write Git metadata, so Aiden commits it, pushes the branch, and opens a pull request to ${job.repository}:${job.baseBranch} after you finish. Return outcome ready with pullRequestUrl null and the local check results, even when you have non-blocking open questions. Write the summary as the pull request description for reviewers. Leave merging and deployment to the maintainer.`
     : `Implement the requested change on branch ${job.branch}, run the repository's appropriate local checks, and open a pull request to ${job.repository}:${job.baseBranch}. Request review from the code owners if identifiable. Return the PR URL and local check results. Leave merging and deployment to the maintainer.`;
   return `<role>You are the external coding agent for this Aiden delivery job.</role>
 <success>${success}</success>
@@ -194,7 +205,7 @@ async function publishCommitted(
   output: CodingResult | null,
   start: string,
 ): Promise<void> {
-  if (output?.outcome !== 'ready' || job.pullRequestUrl || !aidenCommits(job.runtime)) return;
+  if (!output || !shipsWork(output) || job.pullRequestUrl || !aidenCommits(job.runtime)) return;
   const commit = await codingServices.head(job.worktree);
   if (commit === start) {
     job.message = `${codingAgent(job.runtime)} finished without changing the code. ${job.message}`;
@@ -236,7 +247,7 @@ export async function executeCoding(
       codingRequest(job, prompt, controller.signal, progress, directories, controls),
     );
     output = CodingResultSchema.parse(result.value);
-    if (output.outcome === 'ready' && aidenCommits(job.runtime))
+    if (shipsWork(output) && aidenCommits(job.runtime))
       for (const worktree of [job.worktree, ...directories])
         await codingServices.commit(worktree, output.summary);
     if (result.model) job.model = result.model;

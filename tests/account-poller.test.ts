@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import { AccountPoller } from '../packages/core/src/accounts/poller.js';
 
-void test('polling stays within one minute even when idle, disabled, or recovering from an error', async (context) => {
+void test('polling stays within twenty seconds even when idle, disabled, or recovering from an error', async (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   let calls = 0;
   const request = () => {
@@ -23,13 +23,15 @@ void test('polling stays within one minute even when idle, disabled, or recoveri
   poller.start();
   await tick(5000);
   assert.equal(calls, 1);
-  await tick(59999);
+  // The server may suggest five minutes; a machine still asks every twenty seconds, so new or
+  // retried work is picked up promptly.
+  await tick(19999);
   assert.equal(calls, 1);
   await tick(1);
   assert.equal(calls, 2);
-  await tick(60000);
+  await tick(20000);
   assert.equal(calls, 3);
-  await tick(60000);
+  await tick(20000);
   assert.equal(calls, 4);
   poller.stop();
   await tick(180000);
