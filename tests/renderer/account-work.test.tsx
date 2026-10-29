@@ -5,6 +5,7 @@ import { expect, test, vi } from 'vitest';
 import { TeamTaskStatus } from '../../apps/desktop/src/components/TeamTaskStatus';
 import type { Workspace } from '../../apps/desktop/src/hooks/useWorkspace';
 import { AccountWork } from '../../apps/desktop/src/views/AccountWork';
+import { Agents } from '../../apps/desktop/src/views/Agents';
 import { MyWork } from '../../apps/desktop/src/views/MyWork';
 import state from '../../packages/contracts/fixtures/accounts/account-state.json';
 import type { AccountStatus } from '../../packages/contracts/src/api';
@@ -195,6 +196,53 @@ test('a team project says why Aiden’s task waits, and Stop or Try again change
   expect(line).toHaveTextContent('Tried 2 times. Last error: This machine could not copy');
   await userEvent.click(within(line).getByRole('button', { name: 'Stop' }));
   expect(f.call).toHaveBeenCalledWith('accountCancelTask', { taskId: agent.id });
+});
+
+test('Agents leads with running, waiting, and stopped work, and stopped work reruns or goes away', async () => {
+  const agent = state.tasks.find((t) => t.actor === 'agent')!;
+  const running = {
+    ...agent,
+    id: 'run-1',
+    title: 'Build: Connect a Zoom account',
+    status: 'leased' as const,
+    progress: 'Running pnpm test',
+  };
+  const waiting = {
+    ...agent,
+    id: 'wait-1',
+    title: 'Morning check',
+    status: 'queued' as const,
+    attempts: 0,
+    leasedDeviceId: null,
+    waiting: 'Needs a machine with gh',
+  };
+  const stopped = {
+    ...agent,
+    id: 'stop-1',
+    title: 'Build: Reach help from the footer',
+    status: 'failed' as const,
+    attempts: 3,
+    result: { error: 'Could not read GitHub' },
+  };
+  const f = fixture(status(), { ...state, tasks: [running, waiting, stopped] });
+  render(<Agents workspace={f.workspace} />);
+  expect(
+    await screen.findByText('1 running, 1 waiting, 1 stopped on your team’s 2 machines.'),
+  ).toBeInTheDocument();
+  const now = screen.getByRole('region', { name: 'Running now' });
+  expect(now).toHaveTextContent('Build: Connect a Zoom account');
+  expect(now).toHaveTextContent('Now: Running pnpm test');
+  expect(now).toHaveTextContent('Alice MacBook');
+  expect(screen.getByRole('region', { name: 'Waiting' })).toHaveTextContent(
+    'Needs a machine with gh',
+  );
+  const ended = screen.getByRole('region', { name: 'Stopped' });
+  expect(ended).toHaveTextContent('Could not read GitHub');
+  await userEvent.click(within(ended).getByRole('button', { name: /Reach help from the footer/ }));
+  await userEvent.click(within(ended).getByRole('button', { name: 'Run again' }));
+  expect(f.call).toHaveBeenCalledWith('accountRetryTask', { taskId: 'stop-1' });
+  await userEvent.click(within(ended).getByRole('button', { name: 'Remove' }));
+  expect(f.call).toHaveBeenCalledWith('accountCancelTask', { taskId: 'stop-1' });
 });
 
 test('every signed-in person has a global profile link, while only admins have team settings', async () => {

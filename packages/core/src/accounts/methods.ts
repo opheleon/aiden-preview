@@ -89,12 +89,12 @@ async function admission(client: AccountsClient): Promise<string | null> {
 }
 
 /**
- * Queue a stopped or failed Aiden task again as a new task with the same work; the old one stays
- * in the history as it ended.
+ * Queue a stopped or failed Aiden task again as a new task with the same work. A failed original is
+ * then removed so it leaves the team's stopped list; one the server will not remove stays as it ended.
  */
 async function retry(client: AccountsClient, taskId: string): Promise<AccountTask> {
   const old = await client.task(taskId);
-  return client.enqueue(old.projectId, {
+  const again = await client.enqueue(old.projectId, {
     actor: 'agent',
     kind: old.kind,
     title: old.title,
@@ -104,6 +104,8 @@ async function retry(client: AccountsClient, taskId: string): Promise<AccountTas
     connections: old.requires.connections,
     usesModel: old.requires.runtime !== null,
   });
+  if (old.status === 'failed') await client.cancel(old.id).catch(() => undefined);
+  return again;
 }
 
 /** Wire the Teams tier into the worker. Signed out, every method answers without touching the network. */

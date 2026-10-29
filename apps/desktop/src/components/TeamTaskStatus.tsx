@@ -10,7 +10,7 @@ const activeMs = 5_000;
 const idleMs = 30_000;
 
 /** The error a failed attempt left, if any. */
-function lastError(task: AccountTask): string | null {
+export function lastError(task: AccountTask): string | null {
   const result = task.result as { error?: unknown } | null;
   return typeof result?.error === 'string' ? result.error : null;
 }
