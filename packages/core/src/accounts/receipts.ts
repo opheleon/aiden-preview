@@ -2,7 +2,11 @@ import { createHash } from 'node:crypto';
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { NewAccountTask } from '../../../contracts/src/accounts-api.js';
+import type {
+  CheckInput,
+  NewAccountTask,
+  ReviewPacket,
+} from '../../../contracts/src/accounts-api.js';
 import { atomic, json, type Store } from '../storage.js';
 import { type AccountsClient, AccountsError } from './client.js';
 
@@ -14,6 +18,10 @@ export interface CompletionReceipt {
   attemptId: string;
   result: unknown;
   followUps: NewAccountTask[];
+  /** Present when the work goes to its reviewer instead of done. */
+  review?: ReviewPacket;
+  /** A verify task's results for the reviewed task. */
+  checks?: CheckInput[];
   outcome: { durationSec: number; usageBefore: null; usageAfter: null; costUsd: null };
   documentChanged: boolean;
   status: 'pending' | 'acknowledged' | 'superseded';
@@ -37,7 +45,7 @@ export async function sendReceipt(
   receipt: CompletionReceipt,
   upload: (projectId: string) => Promise<void>,
 ): Promise<void> {
-  const { taskId, deviceId, attemptId, result, followUps, outcome } = receipt;
+  const { taskId, deviceId, attemptId, result, followUps, outcome, review, checks } = receipt;
   try {
     if (receipt.documentChanged) {
       await client.authorize(taskId, { deviceId, attemptId });
@@ -45,7 +53,15 @@ export async function sendReceipt(
       receipt.documentChanged = false;
       await saveReceipt(store, receipt);
     }
-    await client.complete(taskId, { deviceId, attemptId, result, followUps, outcome });
+    await client.complete(taskId, {
+      deviceId,
+      attemptId,
+      result,
+      followUps,
+      outcome,
+      ...(review ? { review } : {}),
+      ...(checks ? { checks } : {}),
+    });
     receipt.status = 'acknowledged';
   } catch (error) {
     if (error instanceof AccountsError && [404, 409].includes(error.status))

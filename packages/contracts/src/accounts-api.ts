@@ -1,15 +1,19 @@
 import { z } from 'zod/v3';
 
 import { AccountExecutionSchema } from './accounts-execution.js';
+import { type QuestionScope, type WorkRole, workRoles } from './work-roles.js';
 
 /**
  * Wire contract for the Accounts API used by the Teams tier.
  * Vendored from the private aiden-teams server (src/http/schemas.ts and src/http/views.ts at
- * the Auth0 sign-in revision). Response schemas are strict so drift fails tests/accounts-contract.test.ts, which
- * parses the server's example responses copied into packages/contracts/fixtures/accounts.
+ * the task board revision: work roles, review, and verification). Response schemas are strict so
+ * drift fails tests/accounts-contract.test.ts, which parses the server's example responses copied
+ * into packages/contracts/fixtures/accounts. Fields the task board added default when a server
+ * from before it leaves them out, so this app keeps working while the server rolls out.
  */
 
 const iso = z.string().datetime();
+const role = z.enum(workRoles);
 const runtime = z
   .object({ provider: z.enum(['claude', 'codex']), auth: z.enum(['subscription', 'apiKey']) })
   .strict();
@@ -73,6 +77,28 @@ export const TaskRequirementsSchema = z
   })
   .strict();
 
+/** One check on reviewed work. Automated checks settle on their own; manual ones need a person. */
+export const TaskCheckSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    kind: z.enum(['automated', 'manual']),
+    state: z.enum(['pending', 'passed', 'failed']),
+    detail: z.string().nullable(),
+    url: z.string().nullable(),
+  })
+  .strict();
+
+/** When an agent task entered each stage; null for a stage it has not reached. */
+const TimelineSchema = z
+  .object({
+    startedAt: iso.nullable().default(null),
+    reviewAt: iso.nullable().default(null),
+    verifyAt: iso.nullable().default(null),
+    finishedAt: iso.nullable().default(null),
+  })
+  .strict();
+
 /** A task in an account's queue. */
 export const AccountTaskSchema = z
   .object({
@@ -85,7 +111,21 @@ export const AccountTaskSchema = z
     instructions: z.string(),
     requirementIds: z.array(z.string()),
     requires: TaskRequirementsSchema,
-    status: z.enum(['queued', 'leased', 'blocked', 'done', 'failed', 'cancelled']),
+    /**
+     * Agent work a person must look at waits in `review` with its reviewer, then in `verify`
+     * while its checks run. Nothing moves backwards: a failed check or a change request closes the
+     * task and the server queues a linked fix task.
+     */
+    status: z.enum([
+      'queued',
+      'leased',
+      'blocked',
+      'review',
+      'verify',
+      'done',
+      'failed',
+      'cancelled',
+    ]),
     blockedBy: z.string().nullable(),
     assigneeUserId: z.string().nullable(),
     leasedDeviceId: z.string().nullable(),
@@ -99,6 +139,24 @@ export const AccountTaskSchema = z
     waiting: z.string().nullable().optional(),
     /** The last thing a running task reported, for example "Running pytest". */
     progress: z.string().nullable().optional(),
+    /** The kind of work, which decides who reviews it and who answers its questions. */
+    role: role.nullable().default(null),
+    /** The one member who reviews an agent task and owns its questions. */
+    reviewerUserId: z.string().nullable().default(null),
+    /** The agent task a question or verification run belongs to. */
+    parentTaskId: z.string().nullable().default(null),
+    /** The task this one fixes, so each revision traces back to the one before. */
+    revisionOf: z.string().nullable().default(null),
+    /** How finished reviewed work ended. */
+    verification: z.enum(['passed', 'failed', 'changes_requested']).nullable().default(null),
+    /** What the reviewer looks at: the agent's summary and the pull requests it opened. */
+    review: z
+      .object({ summary: z.string(), pullRequestUrls: z.array(z.string()) })
+      .strict()
+      .nullable()
+      .default(null),
+    checks: z.array(TaskCheckSchema).default([]),
+    timeline: TimelineSchema.default({}),
   })
   .strict();
 
@@ -162,6 +220,8 @@ export const AccountStateSchema = z
           avatar: z.string().nullable().optional(),
           role: z.enum(['owner', 'member']),
           isAdmin: z.boolean(),
+          /** Work roles the member holds; reviews and questions are routed by them. */
+          roles: z.array(role).default([]),
         })
         .strict(),
     ),
@@ -209,6 +269,29 @@ export type AccountProject = z.infer<typeof AccountProjectSchema>;
 export type Decision = z.infer<typeof DecisionSchema>;
 /** The account work screen's data. */
 export type AccountState = z.infer<typeof AccountStateSchema>;
+/** One check on reviewed work, as the server shows it. */
+export type TaskCheck = z.infer<typeof TaskCheckSchema>;
+
+/** One check on reviewed work as a machine reports it; the server gives it an id. */
+export interface CheckInput {
+  /** Up to 200 characters, for example `CI: acme/api#12` or `REQ-3: Members sign in`. */
+  name: string;
+  kind: TaskCheck['kind'];
+  state: TaskCheck['state'];
+  /** Up to 500 characters: what failed, or what a person should look at. */
+  detail?: string | null;
+  url?: string | null;
+}
+
+/**
+ * What an agent hands its reviewer when it completes: the task goes to review instead of done.
+ * At most 20 pull requests and 50 checks; the summary is at most 8000 characters.
+ */
+export interface ReviewPacket {
+  summary: string;
+  pullRequestUrls: string[];
+  checks: CheckInput[];
+}
 
 /** Work a machine adds to a project's queue; the server derives runtime and pinning. */
 export interface NewAccountTask {
@@ -223,4 +306,8 @@ export interface NewAccountTask {
   usesModel?: boolean;
   pinToCaller?: boolean;
   dedupeKey?: string | null;
+  /** The kind of work, classified when the task is created. */
+  role?: WorkRole;
+  /** For a question a person answers: about this task (its reviewer) or general (a lead). */
+  scope?: QuestionScope;
 }

@@ -1,4 +1,5 @@
 import type { SetupStepId } from './guide.js';
+import type { WorkRole } from './work-roles.js';
 
 /**
  * One definition of a task, shared by the project view and My work: who does it, what it is
@@ -9,13 +10,17 @@ import type { SetupStepId } from './guide.js';
 /** Who does a task: Aiden itself, or a person in the PM or Dev role. */
 export type TaskWho = 'Aiden' | 'PM' | 'Dev';
 
-/** Where a task stands. Failed appears only when Aiden gave up after retries; stopped when someone stopped it. */
-export type TaskStatus = 'todo' | 'in-progress' | 'done' | 'failed' | 'stopped';
+/**
+ * Where a task stands. In review covers Aiden's finished work while a person reviews it and its
+ * checks run. Failed appears only when Aiden gave up after retries; stopped when someone stopped it.
+ */
+export type TaskStatus = 'todo' | 'in-progress' | 'in-review' | 'done' | 'failed' | 'stopped';
 
 /** The status words every screen uses. */
 export const taskStatusLabels: Record<TaskStatus, string> = {
   todo: 'To do',
   'in-progress': 'In progress',
+  'in-review': 'In review',
   done: 'Done',
   failed: 'Failed',
   stopped: 'Stopped',
@@ -46,13 +51,24 @@ export function setupStepOf(kind: string): SetupStepId | null {
 }
 
 /**
+ * The work role that reviews a setup step's team task: steps a developer does go to a backend
+ * engineer, and everything else (requirements, checks, trackers) to a product manager.
+ * Example: `code` (Connect code, Dev) gives `be_engineer`; `confirm` gives `product_manager`.
+ * @param step The setup step.
+ */
+export function setupTaskRole(step: SetupStepId): WorkRole {
+  return setupTasks[step].who === 'Dev' ? 'be_engineer' : 'product_manager';
+}
+
+/**
  * Where a team task stands, in the shared status words.
  * @param status The team queue status.
  */
 export function teamTaskStatus(
-  status: 'queued' | 'leased' | 'blocked' | 'done' | 'failed' | 'cancelled',
+  status: 'queued' | 'leased' | 'blocked' | 'review' | 'verify' | 'done' | 'failed' | 'cancelled',
 ): TaskStatus {
   if (status === 'leased') return 'in-progress';
+  if (status === 'review' || status === 'verify') return 'in-review';
   if (status === 'done') return 'done';
   if (status === 'cancelled') return 'stopped';
   if (status === 'failed') return 'failed';

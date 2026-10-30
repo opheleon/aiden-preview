@@ -148,6 +148,7 @@ void test('publication recovery uses recorded commits without running a coding a
     } as unknown as Project;
     const task = {
       title: 'Feature',
+      role: 'fe_engineer',
       execution: {
         checkpoint: {
           summary: 'Built it',
@@ -190,22 +191,37 @@ void test('publication recovery uses recorded commits without running a coding a
     assert.equal(saved.length, 1);
     assert.equal(recovered.followUps?.[0]?.kind, 'coding-question');
     assert.equal(recovered.followUps?.[0]?.assigneeUserId, 'reviewer');
-    assert.equal(recovered.followUps?.[1]?.kind, 'review-pr');
+    assert.equal(recovered.followUps?.[0]?.role, 'fe_engineer');
+    assert.equal(recovered.followUps?.[0]?.scope, 'task');
+    // The recovered PRs go to the task's reviewer as a review packet, not a review-pr follow-up.
+    assert.equal(recovered.followUps?.length, 1);
+    assert.deepEqual(recovered.review, {
+      summary: 'Built it',
+      pullRequestUrls: ['https://github.com/team/app/pull/1'],
+      checks: [
+        {
+          name: 'CI: team/app#1',
+          kind: 'automated',
+          state: 'pending',
+          url: 'https://github.com/team/app/pull/1',
+        },
+      ],
+    });
     t.mock.method(publicationRecoveryServices, 'publish', () =>
       Promise.reject(new MissingPublicationCommit()),
     );
-    let blocked = false;
+    let blocked: unknown;
     await assert.rejects(
       recoverPublication(engine, project, task, {
         ...controls,
-        block: () => {
-          blocked = true;
+        block: (_title, _question, routing) => {
+          blocked = routing;
           return Promise.resolve();
         },
       }),
       /previous machine/,
     );
-    assert.equal(blocked, true);
+    assert.deepEqual(blocked, { role: 'fe_engineer', scope: 'task' });
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -1,5 +1,7 @@
 import { z } from 'zod/v3';
 
+import { questionScopes, workRoles } from './work-roles.js';
+
 /** Runner budgets supplied by Teams; status reports do not refresh these limits. */
 export const ExecutionLimitsSchema = z
   .object({
@@ -63,6 +65,18 @@ export const AgentStatusSchema = z
     message: z.string().trim().min(1).max(500),
     question: z.string().trim().min(1).max(5000).optional(),
     assigneeUserId: z.string().min(1).max(64).optional(),
+    /** Who can answer a question: product_manager, be_engineer, or fe_engineer. */
+    role: z
+      .enum(workRoles)
+      .optional()
+      .describe('For a question: the work role that can answer it.'),
+    /** task when the question is about this slice; general for product or cross-team questions. */
+    scope: z
+      .enum(questionScopes)
+      .optional()
+      .describe(
+        'For a question: task when it is about this slice, general for product or cross-team questions.',
+      ),
   })
   .strict();
 

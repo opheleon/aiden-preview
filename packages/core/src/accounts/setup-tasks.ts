@@ -1,6 +1,11 @@
 import type { AccountTask } from '../../../contracts/src/accounts-api.js';
 import type { SetupProgress, SetupStepId } from '../../../contracts/src/guide.js';
-import { setupStepOf, setupTaskKind, setupTasks } from '../../../contracts/src/task-model.js';
+import {
+  setupStepOf,
+  setupTaskKind,
+  setupTaskRole,
+  setupTasks,
+} from '../../../contracts/src/task-model.js';
 import type { Engine } from '../engine.js';
 import { guideFacts } from '../guide-context.js';
 import { guideClarifications } from '../guide-scope.js';
@@ -73,5 +78,9 @@ export async function syncSetupTasks(
     title: question ? 'Answer Aiden’s question' : setupTasks[next.id].action,
     instructions: question ?? next.detail,
     dedupeKey: `setup:${projectId}:${next.id}`,
+    role: setupTaskRole(next.id),
+    // A question Aiden asks while writing requirements is about the whole product, so it goes to
+    // the project's product lead rather than one task's reviewer.
+    ...(question ? { scope: 'general' as const } : {}),
   });
 }

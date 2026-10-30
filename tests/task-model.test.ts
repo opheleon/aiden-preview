@@ -14,6 +14,8 @@ void test('team tasks map every lifecycle state consistently, retaining failure 
     ['queued', 'To do'],
     ['leased', 'In progress'],
     ['blocked', 'To do'],
+    ['review', 'In review'],
+    ['verify', 'In review'],
     ['done', 'Done'],
     ['failed', 'Failed'],
     ['cancelled', 'Stopped'],

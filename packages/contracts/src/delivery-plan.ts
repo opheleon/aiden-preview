@@ -1,6 +1,7 @@
 import { z } from 'zod/v3';
 
 import { requirementId } from './ids.js';
+import { workRoles } from './work-roles.js';
 
 /** Stable identity for a feature in the implementation plan. */
 const featureId = z.string().regex(/^F-[1-9]\d*$/);
@@ -14,6 +15,11 @@ export const DeliveryFeatureSchema = z
     kind: z.enum(['feature', 'platform']),
     rationale: z.string().trim().min(1).max(600),
     testPlan: z.string().trim().min(1).max(1600).optional(),
+    /**
+     * Who on a team reviews the feature: product_manager, be_engineer, or fe_engineer. Plans saved
+     * before roles existed have none, and the model may answer null when it cannot tell.
+     */
+    role: z.enum(workRoles).nullable().optional(),
     requirementIds: z.array(requirementId).min(1),
     dependsOn: z.array(featureId),
   })

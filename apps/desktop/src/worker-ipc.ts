@@ -15,6 +15,8 @@ const methods = new Set([
   'accountState',
   'accountTakeTask',
   'accountFinishTask',
+  'accountReviewTask',
+  'accountCheckTask',
   'accountSetPickup',
   'accountCreateProject',
   'accountShareProject',

@@ -14,6 +14,7 @@ import {
 import { documentFor, materialize } from '../packages/core/src/accounts/documents.js';
 import { InventoryProbe } from '../packages/core/src/accounts/inventory.js';
 import { AccountSession } from '../packages/core/src/accounts/session.js';
+import { verifyServices } from '../packages/core/src/accounts/verify-task.js';
 import { Engine } from '../packages/core/src/engine.js';
 import { Store } from '../packages/core/src/storage.js';
 import { FixtureRuntime } from './fixture-runtime.js';
@@ -77,6 +78,14 @@ function leased(kind: string): AccountTask {
     resume: null,
     queuedAt: at,
     updatedAt: at,
+    role: null,
+    reviewerUserId: null,
+    parentTaskId: null,
+    revisionOf: null,
+    verification: null,
+    review: null,
+    checks: [],
+    timeline: { startedAt: at, reviewAt: null, verifyAt: null, finishedAt: null },
   };
 }
 
@@ -147,7 +156,12 @@ void test('a hold is reported with its reason and the suggested wait, with verif
     assert.deepEqual(body.sample.tools.gh, { installed: true, signedIn: true });
     assert.equal(body.sample.usageCapPct, 70);
     // The team only assigns kinds this version runs, such as the daily Morning check.
-    assert.deepEqual(body.sample.taskKinds, ['write-requirements', 'check-code', 'build']);
+    assert.deepEqual(body.sample.taskKinds, [
+      'write-requirements',
+      'check-code',
+      'build',
+      'verify',
+    ]);
   } finally {
     await engine.dispose();
   }
@@ -268,8 +282,65 @@ void test('a task this version cannot run goes back to the queue with a plain re
     });
     await agent.poll(poll);
     await agent.idle();
-    const failed = calls.find((c) => c.method === 'fail')?.args[1] as { error: string };
+    const failed = calls.find((c) => c.method === 'fail')?.args[1] as {
+      error: string;
+      permanent?: boolean;
+    };
     assert.match(failed.error, /cannot do "Something new" yet/);
+    // An updated machine may run it, so the team retries it elsewhere.
+    assert.equal(failed.permanent, undefined);
+  } finally {
+    await engine.dispose();
+  }
+});
+
+void test('a verify task with no pull request fails for good, and one with PRs completes with CI checks', async (t) => {
+  const { agent, calls, script, session, engine, project } = await setup();
+  try {
+    await session.saveRefresh('refresh-token');
+    const verify = { ...leased('verify'), instructions: 'Nothing to check here' };
+    script.next = () => ({
+      decision: { type: 'assign', reason: 'Best fit' },
+      task: verify,
+      project: serverProject(project),
+    });
+    await agent.poll(poll);
+    await agent.idle();
+    const failed = calls.find((c) => c.method === 'fail')?.args[1] as {
+      error: string;
+      permanent?: boolean;
+    };
+    assert.match(failed.error, /names no GitHub pull request/);
+    assert.equal(failed.permanent, true);
+    assert.equal(
+      calls.some((c) => c.method === 'replaceDocument'),
+      false,
+      'verifying never copies or uploads the project',
+    );
+    t.mock.method(verifyServices, 'checks', () =>
+      Promise.resolve([{ name: 'build', bucket: 'pass', link: null }]),
+    );
+    script.next = () => ({
+      decision: { type: 'assign', reason: 'Best fit' },
+      task: { ...verify, instructions: 'https://github.com/acme/api/pull/12' },
+      project: serverProject(project),
+    });
+    await agent.poll(poll);
+    await agent.idle();
+    const complete = calls.find((c) => c.method === 'complete')?.args[1] as {
+      checks?: unknown[];
+      review?: unknown;
+    };
+    assert.deepEqual(complete.checks, [
+      {
+        name: 'CI: acme/api#12',
+        kind: 'automated',
+        url: 'https://github.com/acme/api/pull/12',
+        state: 'passed',
+        detail: '1 check passed',
+      },
+    ]);
+    assert.equal(complete.review, undefined);
   } finally {
     await engine.dispose();
   }

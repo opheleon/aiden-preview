@@ -25,6 +25,8 @@ type AccountMethod = Extract<
   | 'accountState'
   | 'accountTakeTask'
   | 'accountFinishTask'
+  | 'accountReviewTask'
+  | 'accountCheckTask'
   | 'accountSetPickup'
   | 'accountCreateProject'
   | 'accountShareProject'
@@ -63,6 +65,7 @@ const writeRequirements: NewAccountTask = {
   title: 'Write requirements',
   instructions: 'Turn the goal into requirements.',
   usesModel: true,
+  role: 'product_manager',
 };
 
 /**
@@ -103,9 +106,42 @@ async function retry(client: AccountsClient, taskId: string): Promise<AccountTas
     tools: old.requires.tools,
     connections: old.requires.connections,
     usesModel: old.requires.runtime !== null,
+    ...(old.role ? { role: old.role } : {}),
   });
   if (old.status === 'failed') await client.cancel(old.id).catch(() => undefined);
   return again;
+}
+
+/**
+ * The reviewer's actions on Aiden's work: approve or ask for changes (a note is required), and pass
+ * or fail a manual check. The server refuses anyone but the task's reviewer.
+ * @param client Reads the signed-in Teams client on first use.
+ */
+function reviewMethods(
+  client: () => AccountsClient,
+): Record<'accountReviewTask' | 'accountCheckTask', (params: unknown) => unknown> {
+  return {
+    accountReviewTask: operation(
+      task
+        .extend({
+          decision: z.enum(['approve', 'changes']),
+          note: z.string().trim().max(5000).optional(),
+        })
+        .strict()
+        .refine((p) => p.decision === 'approve' || !!p.note, 'Say what needs to change.'),
+      (p) => client().review(p.taskId, p.decision, p.note ?? ''),
+    ),
+    accountCheckTask: operation(
+      task
+        .extend({
+          checkId: z.string().min(1).max(64),
+          passed: z.boolean(),
+          note: z.string().trim().max(500).optional(),
+        })
+        .strict(),
+      (p) => client().markCheck(p.taskId, p.checkId, p.passed, p.note ?? ''),
+    ),
+  };
 }
 
 /** Wire the Teams tier into the worker. Signed out, every method answers without touching the network. */
@@ -163,6 +199,7 @@ export function accountMethods(
       task.extend({ answer: z.string().trim().max(5000).optional() }).strict(),
       (p) => context().client.done(p.taskId, p.answer ?? null),
     ),
+    ...reviewMethods(() => context().client),
     accountSetPickup: operation(
       z
         .object({

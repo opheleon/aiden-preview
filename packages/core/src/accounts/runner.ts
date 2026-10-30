@@ -4,7 +4,9 @@ import path from 'node:path';
 import type {
   AccountProject,
   AccountTask,
+  CheckInput,
   NewAccountTask,
+  ReviewPacket,
 } from '../../../contracts/src/accounts-api.js';
 import type {
   DeliveryCheckpoint,
@@ -12,6 +14,7 @@ import type {
   ExecutionLimits,
 } from '../../../contracts/src/accounts-execution.js';
 import type { Baseline, CodingJob, Project, RunManifest } from '../../../contracts/src/index.js';
+import type { QuestionScope, WorkRole } from '../../../contracts/src/work-roles.js';
 import type { LocalToolServer } from '../../../tools/src/mcp.js';
 import { codingAgent } from '../coding-jobs.js';
 import type { Engine } from '../engine.js';
@@ -21,6 +24,9 @@ import { runTeamCoding } from '../team-coding.js';
 import { buildRepositories } from './build-tasks.js';
 import { materialize } from './documents.js';
 import { recoverPublication } from './publication-recovery.js';
+import { buildReview, questionTasks } from './review-packet.js';
+import { PermanentTaskError } from './task-errors.js';
+import { runVerify } from './verify-task.js';
 
 /** A task kind this version of the app does not run yet; reported as a failed attempt. */
 export class UnsupportedTask extends Error {
@@ -36,9 +42,22 @@ export interface TaskOutput {
   result: unknown;
   /** True when the project's document changed and should be uploaded. */
   documentChanged: boolean;
-  /** Work for people that this result creates, for example reviewing a pull request. */
+  /** Work for people that this result creates, for example answering the coding agent's question. */
   followUps?: NewAccountTask[];
+  /** Work a person must review: the task goes to its reviewer instead of done. */
+  review?: ReviewPacket;
+  /** A verify task's CI results, applied to the reviewed task it checks. */
+  checks?: CheckInput[];
 }
+
+/** Who a question needs and whether it is about the task or general; the server routes it. */
+export interface QuestionRouting {
+  role?: WorkRole;
+  scope?: QuestionScope;
+}
+
+/** Injectable coding boundary, so a build's handoff can be tested without a coding agent. */
+export const runnerServices = { runTeamCoding };
 
 /** How a running task reports progress and learns it was stopped. */
 export interface TaskControls {
@@ -49,24 +68,14 @@ export interface TaskControls {
   activity?: (activity: ExecutionActivity) => void;
   authorize?: () => Promise<void>;
   checkpoint?: (checkpoint: DeliveryCheckpoint) => Promise<void>;
-  block?: (title: string, question: string) => Promise<void>;
+  block?: (title: string, question: string, routing?: QuestionRouting) => Promise<void>;
 }
 
 /**
- * The person's next step after a coding session: review its PRs, or answer what it needs.
- * Example: PRs in acme/api and acme/ui become "Review and merge 2 pull requests" listing both.
+ * The person's next step when a coding session opened no pull request: answer what it needs, or
+ * take the session over. The question goes to the build's role, about this task.
  */
-function codingFollowUp(job: CodingJob, pullRequests: string[], verdict: string[]): NewAccountTask {
-  if (pullRequests.length)
-    return {
-      actor: 'human',
-      kind: 'review-pr',
-      title:
-        pullRequests.length === 1
-          ? 'Review and merge the pull request'
-          : `Review and merge ${pullRequests.length} pull requests`,
-      instructions: [...verdict, ...pullRequests, '', job.message].join('\n').slice(0, 4000),
-    };
+function codingQuestion(job: CodingJob, role: WorkRole | null): NewAccountTask {
   const takeOver =
     job.runtime.provider === 'claude'
       ? `run claude --resume ${job.sessionId} in ${job.worktree}`
@@ -79,6 +88,8 @@ function codingFollowUp(job: CodingJob, pullRequests: string[], verdict: string[
       0,
       4000,
     ),
+    ...(role ? { role } : {}),
+    scope: 'task',
   };
 }
 
@@ -95,14 +106,20 @@ function blockingQuestions(job: CodingJob): string {
   return text.slice(0, 5000);
 }
 
-/** Hand the change to the project's coding agent on this machine and report its PR, or why it stopped. */
-async function build(
+/**
+ * Hand the change to the project's coding agent on this machine. When it opened pull requests,
+ * the task goes to review with a packet for its reviewer; otherwise a person is asked what the
+ * session needs. The agent's open questions become routed question tasks either way.
+ */
+export async function runBuild(
   engine: Engine,
   task: AccountTask,
   project: Project,
   controls: TaskControls,
 ): Promise<TaskOutput> {
-  const { job, pullRequests, verdict } = await runTeamCoding(
+  if (!task.instructions.trim())
+    throw new PermanentTaskError('This build task has no instructions to work from.');
+  const { job, pullRequests, verdict, requirements } = await runnerServices.runTeamCoding(
     engine,
     project.id,
     task.resume
@@ -116,7 +133,10 @@ async function build(
   );
   if (job.status === 'failed' || job.status === 'interrupted') throw new Error(job.message);
   if (job.status === 'needs_input' && controls.block) {
-    await controls.block('Coding needs a human answer', blockingQuestions(job));
+    await controls.block('Coding needs a human answer', blockingQuestions(job), {
+      ...(task.role ? { role: task.role } : {}),
+      scope: 'task',
+    });
     controls.signal.throwIfAborted();
   }
   return {
@@ -131,15 +151,12 @@ async function build(
     },
     documentChanged: false,
     followUps: [
-      codingFollowUp(job, pullRequests, verdict),
-      ...(job.openQuestions ?? []).map((item) => ({
-        actor: 'human' as const,
-        kind: 'coding-question',
-        title: item.question.slice(0, 200),
-        instructions: item.question,
-        ...(item.assigneeUserId ? { assigneeUserId: item.assigneeUserId } : {}),
-      })),
+      ...(pullRequests.length ? [] : [codingQuestion(job, task.role)]),
+      ...questionTasks(job.openQuestions ?? [], task.role),
     ],
+    ...(pullRequests.length
+      ? { review: buildReview(job, pullRequests, verdict, requirements) }
+      : {}),
   };
 }
 
@@ -216,7 +233,7 @@ async function checkCode(
 }
 
 /** Task kinds `runAccountTask` can run; sent with every poll so the team only assigns these. */
-export const supportedTaskKinds = ['write-requirements', 'check-code', 'build'] as const;
+export const supportedTaskKinds = ['write-requirements', 'check-code', 'build', 'verify'] as const;
 
 /**
  * Run one account task on this machine through the existing engine, with the project's own
@@ -230,6 +247,8 @@ export async function runAccountTask(
 ): Promise<TaskOutput> {
   controls.signal.throwIfAborted();
   await controls.authorize?.();
+  // Verifying reads CI on GitHub only: no project copy, no code, no model.
+  if (task.kind === 'verify') return runVerify(task, controls);
   const materialized = await materialize(engine, server, true);
   if (!materialized)
     throw new Error(
@@ -258,7 +277,7 @@ export async function runAccountTask(
     case 'check-code':
       return checkCode(engine, project, controls);
     case 'build':
-      return build(engine, task, project, controls);
+      return runBuild(engine, task, project, controls);
     default:
       throw new UnsupportedTask(task.title);
   }
