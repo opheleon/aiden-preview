@@ -15,6 +15,18 @@ export function lastError(task: AccountTask): string | null {
   return typeof result?.error === 'string' ? result.error : null;
 }
 
+/** Finished work waiting on a person: who reviews it, or how far its checks have come. */
+function reviewLine(state: AccountState, task: AccountTask): string {
+  if (task.status === 'verify') {
+    const passed = task.checks.filter((c) => c.state === 'passed').length;
+    return `Approved. ${passed} of ${task.checks.length} checks passed so far.`;
+  }
+  const reviewer = state.members.find((m) => m.id === task.reviewerUserId);
+  return reviewer
+    ? `Waiting for ${reviewer.name || reviewer.email} to review it in My work.`
+    : 'Waiting for the team to pick a reviewer.';
+}
+
 /**
  * What Aiden's team task is doing, in one sentence: waiting for a machine, running on one, or why
  * it stopped. Example: "Tried 2 times. Last error: ... It tries again on the next machine."
@@ -25,6 +37,7 @@ function describe(state: AccountState, task: AccountTask): string {
   if (task.status === 'leased')
     return `Running on ${machine ?? 'a teammate’s machine'}.${task.progress ? ` Now: ${task.progress}` : ''}`;
   if (task.status === 'blocked') return 'Waiting for an answer in My work.';
+  if (task.status === 'review' || task.status === 'verify') return reviewLine(state, task);
   if (task.status === 'cancelled') return 'Stopped. Nothing runs until you try again.';
   if (task.status === 'failed')
     return `Stopped after ${task.attempts} tries.${error ? ` Last error: ${error}` : ''}`;
@@ -52,7 +65,8 @@ export function TeamTaskStatus({ workspace }: { workspace: Workspace }): JSX.Ele
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
   const task = state ? current(state, project.id) : null;
-  const unfinished = !!task && ['queued', 'leased', 'blocked'].includes(task.status);
+  const unfinished =
+    !!task && ['queued', 'leased', 'blocked', 'review', 'verify'].includes(task.status);
   useEffect(() => {
     if (!accountId) return;
     let closed = false;

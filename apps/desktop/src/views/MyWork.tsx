@@ -1,15 +1,19 @@
-import { ArrowRight, CircleHelp, RefreshCw, ShieldCheck } from 'lucide-react';
+import { ArrowRight, CircleHelp, GitPullRequest, RefreshCw, ShieldCheck } from 'lucide-react';
 import { type JSX, useState } from 'react';
 
 import type { AccountTask } from '../../../../packages/contracts/src/accounts-api';
 import { setupStepOf } from '../../../../packages/contracts/src/task-model';
 import { type AccountView, useAccount } from '../hooks/useAccount';
 import type { Workspace } from '../hooks/useWorkspace';
-import { projectName, pullRequests, summary, toggle, WorkCard, WorkDot, WorkRow } from './WorkCard';
+import { PullRequestButtons, ReviewDetail, VerifyDetail } from './ReviewWork';
+import { projectName, summary, toggle, WorkCard, WorkDot, WorkRow } from './WorkCard';
 
 /** Aiden asking a person something: an answer task, or a coding session that paused. */
 const questionKinds = new Set(['answer', 'coding-question']);
-/** Work Aiden hands back for a person to look over before it counts. */
+/**
+ * Older work Aiden handed back as a person's task to look over: pull requests from before review
+ * packets, and confirming requirements. These still finish with Mark done or in the project.
+ */
 const reviewKinds = new Set(['review-pr', 'setup-confirm']);
 
 /** Good morning, afternoon, or evening. */
@@ -30,8 +34,9 @@ function agentLine(account: AccountView): { live: boolean; text: string } {
 }
 
 /**
- * My work: what Aiden needs from you, in three contained cards. Questions to answer, work to look
- * over, and anything else only a person can do. Rows are one line and open in place.
+ * My work: what Aiden needs from you, in contained cards. Questions to answer, Aiden's work you
+ * review, approved work whose checks you verify, and anything else only a person can do. Rows are
+ * one line and open in place. Reviews and checks show only to the reviewer the team picked.
  */
 export function MyWork({ workspace }: { workspace: Workspace }): JSX.Element {
   const account = useAccount(workspace.call);
@@ -48,6 +53,13 @@ export function MyWork({ workspace }: { workspace: Workspace }): JSX.Element {
   const questions = mine.filter((t) => questionKinds.has(t.kind));
   const reviews = mine.filter((t) => reviewKinds.has(t.kind));
   const actions = mine.filter((t) => !questionKinds.has(t.kind) && !reviewKinds.has(t.kind));
+  /** Aiden's work in one stage that the team picked me to review. */
+  const reviewing = (status: 'review' | 'verify') =>
+    (state?.tasks ?? []).filter(
+      (t) => t.actor === 'agent' && t.status === status && t.reviewerUserId === me,
+    );
+  const toReview = reviewing('review');
+  const toVerify = reviewing('verify');
   const line = agentLine(account);
   /** Open a task's project in the project view. */
   const openProject = (projectId: string) =>
@@ -104,24 +116,33 @@ export function MyWork({ workspace }: { workspace: Workspace }): JSX.Element {
             ))}
           </WorkCard>
           <WorkCard
+            icon={<GitPullRequest size={16} aria-hidden="true" />}
+            title="To review"
+            count={toReview.length}
+            empty="Nothing to review."
+          >
+            {toReview.map((task) => (
+              <WorkRow key={task.id} {...row(task, 'brand')}>
+                <ReviewDetail task={task} account={account} onOpen={openProject} />
+              </WorkRow>
+            ))}
+          </WorkCard>
+          <WorkCard
             icon={<ShieldCheck size={16} aria-hidden="true" />}
             title="To verify"
-            count={reviews.length}
+            count={toVerify.length + reviews.length}
             empty="Nothing to look over."
           >
+            {toVerify.map((task) => (
+              <WorkRow key={task.id} {...row(task, 'brand')}>
+                <VerifyDetail task={task} account={account} />
+              </WorkRow>
+            ))}
             {reviews.map((task) => (
               <WorkRow key={task.id} {...row(task, 'brand')}>
                 <Detail task={task} />
                 <div className="work-actions">
-                  {pullRequests(task).map((url, _, all) => (
-                    <button
-                      key={url}
-                      className="work-solid"
-                      onClick={() => void window.aiden?.openExternal(url)}
-                    >
-                      {all.length === 1 ? 'Open pull request' : `Open ${url.split('/')[4]} PR`}
-                    </button>
-                  ))}
+                  <PullRequestButtons task={task} />
                   <Finish task={task} account={account} onOpen={openProject} />
                 </div>
               </WorkRow>
