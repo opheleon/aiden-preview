@@ -274,13 +274,15 @@ jobs:
           name: windows
           path: release
 
-      # The README links to releases/latest/download/Aiden-arm64.dmg, which only stable releases serve.
-      - name: Create permanent download alias
+      # The README and the Teams dashboard link to releases/latest/download/Aiden-arm64.dmg and
+      # Aiden-x64.exe, which only stable releases serve.
+      - name: Create permanent download aliases
         if: env.FLAVOR == 'production'
         working-directory: release
         run: |
           set -euo pipefail
           cp -- "Aiden-$VERSION-arm64.dmg" Aiden-arm64.dmg
+          cp -- "Aiden-$VERSION-x64.exe" Aiden-x64.exe
 
       - name: Write SHA-256 checksums
         working-directory: release
@@ -305,7 +307,7 @@ jobs:
           names=("$PREFIX-$VERSION-arm64.dmg" "$PREFIX-$VERSION-arm64.dmg.blockmap" \
             "$PREFIX-$VERSION-arm64.zip" "$PREFIX-$VERSION-arm64.zip.blockmap" "$CHANNEL-mac.yml" \
             "$PREFIX-$VERSION-x64.exe" "$PREFIX-$VERSION-x64.exe.blockmap" "$CHANNEL.yml" SHA256SUMS.txt)
-          if [[ "$FLAVOR" == production ]]; then names+=(Aiden-arm64.dmg); fi
+          if [[ "$FLAVOR" == production ]]; then names+=(Aiden-arm64.dmg Aiden-x64.exe); fi
           expected=$(printf '%s\n' "${names[@]}" | jq -R . | jq -s sort)
           actual=$(printf '%s\n' * | jq -R . | jq -s sort)
           if [[ "$actual" != "$expected" ]]; then
@@ -313,7 +315,10 @@ jobs:
             exit 1
           fi
           sha256sum --check SHA256SUMS.txt
-          if [[ "$FLAVOR" == production ]]; then cmp -- "Aiden-$VERSION-arm64.dmg" Aiden-arm64.dmg; fi
+          if [[ "$FLAVOR" == production ]]; then
+            cmp -- "Aiden-$VERSION-arm64.dmg" Aiden-arm64.dmg
+            cmp -- "Aiden-$VERSION-x64.exe" Aiden-x64.exe
+          fi
           # Refuse duplicates and leave prior drafts untouched for explicit recovery.
           existing=$(gh api "$endpoint?per_page=100" --paginate --slurp | \
             jq --arg tag "$tag" '[.[][] | select(.tag_name == $tag)] | length')
@@ -346,3 +351,51 @@ jobs:
             exit 1
           fi
           gh api --method PATCH "$endpoint/$release_id" -F draft=false --jq .html_url
+
+      # releases/latest skips pre-releases, so Aiden Beta keeps fixed download addresses on one
+      # pre-release tagged aiden-beta: releases/download/aiden-beta/Aiden-Beta-arm64.dmg and
+      # Aiden-Beta-x64.exe. Its tag is not a version, so neither app's updater ever offers it, and
+      # as a pre-release it is never "latest". Each file is uploaded under a temporary name first,
+      # so the fixed address is missing only for the moment of the rename.
+      - name: Point the fixed Aiden Beta downloads at this build
+        if: env.FLAVOR == 'beta'
+        working-directory: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          endpoint="repos/$GITHUB_REPOSITORY/releases"
+          tag=aiden-beta
+          name='Aiden Beta (newest build)'
+          body="Fixed download addresses for the newest Aiden Beta, currently $VERSION. Checksums, provenance, and release notes are on [Aiden Beta $VERSION](https://github.com/$GITHUB_REPOSITORY/releases/tag/v$VERSION)."
+          release_id=$(gh api "$endpoint?per_page=100" --paginate --slurp | \
+            jq -r --arg tag "$tag" '[.[][] | select(.tag_name == $tag)] | first | .id // empty')
+          if [[ -z "$release_id" ]]; then
+            release_id=$(gh api --method POST "$endpoint" \
+              -f tag_name="$tag" -f target_commitish="$GITHUB_SHA" -f name="$name" -f body="$body" \
+              -F draft=false -F prerelease=true -f make_latest=false --jq .id)
+          else
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$tag" \
+              -f sha="$GITHUB_SHA" -F force=true --jq .object.sha
+            gh api --method PATCH "$endpoint/$release_id" \
+              -f name="$name" -f body="$body" -F prerelease=true -f make_latest=false --jq .html_url
+          fi
+          [[ "$release_id" =~ ^[0-9]+$ ]]
+          for pair in "Aiden-Beta-$VERSION-arm64.dmg:Aiden-Beta-arm64.dmg" \
+            "Aiden-Beta-$VERSION-x64.exe:Aiden-Beta-x64.exe"; do
+            file=${pair%%:*} fixed=${pair#*:}
+            assets=$(gh api "$endpoint/$release_id/assets?per_page=100" --paginate --slurp | \
+              jq -c '[.[][] | {id, name}]')
+            # A temporary upload left by an interrupted run would block this one.
+            for id in $(jq -r --arg n "next-$fixed" '.[] | select(.name == $n) | .id' <<< "$assets"); do
+              gh api --method DELETE "$endpoint/assets/$id"
+            done
+            next=$(gh api --method POST \
+              "https://uploads.github.com/$endpoint/$release_id/assets?name=next-$fixed" \
+              -H 'Content-Type: application/octet-stream' --input "$file" --jq .id)
+            [[ "$next" =~ ^[0-9]+$ ]]
+            for id in $(jq -r --arg n "$fixed" '.[] | select(.name == $n) | .id' <<< "$assets"); do
+              gh api --method DELETE "$endpoint/assets/$id"
+            done
+            gh api --method PATCH "$endpoint/assets/$next" -f name="$fixed" --jq .browser_download_url
+          done
