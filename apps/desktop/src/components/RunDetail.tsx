@@ -1,20 +1,15 @@
 import { ArrowLeft, Square } from 'lucide-react';
 import { type JSX, useEffect, useRef, useState } from 'react';
 
-import type {
-  ActivityEntry,
-  ChatMessage,
-  RunEvent,
-  RunManifest,
-} from '../../../../packages/contracts/src/index';
+import type { ChatMessage, RunManifest } from '../../../../packages/contracts/src/index';
 import { useNow } from '../hooks/useNow';
+import { useRunLog } from '../hooks/useRunLog';
 import type { Workspace } from '../hooks/useWorkspace';
 import { runBlockage } from '../renderer/run-blockers';
 import { duration, runReasons, runStages, runStatus, runTitle } from '../renderer/run-labels';
 import { clockTime } from '../renderer/time';
 import { RunBlockers } from './RunBlockers';
 import { RunChat } from './RunChat';
-const api = window.aiden;
 
 /** Show the provider, actual model when known, and effort captured when this run started. */
 function RunRuntime({ run }: { run: RunManifest }): JSX.Element {
@@ -59,30 +54,6 @@ function Stages({ run, active }: { run: RunManifest; active: boolean }): JSX.Ele
       })}
     </ol>
   );
-}
-
-/** Keep a run's history current: load it, then add each step as the worker reports it. */
-function useRunLog(workspace: Workspace, runId: string): ActivityEntry[] {
-  const [entries, setEntries] = useState<ActivityEntry[]>([]);
-  const { project, call, setError } = workspace;
-  useEffect(() => {
-    let cancelled = false;
-    void call('runLog', { projectId: project.id, runId })
-      .then((log) => !cancelled && setEntries(log))
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not load the run.'));
-    const stop = api?.onEvent((event: RunEvent) => {
-      const entry = event.activity;
-      if (event.type !== 'activity' || event.runId !== runId || !entry) return;
-      setEntries((log) =>
-        log.some((e) => e.at === entry.at && e.summary === entry.summary) ? log : [...log, entry],
-      );
-    });
-    return () => {
-      cancelled = true;
-      stop?.();
-    };
-  }, [call, project.id, runId, setError]);
-  return entries;
 }
 
 /**

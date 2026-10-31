@@ -36,11 +36,17 @@ export async function githubRepository(repo: Repository): Promise<string> {
     throw new Error('Coding jobs require a github.com origin.');
   return match[1];
 }
-/** Create an isolated branch from the remote default without changing the user's checkout. */
+/**
+ * Create an isolated branch from the remote default without changing the user's checkout. With
+ * `resume`, start from the branch's own tip on GitHub instead, so review feedback adds commits to
+ * the same pull request; a repository without that branch yet starts from its default.
+ * Example: resuming aiden/job-1 checks out its pushed commits in a fresh worktree.
+ */
 export async function codingWorktree(
   repo: Repository,
   folder: string,
   branch: string,
+  resume = false,
 ): Promise<{ repository: string; baseBranch: string }> {
   await validateRepository(repo);
   const repository = await githubRepository(repo);
@@ -66,13 +72,37 @@ export async function codingWorktree(
     'origin',
     `refs/heads/${baseBranch}`,
   ]);
-  const sha = (
-    await deliveryGitServices.git(repo.path, ['rev-parse', 'FETCH_HEAD^{commit}'])
-  ).trim();
+  let sha = (await deliveryGitServices.git(repo.path, ['rev-parse', 'FETCH_HEAD^{commit}'])).trim();
+  if (resume) sha = (await pushedBranch(repo.path, branch)) ?? sha;
   await mkdir(path.dirname(folder), { recursive: true, mode: 0o700 });
-  await deliveryGitServices.git(repo.path, ['worktree', 'add', '-b', branch, folder, sha]);
+  // A resumed branch may still be checked out in the earlier attempt's worktree, so it is reset
+  // to the pushed tip here instead of created.
+  await deliveryGitServices.git(repo.path, [
+    'worktree',
+    'add',
+    ...(resume ? ['--force', '-B'] : ['-b']),
+    branch,
+    folder,
+    sha,
+  ]);
   return { repository, baseBranch };
 }
+/** The commit a job branch points to on GitHub, or nothing when it was never pushed there. */
+async function pushedBranch(checkout: string, branch: string): Promise<string | null> {
+  try {
+    await deliveryGitServices.git(checkout, [
+      'fetch',
+      '--no-tags',
+      '--no-recurse-submodules',
+      'origin',
+      `refs/heads/${branch}`,
+    ]);
+    return (await deliveryGitServices.git(checkout, ['rev-parse', 'FETCH_HEAD^{commit}'])).trim();
+  } catch {
+    return null;
+  }
+}
+
 /** Trusted GitHub state for a PR; the agent's summary never supplies merge evidence. */
 export const PullRequestSchema = z.object({
   url: z.string().url(),
@@ -178,7 +208,10 @@ export interface PublicationInput {
   remoteOnly?: boolean;
 }
 
-/** Publish or reconcile one committed branch without duplicating an existing PR. */
+/**
+ * Publish or reconcile one committed branch without duplicating an existing PR. New commits on an
+ * open PR's branch, such as fixes for review feedback, are pushed to that same PR.
+ */
 export async function publishJobBranch(input: PublicationInput): Promise<string> {
   const { repository, branch, baseBranch } = input;
   if (!name.test(repository) || !/^aiden\/job-[a-f0-9-]+$/.test(branch))
@@ -187,6 +220,13 @@ export async function publishJobBranch(input: PublicationInput): Promise<string>
   await input.authorize?.();
   const existing = await findJobPullRequest(repository, branch, baseBranch);
   if (existing) {
+    try {
+      await verifyPublicationCommit(repository, existing, branch, baseBranch, input.commit);
+      return existing;
+    } catch {
+      // The open PR is behind, as after review feedback: push the new commits, fast-forward only.
+    }
+    await ensurePublishedBranch(input);
     await verifyPublicationCommit(repository, existing, branch, baseBranch, input.commit);
     return existing;
   }

@@ -28,10 +28,16 @@ function line(summary: string, extra: Partial<ActivityEntry> = {}): ActivityEntr
   return { at: report.generatedAt, runId: report.id, kind: 'look', summary, ...extra };
 }
 
+/** Wait until the start screen has chosen the person's only GitHub organization. */
+async function orgChosen(): Promise<void> {
+  await waitFor(() => expect(screen.getByLabelText('GitHub organization')).toHaveValue('acme'));
+}
+
 test('setting the intent is one screen, and Aiden starts with only the intent', async () => {
   render(<App />);
   await userEvent.click(await screen.findByRole('button', { name: 'Create project' }));
   expect(screen.getByRole('heading', { name: /What are you building/ })).toBeVisible();
+  await orgChosen();
   const start = screen.getByRole('button', { name: /Hand it to Aiden/ });
   expect(start).toBeDisabled();
   // What is missing is the button's tooltip; the start screen has no other hints.
@@ -41,6 +47,8 @@ test('setting the intent is one screen, and Aiden starts with only the intent', 
   expect(start).toBeEnabled();
   expect(start).not.toHaveAccessibleDescription();
   expect(screen.queryByText('Verification setup: surfaces and connections')).toBeNull();
+  // The only organization the person belongs to is chosen for them, next to the provider.
+  expect(screen.getByLabelText('GitHub organization')).toHaveValue('acme');
   for (const name of ['Import a file', 'Add the project folder (optional)'])
     expect(screen.queryByRole('button', { name })).toBeNull();
   await userEvent.selectOptions(screen.getByLabelText('Model provider'), 'claude');
@@ -52,6 +60,7 @@ test('setting the intent is one screen, and Aiden starts with only the intent', 
         name: 'List books',
         context: 'List books',
         runtime: { provider: 'claude', auth: 'subscription' },
+        githubOrganizations: ['acme'],
       }),
     }),
   );
@@ -67,6 +76,7 @@ test('signed in but unable to reach the team, a new project is refused with the 
   render(<App />);
   // Created at once, before any background team check has finished.
   await userEvent.click(await screen.findByRole('button', { name: 'Create project' }));
+  await orgChosen();
   await userEvent.type(screen.getByLabelText('What are you building?'), 'List books');
   await userEvent.click(screen.getByRole('button', { name: /Hand it to Aiden/ }));
   expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -97,6 +107,7 @@ test('starting needs a connected model, and Connect opens its sign-in controls',
   try {
     render(<App />);
     await userEvent.click(await screen.findByRole('button', { name: 'Create project' }));
+    await orgChosen();
     await userEvent.type(screen.getByLabelText('What are you building?'), 'List books');
     expect(await screen.findByLabelText('Codex connection')).toHaveTextContent('Connected');
     await userEvent.selectOptions(screen.getByLabelText('Model provider'), 'claude');

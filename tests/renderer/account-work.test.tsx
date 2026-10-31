@@ -2,11 +2,10 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 
-import { TeamTaskStatus } from '../../apps/desktop/src/components/TeamTaskStatus';
+import { ChatStatusLine } from '../../apps/desktop/src/components/ChatStatusLine';
 import type { Workspace } from '../../apps/desktop/src/hooks/useWorkspace';
 import { AccountWork } from '../../apps/desktop/src/views/AccountWork';
-import { Agents } from '../../apps/desktop/src/views/Agents';
-import { MyWork } from '../../apps/desktop/src/views/MyWork';
+import { Work } from '../../apps/desktop/src/views/Work';
 import state from '../../packages/contracts/fixtures/accounts/account-state.json';
 import type { AccountStatus } from '../../packages/contracts/src/api';
 
@@ -52,12 +51,14 @@ function fixture(current: AccountStatus, teamState: object = state, projects: ob
   const load = vi.fn(() => Promise.resolve());
   const setArea = vi.fn();
   const setAccountScope = vi.fn();
+  const setSignedIn = vi.fn();
   const setProjects = vi.fn();
   const workspace = {
     call,
     load,
     setArea,
     setAccountScope,
+    setSignedIn,
     projects,
     setProjects,
   } as unknown as Workspace;
@@ -114,46 +115,46 @@ test('projects made on this computer sync into the team one at a time, by choice
   expect(f.call).toHaveBeenCalledWith('projects');
 });
 
-test('My work puts Aiden’s question in its own card and answers it in place', async () => {
+test('Work puts Aiden’s question beside the task it paused and answers it in place', async () => {
   const f = fixture(
     status({ userId: state.tasks.find((t) => t.actor === 'human')!.assigneeUserId }),
   );
-  render(<MyWork workspace={f.workspace} />);
-  const questions = await screen.findByRole('region', { name: 'Questions for you' });
-  expect(screen.getByText('Holding for a better-suited machine')).toBeInTheDocument();
+  render(<Work workspace={f.workspace} />);
+  const needs = await screen.findByRole('region', { name: 'Your tasks' });
   const loads = f.call.mock.calls.filter(([method]) => method === 'accountState').length;
   await userEvent.click(screen.getByRole('button', { name: 'Refresh' }));
   expect(f.call.mock.calls.filter(([method]) => method === 'accountState').length).toBeGreaterThan(
     loads,
   );
-  expect(questions).toHaveTextContent('Invoice payments');
+  expect(needs).toHaveTextContent('Invoice payments · Aiden is paused until you answer');
+  expect(screen.getByRole('region', { name: 'Agent tasks' })).toHaveTextContent(
+    'Write requirementsInvoice payments · Waits on your answerRequirementsWaiting',
+  );
   expect(screen.queryByLabelText('Answer: Which currency?')).not.toBeInTheDocument();
-  await userEvent.click(within(questions).getByRole('button', { name: /Which currency\?/ }));
+  await userEvent.click(within(needs).getByRole('button', { name: /Which currency\?/ }));
   await userEvent.type(screen.getByLabelText('Answer: Which currency?'), 'USD only');
   await userEvent.click(screen.getByRole('button', { name: 'Send' }));
   expect(f.call).toHaveBeenCalledWith('accountFinishTask', {
     taskId: state.tasks.find((t) => t.actor === 'human')?.id,
     answer: 'USD only',
   });
-  expect(screen.getByRole('region', { name: 'To verify' })).toHaveTextContent(
-    'Nothing to look over.',
-  );
-  expect(screen.queryByText('Write requirements')).not.toBeInTheDocument();
   expect(screen.queryByRole('region', { name: 'This machine' })).not.toBeInTheDocument();
 });
 
-test('a setup step lands in For you to do and closes from the project, not here', async () => {
+test('a setup step lands in Your tasks and closes from the project, not here', async () => {
   const human = state.tasks.find((t) => t.actor === 'human')!;
   const setup = { ...human, kind: 'setup-code', title: 'Connect code' };
   const f = fixture(status({ userId: human.assigneeUserId }), { ...state, tasks: [setup] });
-  render(<MyWork workspace={f.workspace} />);
-  const todo = await screen.findByRole('region', { name: 'For you to do' });
+  render(<Work workspace={f.workspace} />);
+  const todo = await screen.findByRole('region', { name: 'Your tasks' });
   await userEvent.click(within(todo).getByRole('button', { name: /Connect code/ }));
   expect(within(todo).queryByRole('button', { name: 'Mark done' })).not.toBeInTheDocument();
   await userEvent.click(within(todo).getByRole('button', { name: 'Open project' }));
   expect(f.load).toHaveBeenCalledWith(setup.projectId);
   await vi.waitFor(() => expect(f.setArea).toHaveBeenCalledWith('projects'));
-  expect(screen.getByText('No questions right now.')).toBeInTheDocument();
+  expect(screen.getByRole('region', { name: 'Agent tasks' })).toHaveTextContent(
+    'Aiden has nothing to do right now.',
+  );
 });
 
 test('Teams settings show the team, its machines, and this machine', async () => {
@@ -188,23 +189,30 @@ test('a team project says why Aiden’s task waits, and Stop or Try again change
   };
   const f = fixture(status(), { ...state, tasks: [failing] });
   const project = { id: agent.projectId, account: { accountId: state.account.id, revision: 1 } };
-  const workspace = { ...f.workspace, project } as unknown as Workspace;
-  render(<TeamTaskStatus workspace={workspace} />);
-  const line = await screen.findByRole('region', { name: 'Aiden’s team task' });
-  expect(line).toHaveTextContent('Write requirements');
-  expect(line).toHaveTextContent('To do');
+  const workspace = {
+    ...f.workspace,
+    project,
+    activeRuns: [],
+    runs: [],
+    busy: false,
+  } as unknown as Workspace;
+  render(<ChatStatusLine workspace={workspace} setup={undefined} />);
+  const line = await screen.findByRole('region', { name: 'Project status' });
+  expect(await within(line).findByText('Write requirements')).toBeInTheDocument();
   expect(line).toHaveTextContent('Tried 2 times. Last error: This machine could not copy');
   await userEvent.click(within(line).getByRole('button', { name: 'Stop' }));
   expect(f.call).toHaveBeenCalledWith('accountCancelTask', { taskId: agent.id });
 });
 
-test('Agents leads with running, waiting, and stopped work, and stopped work reruns or goes away', async () => {
+test('Agent tasks lists running, failed, then waiting work, and History keeps every ending', async () => {
   const agent = state.tasks.find((t) => t.actor === 'agent')!;
   const running = {
     ...agent,
     id: 'run-1',
+    kind: 'build',
     title: 'Build: Connect a Zoom account',
     status: 'leased' as const,
+    blockedBy: null,
     progress: 'Running pnpm test',
   };
   const waiting = {
@@ -212,11 +220,12 @@ test('Agents leads with running, waiting, and stopped work, and stopped work rer
     id: 'wait-1',
     title: 'Morning check',
     status: 'queued' as const,
+    blockedBy: null,
     attempts: 0,
     leasedDeviceId: null,
     waiting: 'Needs a machine with gh',
   };
-  const stopped = {
+  const failed = {
     ...agent,
     id: 'stop-1',
     title: 'Build: Reach help from the footer',
@@ -224,25 +233,34 @@ test('Agents leads with running, waiting, and stopped work, and stopped work rer
     attempts: 3,
     result: { error: 'Could not read GitHub' },
   };
-  const f = fixture(status(), { ...state, tasks: [running, waiting, stopped] });
-  render(<Agents workspace={f.workspace} />);
-  expect(
-    await screen.findByText('1 running, 1 waiting, 1 stopped on your team’s 2 machines.'),
-  ).toBeInTheDocument();
-  const now = screen.getByRole('region', { name: 'Running now' });
-  expect(now).toHaveTextContent('Build: Connect a Zoom account');
-  expect(now).toHaveTextContent('Now: Running pnpm test');
-  expect(now).toHaveTextContent('Alice MacBook');
-  expect(screen.getByRole('region', { name: 'Waiting' })).toHaveTextContent(
-    'Needs a machine with gh',
+  const stopped = {
+    ...agent,
+    id: 'cancel-1',
+    title: 'Size the billing work',
+    status: 'cancelled' as const,
+    result: null,
+  };
+  const f = fixture(status(), { ...state, tasks: [running, waiting, failed, stopped] });
+  render(<Work workspace={f.workspace} />);
+  expect(await screen.findByText(/^0 tasks for you, 1 running/)).toBeInTheDocument();
+  const needs = screen.getByRole('region', { name: 'Agent tasks' });
+  // Running first, then failed, then waiting; a build is tagged Build instead of titled with it.
+  expect(needs).not.toHaveTextContent('Build: Connect');
+  expect(needs).toHaveTextContent(
+    /Connect a Zoom account.*Alice MacBook.*Build.*Running.*Reach help from the footer.*Failed after 3 tries · Could not read GitHub.*Morning check.*Needs a machine with gh.*Waiting/,
   );
-  const ended = screen.getByRole('region', { name: 'Stopped' });
-  expect(ended).toHaveTextContent('Could not read GitHub');
-  await userEvent.click(within(ended).getByRole('button', { name: /Reach help from the footer/ }));
-  await userEvent.click(within(ended).getByRole('button', { name: 'Run again' }));
+  // Run again shows on the row itself, without opening it.
+  await userEvent.click(within(needs).getByRole('button', { name: 'Run again' }));
   expect(f.call).toHaveBeenCalledWith('accountRetryTask', { taskId: 'stop-1' });
-  await userEvent.click(within(ended).getByRole('button', { name: 'Remove' }));
+  await userEvent.click(within(needs).getByRole('button', { name: /Reach help from the footer/ }));
+  await userEvent.click(within(needs).getByRole('button', { name: 'Dismiss' }));
   expect(f.call).toHaveBeenCalledWith('accountCancelTask', { taskId: 'stop-1' });
+  await userEvent.click(screen.getByRole('tab', { name: 'History' }));
+  // The fixture's tasks ended on Oct 20, so History groups them under that day.
+  const history = screen.getByRole('region', { name: /Oct 20/ });
+  expect(history).toHaveTextContent('FailedBuild: Reach help from the footer');
+  expect(history).toHaveTextContent('StoppedSize the billing work');
+  expect(within(history).getAllByRole('button', { name: 'Run again' })).toHaveLength(2);
 });
 
 test('every signed-in person has a global profile link, while only admins have team settings', async () => {

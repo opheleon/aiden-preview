@@ -20,7 +20,11 @@ async function setup(ports = [39871, 39872]) {
   let now = 1_000_000;
   let issued = 0;
   let refreshStatus = 200;
-  // eslint-disable-next-line @typescript-eslint/require-await -- fetch stand-in must return a promise like fetch does
+  let refreshError = 'invalid_grant';
+  /** Only this refresh token is refused, when set; others are accepted. */
+  let refusedToken: string | undefined;
+  /** Runs before a refusal, for example another Aiden process saving a newer token. */
+  let beforeRefusal: () => Promise<void> = () => Promise.resolve();
   const http = (async (url: string | URL | Request, init?: RequestInit) => {
     const href = url instanceof Request ? url.url : url.toString();
     const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as Record<
@@ -29,8 +33,14 @@ async function setup(ports = [39871, 39872]) {
     >;
     requests.push({ url: href, body });
     if (href.endsWith('/oauth/revoke')) return new Response('{}', { status: 200 });
-    if (body.grant_type === 'refresh_token' && refreshStatus !== 200)
-      return new Response('{"error":"invalid_grant"}', { status: refreshStatus });
+    if (
+      body.grant_type === 'refresh_token' &&
+      refreshStatus !== 200 &&
+      (!refusedToken || body.refresh_token === refusedToken)
+    ) {
+      await beforeRefusal();
+      return new Response(JSON.stringify({ error: refreshError }), { status: refreshStatus });
+    }
     issued += 1;
     return new Response(
       JSON.stringify({
@@ -52,7 +62,13 @@ async function setup(ports = [39871, 39872]) {
     signIn,
     requests,
     advance: (ms: number) => (now += ms),
-    rejectRefresh: (status: number) => (refreshStatus = status),
+    rejectRefresh: (status: number, error = 'invalid_grant', only?: string) => {
+      refreshStatus = status;
+      refreshError = error;
+      refusedToken = only;
+    },
+    /** Do something just before Auth0 refuses a refresh. */
+    onRefusal: (run: () => Promise<void>) => (beforeRefusal = run),
   };
 }
 
@@ -166,6 +182,30 @@ void test('a rejected refresh token signs out; sign-out revokes at Auth0', async
   const revoke = f.requests.find((r) => r.url.endsWith('/oauth/revoke'));
   assert.deepEqual(revoke?.body, { client_id: 'desktop', token: 'refresh-9' });
   assert.equal(await f.session.refreshToken(), undefined);
+});
+
+void test('an Auth0 outage or a client error keeps the sign-in and is retried later', async () => {
+  const f = await setup([39881, 39882]);
+  await f.session.saveRefresh('refresh-0');
+  f.rejectRefresh(503, 'temporarily_unavailable');
+  await assert.rejects(f.signIn.accessToken());
+  assert.equal(await f.session.refreshToken(), 'refresh-0', 'the sign-in is kept');
+  assert.match(f.signIn.progress().failure ?? '', /could not renew .* It will try again/);
+  f.rejectRefresh(401, 'access_denied');
+  await assert.rejects(f.signIn.accessToken());
+  assert.equal(await f.session.refreshToken(), 'refresh-0');
+  f.rejectRefresh(200);
+  assert.equal(await f.signIn.accessToken(), 'access-1');
+});
+
+void test('a newer token another Aiden process saved is used instead of signing out', async () => {
+  const f = await setup([39883, 39884]);
+  await f.session.saveRefresh('refresh-0');
+  // Another process rotated refresh-0 first, so Auth0 refuses it, but its new token is saved.
+  f.rejectRefresh(403, 'invalid_grant', 'refresh-0');
+  f.onRefusal(() => f.session.saveRefresh('refresh-newer'));
+  assert.equal(await f.signIn.accessToken(), 'access-1');
+  assert.equal(await f.session.refreshToken(), 'refresh-1');
 });
 
 void test('the Teams tenant must be HTTPS', () => {

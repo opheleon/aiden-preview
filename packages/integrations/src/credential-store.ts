@@ -6,15 +6,17 @@ import path from 'node:path';
 import { AsyncEntry } from '@napi-rs/keyring';
 import { z } from 'zod/v3';
 
+import { flavorFromEnv } from '../../contracts/src/app-flavor.js';
 import { atomic, optionalJson } from '../../core/src/storage.js';
 import type { CredentialEntry } from './credentials.js';
 
 const StoredSchema = z.object({ password: z.string() }).strict();
 
 /**
- * One credential kept as an owner-only file under `AIDEN_HOME/credentials`, for machines with no
- * OS credential store, such as a Linux container on Fly.io. The file name is a hash of the service
- * and id, so neither appears on disk; the folder is 0700 and each file 0600.
+ * One credential kept as an owner-only file under `AIDEN_HOME/credentials`, for runs from source
+ * and machines with no OS credential store, such as a Linux container on Fly.io. Encryption at rest
+ * comes from the disk (FileVault on a Mac, an encrypted volume on Fly.io). The file name is a hash
+ * of the service and id, so neither appears on disk; the folder is 0700 and each file 0600.
  */
 export class FileCredentialEntry implements CredentialEntry {
   private readonly file: string;
@@ -55,8 +57,10 @@ export class FileCredentialEntry implements CredentialEntry {
 
 /**
  * The credential entry for a service and id: the OS store by default, or an owner-only file when
- * `AIDEN_CREDENTIAL_STORE=file`. Any other non-empty value is refused, so a typo never silently
- * falls back to session-only storage.
+ * `AIDEN_CREDENTIAL_STORE=file`. A run from source defaults to the file, like a project's `.env`:
+ * its Electron binary is ad hoc signed, so macOS asks for the keychain password again after every
+ * Electron upgrade. `AIDEN_CREDENTIAL_STORE=keyring` keeps a source run on the OS store. Any other
+ * non-empty value is refused, so a typo never silently falls back to session-only storage.
  * Example: `credentialEntry('com.opheleon.aiden.mcp', 'linear')`.
  */
 export function credentialEntry(
@@ -64,7 +68,8 @@ export function credentialEntry(
   id: string,
   env: NodeJS.ProcessEnv = process.env,
 ): CredentialEntry {
-  const store = env.AIDEN_CREDENTIAL_STORE?.trim();
+  const store =
+    env.AIDEN_CREDENTIAL_STORE?.trim() || (flavorFromEnv(env) === 'local' ? 'file' : undefined);
   if (store === 'file')
     return new FileCredentialEntry(env.AIDEN_HOME || path.join(homedir(), '.aiden'), service, id);
   if (store && store !== 'keyring')

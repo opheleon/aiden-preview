@@ -1,4 +1,4 @@
-import { RotateCcw } from 'lucide-react';
+import { ArrowDown, RotateCcw } from 'lucide-react';
 import { type JSX, type RefObject, useEffect, useRef } from 'react';
 
 import {
@@ -8,6 +8,7 @@ import {
   type SetupProgress,
   type SetupStepId,
 } from '../../../../packages/contracts/src/guide';
+import { ChatStatusLine } from '../components/ChatStatusLine';
 import { ChatSteps } from '../components/ChatSteps';
 import { GuideClarification } from '../components/GuideClarification';
 import { GuideComposer } from '../components/GuideComposer';
@@ -17,9 +18,8 @@ import { GuideThinking } from '../components/GuideThinking';
 import { GuideWidgetCard } from '../components/GuideWidgets';
 import { ProjectChatAction } from '../components/ProjectChatAction';
 import { ProviderNotice } from '../components/ProviderNotice';
-import { SetupChecklist } from '../components/SetupChecklist';
-import { TeamTaskStatus } from '../components/TeamTaskStatus';
 import type { Guide } from '../hooks/useGuide';
+import { useStickToBottom } from '../hooks/useStickToBottom';
 import { useTeamSetupSync } from '../hooks/useTeamSetupSync';
 import type { Workspace } from '../hooks/useWorkspace';
 import { contextualGuideMessage, type ProjectChatEntry } from '../renderer/project-chat-entry';
@@ -51,7 +51,7 @@ function ThreadStatus({ guide, waiting }: { guide: Guide; waiting: boolean }): J
   return (
     <>
       {guide.asking && <p className="chat-you">{guide.asking}</p>}
-      {guide.thinking && <GuideThinking />}
+      {guide.thinking && <GuideThinking doing={guide.doing} />}
       {waiting && (
         <p className="guide-event">
           No reply yet.{' '}
@@ -208,7 +208,6 @@ export function GuideChat({
 }): JSX.Element {
   const input = useRef<HTMLTextAreaElement>(null);
   const thread = useRef<HTMLDivElement>(null);
-  const following = useRef(true);
   const latestReply = useRef<HTMLDivElement>(null);
   const requestedAction = useRef<HTMLDivElement>(null);
   const { ready, playback } = guide;
@@ -220,39 +219,32 @@ export function GuideChat({
   useEffect(() => {
     if (visible && ready && autoPlayback && passive(entry)) playback();
   }, [visible, ready, autoPlayback, playback, entry]);
-  const { view, thinking, asking } = guide;
+  const { view, thinking } = guide;
   useTeamSetupSync(workspace, view);
   const missingRequirement = requirementMissing(entry, workspace);
   const { messages, lastReply, waiting } = conversationState(guide);
   const saved = new Set(messages.flatMap((m) => (m.result ? [m.result.runId] : [])));
+  const { following, hold, follow, behind } = useStickToBottom(thread, visible);
   useEffect(() => {
-    if (entry) following.current = true;
-  }, [entry]);
+    if (entry) follow();
+  }, [entry, follow]);
   useResultFocus({ threadRef: thread, followingRef: following, visible, entry, onClearEntry });
+  // A requested action, or a reply taller than the thread, opens at its top; anything else follows.
   useEffect(() => {
     const element = thread.current;
     if (!visible || !element || !following.current || entry?.type === 'result') return;
     if (entry && requestedAction.current) {
-      const target =
+      hold(
         requestedAction.current.querySelector('[data-guide-entry-target] input[type="url"]') ??
-        requestedAction.current;
-      scrollToTarget(element, target);
+          requestedAction.current,
+      );
       return;
     }
     const reply = latestReply.current;
     if (!thinking && !workspace.busy && reply && reply.clientHeight > element.clientHeight)
-      scrollToTarget(element, reply);
-    else element.scrollTop = element.scrollHeight;
-  }, [
-    visible,
-    messages.length,
-    thinking,
-    asking,
-    workspace.busy,
-    workspace.live,
-    workspace.verification,
-    entry,
-  ]);
+      hold(reply);
+    else follow();
+  }, [visible, messages.length, thinking, workspace.busy, entry, following, hold, follow]);
   /** Put text in the composer, for "Change something" and similar prompts. */
   function compose(text: string): void {
     setDraft(text);
@@ -261,26 +253,7 @@ export function GuideChat({
   return (
     <div className="guide-tab">
       <ProviderNotice workspace={workspace} />
-      {view && (
-        <SetupChecklist
-          setup={view.setup}
-          working={workspace.busy}
-          team={!!workspace.project.account}
-        />
-      )}
-      <TeamTaskStatus workspace={workspace} />
-      <div
-        className="guide-thread"
-        ref={thread}
-        role="log"
-        aria-label="Conversation with Aiden"
-        onScroll={() => {
-          const element = thread.current;
-          if (element)
-            following.current =
-              element.scrollHeight - element.scrollTop - element.clientHeight < 80;
-        }}
-      >
+      <div className="guide-thread" ref={thread} role="log" aria-label="Conversation with Aiden">
         {loadingRequirements(guide, workspace) && <GuideThinking />}
         {view?.thread.summary && (
           <p className="guide-event">Earlier in this conversation: {view.thread.summary}</p>
@@ -315,6 +288,12 @@ export function GuideChat({
           </div>
         )}
       </div>
+      {behind && (
+        <button className="guide-jump" onClick={follow}>
+          New messages <ArrowDown size={13} aria-hidden="true" />
+        </button>
+      )}
+      <ChatStatusLine workspace={workspace} setup={view?.setup} />
       <GuideComposer
         input={input}
         maxLength={2000 - contextualGuideMessage(entry, '').length}
@@ -322,7 +301,7 @@ export function GuideChat({
         onChange={setDraft}
         disabled={thinking || !workspace.baseline || missingRequirement}
         onSend={(text) => {
-          following.current = true;
+          follow();
           if (entry) {
             void guide.ask(contextualGuideMessage(entry, text));
             onClearEntry();

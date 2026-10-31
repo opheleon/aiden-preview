@@ -40,10 +40,8 @@ test('intent-only setup opens on the Chat tab, saves web settings, and keeps the
     await page.getByRole('button', { name: /Hand it to Aiden/ }).click();
     const chat = page.getByRole('tabpanel', { name: 'Chat' });
     await expect(chat).toBeVisible();
-    await expect(chat.getByRole('region', { name: 'Project setup' })).toBeVisible();
-    await expect(chat.getByRole('status', { name: 'Setup status' })).toHaveText(
-      'Setup not complete',
-    );
+    await expect(chat.getByRole('region', { name: 'Project status' })).toBeVisible();
+    await expect(chat.getByRole('status', { name: 'Setup status' })).toHaveText(/^Setup \d of \d$/);
     await expect(chat.getByLabel('Message the Guide')).toBeInViewport();
     const thinking = chat.getByRole('status', { name: 'Aiden is thinking' });
     await expect(thinking).toHaveText('Thinking');
@@ -67,7 +65,7 @@ test('intent-only setup opens on the Chat tab, saves web settings, and keeps the
     await page.getByRole('button', { name: 'Go to Chat', exact: true }).click();
     await expect(chat.getByRole('button', { name: 'Looks right' })).toBeVisible();
     await expect(chat.getByRole('region', { name: 'Change project scope' })).toHaveCount(0);
-    // Setup is one compact line; Show steps opens every step and what it involves.
+    // Setup is part of one slim status line; Show steps opens every step and what it involves.
     await chat.getByRole('button', { name: 'Show steps' }).click();
     await expect(
       chat.getByText(/Review the requirements and resolve any open questions/),

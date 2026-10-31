@@ -7,7 +7,7 @@ import type { DesktopBridge } from '../bridge';
 /** How often the Teams screen refreshes while it is open and no agent work is under way. */
 const refreshMs = 15_000;
 /** How often it refreshes while an agent task is waiting or running, so pickups show promptly. */
-const activeMs = 5_000;
+const activeMs = 2_000;
 /** How often it checks while a browser sign-in is waiting. */
 const signingInMs = 2_000;
 

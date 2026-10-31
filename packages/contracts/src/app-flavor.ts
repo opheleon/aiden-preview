@@ -41,3 +41,12 @@ export function flavorFromEnv(env: Record<string, string | undefined>): AppFlavo
     ? env.AIDEN_FLAVOR
     : 'production';
 }
+
+/**
+ * Whether this copy of Aiden uses the beta Teams tenant, server, and keychain entries. Aiden Beta
+ * does, and so does a local development run, so working on Aiden never signs in to production.
+ * @param env The process environment.
+ */
+export function usesBetaTeams(env: Record<string, string | undefined>): boolean {
+  return flavorFromEnv(env) !== 'production';
+}

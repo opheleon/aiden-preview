@@ -29,18 +29,24 @@ async function loginFixture(mode: string) {
       } else {
         response.end(JSON.stringify({ signedIn: authenticated && mode !== 'spa-expired' }));
       }
-    } else if (mode.startsWith('spa') && request.url === '/app') {
+    } else if (
+      (mode.startsWith('spa') && request.url === '/app') ||
+      (mode === 'spa-home' && request.url === '/')
+    ) {
       response.end(`<main id="root"><h1>Projects</h1></main><script>
         const root = document.getElementById('root');
         const app = ${JSON.stringify(content.good)};
         setTimeout(async () => {
           const session = await fetch('/session').then(response => response.json());
-          if (session.signedIn) { root.innerHTML = app; return; }
+          // Like many apps, spa-home moves from its home page to /app once signed in.
+          const home = () => ${JSON.stringify(mode === 'spa-home')} && history.replaceState(null, '', '/app');
+          if (session.signedIn) { root.innerHTML = app; home(); return; }
           root.innerHTML = ${JSON.stringify(form)};
           root.querySelector('form').onsubmit = async event => {
             event.preventDefault();
             await fetch('/session', {method: 'POST'});
             root.innerHTML = app;
+            home();
           };
         }, 150);
       </script>`);
@@ -67,8 +73,10 @@ async function loginFixture(mode: string) {
   return {
     submissions: () => submissions,
     config: VerificationConfigSchema.parse({
-      url: `${origin}/app`,
-      webLogin: { loginUrl: `${origin}/${mode.startsWith('spa') ? 'app' : 'login'}` },
+      url: `${origin}/${mode === 'spa-home' ? '' : 'app'}`,
+      webLogin: {
+        loginUrl: `${origin}/${mode === 'spa-home' ? '' : mode.startsWith('spa') ? 'app' : 'login'}`,
+      },
       credentials: { username: 'synthetic@example.test', password: 'synthetic-password' },
     }),
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
@@ -124,6 +132,17 @@ void test(
 
 void test('automatic login supports same-URL SPA sign-in and waits for session hydration', async (t) => {
   const f = await loginFixture('spa');
+  const browser = await launchBrowser();
+  t.after(async () => {
+    await browser.close();
+    await f.close();
+  });
+  const state = await privateBrowserLogin(browser, new URL(f.config.url!), f.config);
+  assert.equal(state.cookies[0]?.name, 'session');
+});
+
+void test('automatic login follows the app from the page given to its own signed-in home', async (t) => {
+  const f = await loginFixture('spa-home');
   const browser = await launchBrowser();
   t.after(async () => {
     await browser.close();

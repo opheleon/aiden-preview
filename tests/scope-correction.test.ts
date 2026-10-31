@@ -109,7 +109,7 @@ for (const timing of ['idle', 'busy', 'restart', 'legacy-restart'] as const) {
       assert.notEqual(baseline.id, original.id);
       assert.equal(baseline.product.requirements[0]?.text, corrected);
       assert.deepEqual(baseline.product.requirements[1], original.product.requirements[1]);
-      assert.ok(prompts.some((p) => p.includes('Establish a minimal') && p.includes(answer)));
+      assert.ok(prompts.some((p) => p.includes('Establish a complete') && p.includes(answer)));
       const report = await engine.getReport(f.project.id);
       assert.equal(report.baselineId, baseline.id);
       assert.equal(report.baseline.requirements[0]?.text, corrected);

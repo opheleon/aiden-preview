@@ -17,7 +17,8 @@ import { DesktopUpdater } from './updater.js';
 import { ProjectWatcher } from './watcher.js';
 import { registerWorkerIpc } from './worker-ipc.js';
 // Aiden Beta is its own app: its own name, data folder, sign-in, servers, and update feed. The
-// worker inherits AIDEN_FLAVOR, which selects the beta Teams server, tenant, and keychain entries.
+// worker inherits AIDEN_FLAVOR, which selects the beta Teams server, tenant, and keychain entries;
+// a local run from source uses them too, so development never signs in to production teams.
 const flavor = appFlavor(app.getVersion(), app.isPackaged);
 process.env.AIDEN_FLAVOR = flavor;
 const appName = flavor === 'beta' ? 'Aiden Beta' : 'Aiden';

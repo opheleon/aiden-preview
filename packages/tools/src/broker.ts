@@ -66,6 +66,10 @@ export function describeToolCall(
     artifact_validate: () => 'Checked its answer against the expected format',
     external_read: () => `Read from ${text(input.tool, 'a connected tool')}`,
     request_clarification: () => 'Wrote down a question for you',
+    github_repositories: () => `Listed ${text(input.owner, '')}'s repositories on GitHub`,
+    github_files: () =>
+      `Looked through ${text(input.repository, '')}/${prefix || text(input.path, '')}`,
+    github_read: () => `Read ${text(input.repository, '')}/${text(input.path, '')} on GitHub`,
   };
   return steps[name]?.() ?? `Used ${name.replaceAll('_', ' ')}`;
 }
@@ -76,6 +80,8 @@ const location = { repositoryId: rid, sha };
 export class ToolBroker {
   reads: ReadReceipt[] = [];
   snapshots: Snapshot[] = [];
+  /** Extra read-only tools for this run, such as GitHub browsing while planning requirements. */
+  extra: ToolDefinition[] = [];
   mutationAllowed = false;
   signal?: AbortSignal;
   validateArtifact: (value: unknown) => unknown = (v) => v;
@@ -123,6 +129,7 @@ export class ToolBroker {
       ...this.synchronizationTools(),
       ...this.artifactTools(),
       ...this.contextTools(),
+      ...this.extra,
     ];
   }
   /**

@@ -19,17 +19,20 @@ export function teamTarget(status: AccountStatus): { scope: string; problem: str
 }
 
 /**
- * Show the team screens when the person is signed in to a team. Checked again whenever the person
- * changes screens, so signing in or out shows up right away. A new project checks its team again
+ * Show the team screens when the person is signed in to a team, and Sign in or Sign out to match.
+ * Checked again whenever the person changes screens, so signing in or out shows up right away. A new project checks its team again
  * when it is created, so this lagging behind never decides where a project goes.
  * @param workspace The workspace whose new-project target is kept current.
  */
 export function useTeamScope(workspace: Workspace): void {
-  const { call, setAccountScope, area } = workspace;
+  const { call, setAccountScope, setSignedIn, area } = workspace;
   useEffect(() => {
     if (!window.aiden) return;
     void call('accountStatus')
-      .then((status) => setAccountScope(teamTarget(status).scope))
+      .then((status) => {
+        setAccountScope(teamTarget(status).scope);
+        setSignedIn(status.signedIn);
+      })
       .catch(() => setAccountScope(''));
-  }, [call, setAccountScope, area]);
+  }, [call, setAccountScope, setSignedIn, area]);
 }

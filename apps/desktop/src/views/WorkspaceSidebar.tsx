@@ -1,4 +1,12 @@
-import { BookOpen, ExternalLink, MessageCircle, Plus, Settings2, Users } from 'lucide-react';
+import {
+  BookOpen,
+  ExternalLink,
+  LogIn,
+  LogOut,
+  MessageCircle,
+  Plus,
+  Settings2,
+} from 'lucide-react';
 import { type JSX, useState } from 'react';
 
 import { helpLinks } from '../../../../packages/contracts/src/guide';
@@ -28,6 +36,47 @@ function startNewProject(workspace: Workspace): void {
   workspace.setActivity([]);
   workspace.setCalls([]);
   workspace.setError('');
+}
+
+/**
+ * Sign in to Teams or sign out, matching where this computer stands. Signing in opens the browser
+ * and shows the Teams tab in Settings while it waits; signing out leaves the team screens.
+ */
+function TeamsSignIn({ workspace }: { workspace: Workspace }): JSX.Element {
+  const { signedIn, setSignedIn, setAccountScope, area, setArea, setSettingsTab, action, call } =
+    workspace;
+  if (!signedIn)
+    return (
+      <button
+        className="sidebar-section"
+        onClick={() =>
+          void action(async () => {
+            setSettingsTab('teams');
+            setArea('settings');
+            await call('accountSignIn');
+          })
+        }
+      >
+        <LogIn size={17} />
+        <span>Sign in</span>
+      </button>
+    );
+  return (
+    <button
+      className="sidebar-section"
+      onClick={() =>
+        void action(async () => {
+          await call('accountSignOut');
+          setSignedIn(false);
+          setAccountScope('');
+          if (area === 'work') setArea('projects');
+        })
+      }
+    >
+      <LogOut size={17} />
+      <span>Sign out</span>
+    </button>
+  );
 }
 
 /** Projects Aiden is running, plus settings and support. */
@@ -66,13 +115,7 @@ export function WorkspaceSidebar({
         )}
       </nav>
       <div className="sidebar-bottom">
-        <button
-          className={area === 'account' ? 'sidebar-section selected' : 'sidebar-section'}
-          onClick={() => setArea('account')}
-        >
-          <Users size={17} />
-          <span>Teams</span>
-        </button>
+        <TeamsSignIn workspace={workspace} />
         <button className="sidebar-section" data-guide-trigger onClick={onGettingStarted}>
           <BookOpen size={17} />
           <span>Help / Getting started</span>

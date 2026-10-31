@@ -261,6 +261,8 @@ export function appFixture() {
           return tickets;
         case 'integrations':
           return connections;
+        case 'githubOrganizations':
+          return { items: ['acme'] };
         case 'verificationSettings':
           return { url: appUrl };
         case 'configureGuideVerification':

@@ -1,0 +1,61 @@
+/* A live tail of one run, terminal style, above the chat's status line. */
+.run-tail {
+  position: relative;
+  margin-bottom: 10px;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: #e7e5ee;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.run-tail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid #2a2833;
+  color: var(--faint);
+}
+
+.run-tail-live {
+  color: #4cc38a;
+}
+
+.run-tail-lines {
+  max-height: 240px;
+  margin: 0;
+  padding: 8px 14px 12px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.run-tail-lines li {
+  display: flex;
+  gap: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.run-tail-lines time {
+  flex: none;
+  color: var(--faint);
+}
+
+.run-tail-empty {
+  color: var(--faint);
+}
+
+.run-tail-jump {
+  position: absolute;
+  right: 14px;
+  bottom: 10px;
+  padding: 4px 10px;
+  border: 1px solid #2a2833;
+  border-radius: 999px;
+  background: var(--ink-hover);
+  color: #e7e5ee;
+  font-size: 12px;
+}

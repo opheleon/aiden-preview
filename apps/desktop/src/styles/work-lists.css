@@ -1,0 +1,216 @@
+/* Work: machine chips, tabs, lists of rows for you and Aiden, History pills, and projects. */
+
+.work-machines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.work-machine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 12px 3px 3px;
+  border: 1px solid #e8e5dd;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.work-machine .work-avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+}
+
+.work-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #e8e5dd;
+}
+
+.work-tab {
+  margin-bottom: -1px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.work-tab.active {
+  border-bottom-color: var(--brand);
+  color: var(--ink);
+}
+
+.work-lists {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* A row a machine just picked up rings once, then settles. */
+.work-row--picked {
+  animation: work-picked 1.2s ease-out 1;
+}
+
+@keyframes work-picked {
+  from {
+    box-shadow: inset 0 0 0 2px rgb(34 160 107 / 45%);
+  }
+
+  to {
+    box-shadow: inset 0 0 0 2px rgb(34 160 107 / 0%);
+  }
+}
+
+.work-row--picked .work-sub {
+  color: #22a06b;
+}
+
+.work-row--failed .work-sub {
+  color: #a2412b;
+}
+
+/* Where an Aiden row ends: Running, Waiting, a check, or Run again, at one width so tags align. */
+.work-slot {
+  display: flex;
+  flex: none;
+  justify-content: flex-start;
+  width: 120px;
+  padding-right: 20px;
+}
+
+.work-row-line .work-slot .work-inline {
+  margin: 0;
+}
+
+/* The column a row's tag sits in, left-aligned so Build and Check start at the same place. */
+.work-kind {
+  display: flex;
+  flex: none;
+  justify-content: flex-start;
+  width: 104px;
+}
+
+/* The kind of Aiden work on a row, such as Build or Check. */
+.work-tag {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eceafb;
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.work-running {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #22a06b;
+}
+
+.work-pulse {
+  animation: work-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes work-pulse {
+  50% {
+    box-shadow: 0 0 0 4px rgb(34 160 107 / 18%);
+  }
+}
+
+.work-done {
+  color: #22a06b;
+}
+
+.work-inline {
+  flex: none;
+  height: 28px;
+  white-space: nowrap;
+  margin-left: auto;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+/* The row's main button shares the line with an inline action such as Run again, so the divider
+   and hover shade belong to the whole line rather than the button alone. */
+.work-row-line {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border-top: 1px solid #f0eee8;
+}
+
+.work-row-line:hover,
+.work-row-line:has(.work-item[aria-expanded='true']) {
+  background: #fbfaf7;
+}
+
+.work-row-line .work-item {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  border-top: 0;
+  background: none;
+}
+
+.work-row-line .work-inline {
+  margin-right: 20px;
+}
+
+.work-pill {
+  flex: none;
+  min-width: 64px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.work-pill--done {
+  background: #e3f1e6;
+  color: #306447;
+}
+
+.work-pill--failed {
+  background: #f9e3dc;
+  color: #a2412b;
+}
+
+.work-pill--stopped,
+.work-pill--held {
+  background: #f1efea;
+  color: var(--muted);
+}
+
+/* Closed projects' work, folded at the bottom of History. */
+.work-closed > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  font-size: 14px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .work-row--picked,
+  .work-pulse {
+    animation: none;
+  }
+}

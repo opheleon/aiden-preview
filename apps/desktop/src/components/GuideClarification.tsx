@@ -4,20 +4,16 @@ import { type JSX, useState } from 'react';
 import type { Call } from '../../../../packages/contracts/src/index';
 import type { Guide } from '../hooks/useGuide';
 
-/** Keep choices local to this question until Submit; typed messages remain independent. */
-function QuestionChoices({
-  question,
-  guide,
-  busy,
-}: {
-  question: Call;
-  guide: Guide;
-  busy: boolean;
-}): JSX.Element {
+/**
+ * Keep choices local to this question until Submit; typed messages remain independent. The
+ * question stays answerable while a check runs: the answer is saved at once, and the requirements
+ * update when the check finishes. Only the Guide's own reply in progress holds it.
+ */
+function QuestionChoices({ question, guide }: { question: Call; guide: Guide }): JSX.Element {
   const [selected, setSelected] = useState<string[]>([]);
   const multiple = question.selectionMode === 'multiple';
   const choices = question.options.filter((option) => selected.includes(option));
-  const disabled = guide.thinking || busy;
+  const disabled = guide.thinking;
   return (
     <section className="guide-clarification" aria-label="Clarify your goal">
       <p className="chat-aiden guide-reply">{question.question}</p>
@@ -69,8 +65,7 @@ export function GuideClarification({
   busy: boolean;
 }): JSX.Element | null {
   const question = guide.view?.clarifications?.[0];
-  if (question)
-    return <QuestionChoices key={question.id} question={question} guide={guide} busy={busy} />;
+  if (question) return <QuestionChoices key={question.id} question={question} guide={guide} />;
   if (guide.thinking || busy || !guide.view?.requirementsPending) return null;
   return (
     <p className="guide-event">

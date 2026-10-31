@@ -13,9 +13,11 @@ import {
 } from '../packages/core/src/accounts/client.js';
 import { documentFor, materialize } from '../packages/core/src/accounts/documents.js';
 import { InventoryProbe } from '../packages/core/src/accounts/inventory.js';
+import { reconcileProjectStatus } from '../packages/core/src/accounts/project-status.js';
 import { AccountSession } from '../packages/core/src/accounts/session.js';
 import { verifyServices } from '../packages/core/src/accounts/verify-task.js';
 import { Engine } from '../packages/core/src/engine.js';
+import { decideProject, readLifecycle } from '../packages/core/src/project-lifecycle.js';
 import { Store } from '../packages/core/src/storage.js';
 import { FixtureRuntime } from './fixture-runtime.js';
 import { fixture } from './helpers.js';
@@ -117,8 +119,22 @@ async function setup() {
   });
   const agent = new AccountAgent(engine, session, client, inventory, () => new Date(at));
   const project = { ...f.project, id: 'acct-project-1', repositories: [] };
-  return { f, store, engine, session, agent, calls, script, project };
+  return { f, store, engine, session, agent, calls, script, project, client };
 }
+
+void test("a team project carries its GitHub organizations to every member's copy", async () => {
+  const { engine, store, project } = await setup();
+  try {
+    const shared = { ...project, githubOrganizations: ['opheleon-demo'] };
+    await materialize(engine, serverProject(shared), true);
+    const local = JSON.parse(
+      await readFile(path.join(store.project(project.id), 'project.json'), 'utf8'),
+    ) as { githubOrganizations?: string[] };
+    assert.deepEqual(local.githubOrganizations, ['opheleon-demo']);
+  } finally {
+    await engine.dispose();
+  }
+});
 
 void test('a signed-out machine never asks the account for work', async () => {
   const { agent, calls, engine } = await setup();
@@ -240,6 +256,65 @@ void test('a leased Morning check runs a morning code check here instead of bein
       false,
       'a check leaves the shared document unchanged',
     );
+  } finally {
+    await engine.dispose();
+  }
+});
+
+void test('a Morning check on a project with no requirements yet finishes with a note, not a file error', async () => {
+  const { agent, calls, script, session, engine, project } = await setup();
+  try {
+    await session.saveRefresh('refresh-token');
+    script.next = () => ({
+      decision: { type: 'assign', reason: 'Best fit for this machine' },
+      task: leased('check-code'),
+      project: serverProject(project),
+    });
+    await agent.poll(poll);
+    await agent.idle();
+    assert.equal(
+      calls.some((c) => c.method === 'fail'),
+      false,
+    );
+    const complete = calls.find((c) => c.method === 'complete')?.args[1] as
+      { result?: { note?: string; total?: number } } | undefined;
+    assert.match(complete?.result?.note ?? '', /no requirements/);
+    assert.equal(complete?.result?.total, 0);
+    assert.equal((await engine.history(project.id)).length, 0, 'no check ran');
+  } finally {
+    await engine.dispose();
+  }
+});
+
+void test('closing a team project closes it for the team, and the newer decision wins either way', async () => {
+  const { calls, script, engine, store, project, client } = await setup();
+  try {
+    await materialize(engine, serverProject(project), true);
+    const pushed: string[] = [];
+    engine.onProjectStatus = (_id, status) => {
+      pushed.push(status);
+      return Promise.resolve();
+    };
+    await decideProject(engine, project.id, { action: 'closed', note: '' });
+    assert.deepEqual(pushed, ['closed'], 'closing here tells the team');
+
+    // The team missed it (say it was offline), and its last change is older: it closes there.
+    const listed = { id: project.id, name: 'Books', revision: 1, status: 'active' as const };
+    script.project = () => ({ ...serverProject(project), updatedAt: '2020-01-01T00:00:00.000Z' });
+    const [sent] = await reconcileProjectStatus(engine, client, [listed]);
+    assert.equal(sent?.status, 'closed');
+    assert.deepEqual(calls.find((c) => c.method === 'setProjectStatus')?.args, [
+      project.id,
+      'closed',
+    ]);
+
+    // A teammate reopened it after that: it reopens here, with nothing deleted.
+    script.project = () => ({ ...serverProject(project), updatedAt: '2099-01-01T00:00:00.000Z' });
+    const [kept] = await reconcileProjectStatus(engine, client, [listed]);
+    assert.equal(kept?.status, 'active');
+    const lifecycle = await readLifecycle(store, project.id);
+    assert.equal(lifecycle.status, 'active');
+    assert.equal(lifecycle.history.at(-1)?.note, 'Reopened by your team.');
   } finally {
     await engine.dispose();
   }

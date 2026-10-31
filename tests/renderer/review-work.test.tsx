@@ -2,9 +2,9 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 
-import { TeamTaskStatus } from '../../apps/desktop/src/components/TeamTaskStatus';
+import { describeTeamTask } from '../../apps/desktop/src/components/TeamTaskStatus';
 import type { Workspace } from '../../apps/desktop/src/hooks/useWorkspace';
-import { MyWork } from '../../apps/desktop/src/views/MyWork';
+import { Work } from '../../apps/desktop/src/views/Work';
 import type { AccountState } from '../../packages/contracts/src/accounts-api';
 import {
   bob,
@@ -43,12 +43,12 @@ async function withBridge(run: (open: ReturnType<typeof vi.fn>) => Promise<void>
   }
 }
 
-test('the reviewer sees Aiden’s work in To review with its PRs and checks, and approves it', async () => {
+test('the reviewer sees Aiden’s work in Your tasks with its PRs and checks, and approves it', async () => {
   await withBridge(async (openExternal) => {
     const f = fixture();
-    render(<MyWork workspace={f.workspace} />);
-    const card = await screen.findByRole('region', { name: 'To review' });
-    expect(card).toHaveTextContent('1');
+    render(<Work workspace={{ ...f.workspace, projects: [] }} />);
+    const card = await screen.findByRole('region', { name: 'Your tasks' });
+    expect(card).toHaveTextContent('Ready for your review');
     expect(card).not.toHaveTextContent('Alice reviews this');
     await userEvent.click(within(card).getByRole('button', { name: /Members sign in/ }));
     expect(card).toHaveTextContent('1 of 2 requirements met');
@@ -70,8 +70,8 @@ test('the reviewer sees Aiden’s work in To review with its PRs and checks, and
 
 test('Request changes needs a short note before it sends', async () => {
   const f = fixture();
-  render(<MyWork workspace={f.workspace} />);
-  const card = await screen.findByRole('region', { name: 'To review' });
+  render(<Work workspace={{ ...f.workspace, projects: [] }} />);
+  const card = await screen.findByRole('region', { name: 'Your tasks' });
   await userEvent.click(within(card).getByRole('button', { name: /Members sign in/ }));
   await userEvent.click(within(card).getByRole('button', { name: 'Request changes' }));
   const send = within(card).getByRole('button', { name: 'Send' });
@@ -91,12 +91,12 @@ test('Request changes needs a short note before it sends', async () => {
   });
 });
 
-test('To verify lists the checks and lets the reviewer pass or fail manual ones; legacy reviews stay', async () => {
+test('verify rows list the checks and let the reviewer pass or fail manual ones; legacy reviews stay', async () => {
   await withBridge(async (openExternal) => {
     const f = fixture();
-    render(<MyWork workspace={f.workspace} />);
-    const card = await screen.findByRole('region', { name: 'To verify' });
-    expect(card).toHaveTextContent('2');
+    render(<Work workspace={{ ...f.workspace, projects: [] }} />);
+    const card = await screen.findByRole('region', { name: 'Your tasks' });
+    expect(card).toHaveTextContent('Approved. Check what only a person can');
     await userEvent.click(within(card).getByRole('button', { name: /Recurring events/ }));
     expect(card).toHaveTextContent('3 checks passed');
     const manual = verifyTask.checks[1]!;
@@ -123,33 +123,24 @@ test('To verify lists the checks and lets the reviewer pass or fail manual ones;
   });
 });
 
-test('a waiting verify task says so; nothing shows when the team has nothing for this reviewer', async () => {
+test('a waiting verify task says so, and nothing else is up for review', async () => {
   const running = {
     ...verifyTask,
     checks: [{ ...verifyTask.checks[0]!, state: 'pending' as const, detail: null }],
   };
   const f = fixture({ ...reviewState(), tasks: [running] });
-  render(<MyWork workspace={f.workspace} />);
-  const card = await screen.findByRole('region', { name: 'To verify' });
+  render(<Work workspace={{ ...f.workspace, projects: [] }} />);
+  const card = await screen.findByRole('region', { name: 'Your tasks' });
   await userEvent.click(within(card).getByRole('button', { name: /Recurring events/ }));
   expect(card).toHaveTextContent('One automated check is still running');
-  expect(screen.getByRole('region', { name: 'To review' })).toHaveTextContent('Nothing to review.');
+  expect(card).not.toHaveTextContent('Ready for your review');
 });
 
-test('a team project explains review and verification, and can still be stopped', async () => {
-  const project = { id: reviewTask.projectId, account: { accountId: 'a', revision: 1 } };
+test('a team project explains review and verification in words', () => {
   for (const [task, words] of [
-    [reviewTask, `Waiting for ${bob.name} to review it in My work.`],
+    [reviewTask, `Waiting for ${bob.name} to review it in Work.`],
     [{ ...reviewTask, reviewerUserId: null }, 'Waiting for the team to pick a reviewer.'],
     [verifyTask, 'Approved. 1 of 2 checks passed so far.'],
-  ] as const) {
-    const f = fixture({ ...reviewState(), tasks: [task] });
-    const workspace = { ...f.workspace, project } as unknown as Workspace;
-    const { unmount } = render(<TeamTaskStatus workspace={workspace} />);
-    const line = await screen.findByRole('region', { name: 'Aiden’s team task' });
-    expect(line).toHaveTextContent('In review');
-    expect(line).toHaveTextContent(words);
-    expect(within(line).getByRole('button', { name: 'Stop' })).toBeInTheDocument();
-    unmount();
-  }
+  ] as const)
+    expect(describeTeamTask(reviewState(), task)).toBe(words);
 });

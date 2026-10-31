@@ -69,6 +69,28 @@ export interface TaskControls {
   authorize?: () => Promise<void>;
   checkpoint?: (checkpoint: DeliveryCheckpoint) => Promise<void>;
   block?: (title: string, question: string, routing?: QuestionRouting) => Promise<void>;
+  /** Read another task of the team, such as the build a fix task revises. */
+  original?: (taskId: string) => Promise<AccountTask>;
+}
+
+/**
+ * The branch a fix task continues: the one its original build pushed, so the reviewer's requested
+ * changes update the same pull requests instead of opening new ones. Builds record their branch;
+ * older results only have the job id the branch is named after.
+ * Example: a fix for a build whose result says branch "aiden/job-j1" continues on aiden/job-j1.
+ */
+async function revisionBranch(
+  task: AccountTask,
+  controls: TaskControls,
+): Promise<string | undefined> {
+  if (!task.revisionOf || !controls.original) return undefined;
+  const original = await controls.original(task.revisionOf).catch(() => null);
+  const result = original?.result as { branch?: unknown; jobId?: unknown } | null | undefined;
+  if (typeof result?.branch === 'string' && /^aiden\/job-[a-f0-9-]+$/.test(result.branch))
+    return result.branch;
+  return typeof result?.jobId === 'string' && /^[a-f0-9-]+$/.test(result.jobId)
+    ? `aiden/job-${result.jobId}`
+    : undefined;
 }
 
 /**
@@ -100,9 +122,10 @@ function codingQuestion(job: CodingJob, role: WorkRole | null): NewAccountTask {
  */
 function blockingQuestions(job: CodingJob): string {
   const blocking = (job.openQuestions ?? []).filter((item) => item.blocking);
+  // Without a question of its own, the agent's report is the context and the ask is plain.
   const text = blocking.length
     ? blocking.map((item, index) => `${index + 1}. ${item.question}`).join('\n')
-    : job.message;
+    : `How should this build continue?\n\n${job.message}`;
   return text.slice(0, 5000);
 }
 
@@ -119,17 +142,21 @@ export async function runBuild(
 ): Promise<TaskOutput> {
   if (!task.instructions.trim())
     throw new PermanentTaskError('This build task has no instructions to work from.');
+  const branch = await revisionBranch(task, controls);
   const { job, pullRequests, verdict, requirements } = await runnerServices.runTeamCoding(
     engine,
     project.id,
-    task.resume
-      ? `${task.instructions}\n<human_answer>${JSON.stringify(task.resume)}</human_answer>`
-      : task.instructions,
+    branch
+      ? `${task.instructions}\nThe reviewer's feedback is in revision_feedback above. Address every point on the existing branch and commit; the same pull requests update.`
+      : task.resume
+        ? `${task.instructions}\n<human_answer>${JSON.stringify(task.resume)}</human_answer>`
+        : task.instructions,
     controls.progress,
     controls.signal,
     buildRepositories(task.instructions),
     task.requirementIds,
     controls,
+    branch,
   );
   if (job.status === 'failed' || job.status === 'interrupted') throw new Error(job.message);
   if (job.status === 'needs_input' && controls.block) {
@@ -142,6 +169,7 @@ export async function runBuild(
   return {
     result: {
       jobId: job.id,
+      branch: job.branch,
       sessionId: job.sessionId,
       status: job.status,
       summary: job.message,
@@ -199,16 +227,23 @@ async function ensureCode(engine: Engine, project: Project): Promise<Project> {
   return (await engine.state(project.id)).project ?? project;
 }
 
+/** What a check on a project with no requirements yet says, in place of a missing-file error. */
+const nothingToCheck = 'Nothing to check yet: this project has no requirements.';
+
 /**
  * Check the latest code against the requirements, the same check as Run the check now, and report
  * how many requirements it found met. The report stays on this machine like a solo check's.
- * Example: the team's Morning check on a project with 3 requirements returns `{ met: 1, total: 3 }`.
+ * Example: the team's Morning check on a project with 3 requirements returns `{ met: 1, total: 3 }`;
+ * on a project whose requirements are not written yet it finishes at once with `nothingToCheck`.
  */
 async function checkCode(
   engine: Engine,
   project: Project,
   controls: TaskControls,
 ): Promise<TaskOutput> {
+  // The team queues a Morning check for every active project, including one created moments ago.
+  if (!(await optionalJson<Baseline>(path.join(engine.store.project(project.id), 'baseline.json'))))
+    return { result: { met: 0, total: 0, note: nothingToCheck }, documentChanged: false };
   controls.activity?.({ type: 'tool-start', id: 'check-code' });
   const { runId } = await engine.report(project.id, 'morning');
   /** Stop the check when the team stops the task. */

@@ -6,7 +6,7 @@ import {
   type TaskWho,
 } from '../../../../packages/contracts/src/task-model';
 
-/** Who does a task: Aiden, PM, or Dev, styled the same in the project view and My work. */
+/** Who does a task: Aiden, PM, or Dev, styled the same in the project view and Work. */
 export function TaskChip({ who }: { who: TaskWho }): JSX.Element {
   return <span className={`chip chip--${who.toLowerCase()}`}>{who}</span>;
 }

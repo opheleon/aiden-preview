@@ -114,7 +114,7 @@ Artifacts are written to `release/mac`. `pnpm package:win` builds the Windows in
 
 macOS controls the Keychain permission dialog. The application explains its purpose beside connection controls: it is saving or unlocking that connection's sign-in. Do not imitate the system password dialog inside the app.
 
-Development uses the Electron executable, including for the credential worker, so the OS can identify it as Electron despite `app.setName('Aiden')`. Verify the requesting name and icon using the signed packaged application. Keep its signing identity stable across upgrades. The existing credential service name, `com.opheleon.aiden.mcp`, remains for compatibility; replacing it with a readable name requires a credential migration, not simply changing the string.
+Development uses the Electron executable, including for the credential worker, so the OS can identify it as Electron despite `app.setName('Aiden')`. That executable is ad hoc signed, so a run from source keeps credentials in owner-only files under its data folder instead of Keychain (see [Architecture](architecture.md)). Verify the requesting name and icon using the signed packaged application. Keep its signing identity stable across upgrades. The existing credential service name, `com.opheleon.aiden.mcp`, remains for compatibility; replacing it with a readable name requires a credential migration, not simply changing the string.
 
 Before release, record the native permission dialog from a disposable connection in the signed app, confirm the Aiden identity, and test access again after restart and upgrade. Also verify that declining access leaves a clear recovery path. Synthetic desktop tests do not establish these native permission behaviors.
 
