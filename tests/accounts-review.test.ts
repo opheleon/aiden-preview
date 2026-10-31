@@ -6,7 +6,7 @@ import type { AccountTask } from '../packages/contracts/src/accounts-api.js';
 import type { CodingJob, Project } from '../packages/contracts/src/index.js';
 import { setupTaskRole } from '../packages/contracts/src/task-model.js';
 import { featureRole } from '../packages/core/src/accounts/build-tasks.js';
-import { AccountsClient } from '../packages/core/src/accounts/client.js';
+import { AccountsClient, accountsContract } from '../packages/core/src/accounts/client.js';
 import {
   buildReview,
   ciCheckName,
@@ -301,9 +301,10 @@ void test('features take the plan role, else a documented guess; setup steps fol
 });
 
 void test('the client sends reviews, manual checks, permanent failures, and review packets', async () => {
-  const sent: { url: string; body: unknown }[] = [];
+  const sent: { url: string; body: unknown; contract: string | undefined }[] = [];
   const http = ((url: string, init: RequestInit) => {
-    sent.push({ url, body: JSON.parse(init.body as string) });
+    const headers = init.headers as Record<string, string>;
+    sent.push({ url, body: JSON.parse(init.body as string), contract: headers['aiden-contract'] });
     return Promise.resolve(new Response(JSON.stringify(taskView), { status: 200 }));
   }) as typeof fetch;
   const client = new AccountsClient('https://api.example.com', () => Promise.resolve('t'), http);
@@ -328,6 +329,11 @@ void test('the client sends reviews, manual checks, permanent failures, and revi
   assert.deepEqual(
     sent.map((call) => call.url.replace('https://api.example.com/api/v1', '')),
     ['/tasks/t%201/review', '/tasks/t1/checks/c%2F2', '/tasks/t1/fail', '/tasks/t1/complete'],
+  );
+  // Every request asks for the review-and-verify shape; without it the server answers as for older apps.
+  assert.deepEqual(
+    sent.map((call) => call.contract),
+    sent.map(() => String(accountsContract)),
   );
   assert.deepEqual(sent[0]!.body, { decision: 'changes', note: 'Handle expired invites' });
   assert.deepEqual(sent[1]!.body, { passed: true, note: '' });

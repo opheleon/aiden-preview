@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Teams: Aiden now tells the Teams server which version of its answers it reads, so the server can keep answering older copies of Aiden in the shape they understand. Before, a server update could stop an Aiden Beta that had not updated yet from showing team work at all, with an "Unrecognized key(s)" error.
 - Agents shows why a task is waiting (for example "Publication needs reconciliation. Committed work has been preserved.") instead of always saying the next machine with room picks it up, and names each agent's machine, so two machines on one account are easy to tell apart.
 - Agents now leads with the team's work: Running now (what each task is doing and on which machine), Waiting (and why), Stopped, and Finished today, with each machine listed below. Open a stopped task to see its last error, then Run again or Remove it if it is no longer needed. Running or waiting tasks can be stopped from the same place. Running a task again also clears the old one from Stopped.
 - Teams: when a coding agent stops on a blocking question, the team now sees that question (or a numbered list of them) to answer, instead of the agent's whole summary. The machine's log now says the task is waiting on a person and why, instead of always saying it was blocked on recovering committed work.

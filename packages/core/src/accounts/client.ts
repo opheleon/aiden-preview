@@ -31,6 +31,13 @@ const defaultUrl = 'https://api.opheleon.ai';
 const betaUrl = 'https://api-beta.opheleon.ai';
 /** No Accounts call should hold up the app for long. */
 const timeoutMs = 15_000;
+/**
+ * The response shape this app reads, sent as `Aiden-Contract` on every request. Without it the
+ * server answers in the shape apps released before review and verify read, with no review fields
+ * and work under review shown as done. Raise it when the vendored contract gains fields or
+ * statuses, together with the server, so an installed app never sees a shape it would reject.
+ */
+export const accountsContract = 2;
 
 /** An Accounts API failure with the server's stable code and caller-safe message. */
 export class AccountsError extends Error {
@@ -122,6 +129,7 @@ export class AccountsClient {
         method,
         headers: {
           'content-type': 'application/json',
+          'aiden-contract': String(accountsContract),
           ...(token ? { authorization: `Bearer ${token}` } : {}),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
