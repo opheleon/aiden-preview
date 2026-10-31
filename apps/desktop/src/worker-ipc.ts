@@ -152,7 +152,16 @@ export function registerWorkerIpc(
     const r = await worker.request(method, params as WorkerParams<WorkerMethod>);
     await openAuthorization(method, r);
     // Ask for work right away after anything that can change what this machine should do.
-    if (['accountSetPickup', 'accountCreateProject', 'accountShareProject'].includes(method))
+    if (
+      [
+        'accountSetPickup',
+        'accountCreateProject',
+        'accountShareProject',
+        'accountRetryTask',
+        'accountSyncSetup',
+        'accountFinishTask',
+      ].includes(method)
+    )
       onAccountChange();
     if (method === 'accountStatus') {
       const now = (r as WorkerResult<'accountStatus'>).signedIn;

@@ -111,7 +111,7 @@ export async function superviseAttempt(input: SupervisionInput): Promise<Supervi
         },
         block: async (title, question) => {
           await client.needsHuman(task.id, { ...binding, title, question });
-          stop('The task is blocked on recovery of its committed work.');
+          stop(`The task is waiting on a person: ${title}.`);
         },
         activity: (activity) => watch.observe(activity, clock().getTime()),
         progress: (line) => {

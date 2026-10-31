@@ -3,7 +3,7 @@ import type { WorkerClient } from '../client.js';
 /** Bounds on how often this machine asks its account for work. */
 const minimumSeconds = 15;
 /** Check in within the three-minute presence window, including with pickup disabled. */
-const maximumSeconds = 60;
+const maximumSeconds = 20;
 
 /**
  * Ask the account for work on the schedule the server suggests. The host process owns this timer

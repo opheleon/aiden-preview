@@ -1,9 +1,17 @@
-import { Clock, Laptop, ShieldCheck } from 'lucide-react';
+import { CircleAlert, Clock, Laptop, Play, ShieldCheck } from 'lucide-react';
 import { type JSX, useState } from 'react';
 
 import type { AccountState, AccountTask } from '../../../../packages/contracts/src/accounts-api';
 import { useAccount } from '../hooks/useAccount';
 import type { Workspace } from '../hooks/useWorkspace';
+import {
+  finishedLine,
+  runningLine,
+  stoppedLine,
+  type TaskAction,
+  TaskCard,
+  waitingLine,
+} from './AgentTasks';
 import {
   type Dot,
   memberName,
@@ -45,12 +53,6 @@ function agentState(
   if (!device.pickupEnabled)
     return { task: null, doing: 'Not taking team work', word: 'Off', dot: 'quiet' };
   return { task: null, doing: 'Ready for the next task', word: 'Ready', dot: 'live' };
-}
-
-/** Whose agent ran a task, by the machine it ran on. */
-function ranBy(state: AccountState, task: AccountTask): string {
-  const device = state.devices.find((d) => d.deviceId === task.leasedDeviceId);
-  return device ? `${memberName(state, device.owner)}’s agent` : 'An agent';
 }
 
 /** Where a teammate's agent runs, its latest step, and whether it takes team work. */
@@ -100,57 +102,123 @@ function AgentDetail({
   );
 }
 
+/** The team's agent tasks, sorted into what is running, waiting, stopped, and done today. */
+function sortTasks(
+  state: AccountState | null,
+): Record<'running' | 'waiting' | 'stopped' | 'finished', AccountTask[]> {
+  const agent = (state?.tasks ?? []).filter((t) => t.actor === 'agent');
+  const today = new Date().toDateString();
+  /** Most recently changed first. */
+  const newest = (a: AccountTask, b: AccountTask) => b.updatedAt.localeCompare(a.updatedAt);
+  return {
+    running: agent.filter((t) => t.status === 'leased'),
+    waiting: agent.filter((t) => t.status === 'queued' || t.status === 'blocked'),
+    stopped: agent.filter((t) => t.status === 'failed').sort(newest),
+    finished: agent
+      .filter((t) => t.status === 'done' && new Date(t.updatedAt).toDateString() === today)
+      .sort(newest),
+  };
+}
+
+/** The page's opening line: how much is running, waiting, and stopped. */
+function lede(machines: number, tasks: ReturnType<typeof sortTasks>): string {
+  if (!machines) return 'No machines are picking up work. Work waits until someone opens Aiden.';
+  const parts = [
+    `${tasks.running.length} running`,
+    `${tasks.waiting.length} waiting`,
+    ...(tasks.stopped.length ? [`${tasks.stopped.length} stopped`] : []),
+  ];
+  return `${parts.join(', ')} on your team’s ${machines === 1 ? 'machine' : `${machines} machines`}.`;
+}
+
 /**
- * Agents: every teammate's agent and what it is on, the work waiting for a machine with room, and
- * what finished today. Rows are one line; a teammate's agent opens to show where it runs.
+ * Agents: the team's agent work first (running now, waiting, stopped with Run again and Remove,
+ * finished today), then each teammate's machine and what it is on. Rows open in place.
  */
 export function Agents({ workspace }: { workspace: Workspace }): JSX.Element {
   const account = useAccount(workspace.call);
   const [open, setOpen] = useState<string | null>(null);
+  const [acting, setActing] = useState<string | null>(null);
+  const [failure, setFailure] = useState('');
   const { state } = account;
-  const today = new Date().toDateString();
+  const tasks = sortTasks(state);
   const agents = state
     ? state.devices.map((device) => ({ device, ...agentState(state, device) }))
     : [];
-  const working = agents.filter((a) => a.word === 'Running').length;
-  const waitingOnYou = agents.filter((a) => a.word === 'Waiting on you').length;
-  const queued = (state?.tasks ?? []).filter((t) => t.actor === 'agent' && t.status === 'queued');
-  const finished = (state?.tasks ?? [])
-    .filter(
-      (t) =>
-        t.actor === 'agent' &&
-        (t.status === 'done' || t.status === 'failed') &&
-        new Date(t.updatedAt).toDateString() === today,
-    )
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   /** Open a task's project in the project view. */
   const openProject = (projectId: string) =>
     void workspace.load(projectId).then(() => workspace.setArea('projects'));
-  const lede = !agents.length
-    ? 'No machines are picking up work. Work waits until someone opens Aiden.'
-    : `${working === 1 ? 'One agent is' : `${working || 'No'} agents are`} working on your team’s Macs.${
-        waitingOnYou
-          ? ` ${waitingOnYou === 1 ? 'One is' : `${waitingOnYou} are`} waiting on you.`
-          : ''
-      }`;
+  /** Stop, rerun, or remove a task for the whole team, then show the new state. */
+  const act = (task: AccountTask, action: TaskAction) => {
+    setActing(task.id);
+    setFailure('');
+    const method = action === 'rerun' ? 'accountRetryTask' : 'accountCancelTask';
+    void workspace
+      .call(method, { taskId: task.id })
+      .then(() => account.reload())
+      .catch((e: unknown) =>
+        setFailure(e instanceof Error ? e.message : 'That did not work. Try again.'),
+      )
+      .finally(() => setActing(null));
+  };
+  const page = { open, setOpen, acting, act, openProject };
+  const error = failure || account.error;
   return (
     <div className="content work-view">
       <header className="work-header">
         <h1>Agents</h1>
-        {state && <p className="work-lede">{lede}</p>}
+        {state && <p className="work-lede">{lede(state.devices.length, tasks)}</p>}
       </header>
-      {account.error && (
+      {error && (
         <p className="error" role="alert">
-          {account.error}
+          {error}
         </p>
       )}
       {!state ? (
         <p className="work-empty">Loading your team…</p>
       ) : (
         <>
+          <TaskCard
+            {...page}
+            state={state}
+            icon={<Play size={16} aria-hidden="true" />}
+            title="Running now"
+            empty="Nothing running right now."
+            tasks={tasks.running}
+            line={runningLine}
+          />
+          <TaskCard
+            {...page}
+            state={state}
+            icon={<Clock size={16} aria-hidden="true" />}
+            title="Waiting"
+            empty="Nothing waiting. Every task has a machine."
+            tasks={tasks.waiting}
+            line={waitingLine}
+          />
+          {tasks.stopped.length > 0 && (
+            <TaskCard
+              {...page}
+              state={state}
+              icon={<CircleAlert size={16} aria-hidden="true" />}
+              title="Stopped"
+              empty=""
+              tasks={tasks.stopped}
+              line={stoppedLine}
+            />
+          )}
+          <TaskCard
+            {...page}
+            state={state}
+            icon={<ShieldCheck size={16} aria-hidden="true" />}
+            title="Finished today"
+            empty="Nothing finished yet today."
+            tasks={tasks.finished}
+            line={finishedLine}
+          />
           <WorkCard
             icon={<Laptop size={16} aria-hidden="true" />}
-            title="Your team’s agents"
+            title="Machines"
             count={agents.length}
             empty="No machines yet."
           >
@@ -165,8 +233,8 @@ export function Agents({ workspace }: { workspace: Workspace }): JSX.Element {
                       <WorkDot dot={dot} />
                     </span>
                   }
-                  title={doing}
-                  sub={`${owner}’s agent · ${word}`}
+                  title={`${device.name} · ${owner}`}
+                  sub={`${word} · ${doing}`}
                   meta={task ? projectName(state, task) : `Seen ${when(device.lastSeenAt)}`}
                   open={open === device.deviceId}
                   onToggle={() => setOpen(toggle(open, device.deviceId))}
@@ -175,57 +243,6 @@ export function Agents({ workspace }: { workspace: Workspace }): JSX.Element {
                 </WorkRow>
               );
             })}
-          </WorkCard>
-          <WorkCard
-            icon={<Clock size={16} aria-hidden="true" />}
-            title="Waiting for room"
-            count={queued.length}
-            empty="Nothing waiting. Every task has a machine."
-          >
-            {queued.map((task) => (
-              <WorkRow
-                key={task.id}
-                lead={<WorkDot dot="quiet" />}
-                title={task.title}
-                sub={task.waiting ?? 'The next machine with room picks it up'}
-                meta={projectName(state, task)}
-                open={open === task.id}
-                onToggle={() => setOpen(toggle(open, task.id))}
-              >
-                <div className="work-actions">
-                  <button className="work-soft" onClick={() => openProject(task.projectId)}>
-                    Open project
-                  </button>
-                </div>
-              </WorkRow>
-            ))}
-          </WorkCard>
-          <WorkCard
-            icon={<ShieldCheck size={16} aria-hidden="true" />}
-            title="Finished today"
-            count={finished.length}
-            empty="Nothing finished yet today."
-          >
-            {finished.map((task) => (
-              <WorkRow
-                key={task.id}
-                lead={<WorkDot dot={task.status === 'done' ? 'brand' : 'warn'} />}
-                title={task.title}
-                sub={`${ranBy(state, task)} · ${projectName(state, task)}`}
-                meta={task.status === 'done' ? `Done ${when(task.updatedAt)}` : 'Stopped'}
-                open={open === task.id}
-                onToggle={() => setOpen(toggle(open, task.id))}
-              >
-                {task.status === 'failed' && (
-                  <p className="work-note">Stopped after {task.attempts} tries.</p>
-                )}
-                <div className="work-actions">
-                  <button className="work-soft" onClick={() => openProject(task.projectId)}>
-                    Open project
-                  </button>
-                </div>
-              </WorkRow>
-            ))}
           </WorkCard>
         </>
       )}

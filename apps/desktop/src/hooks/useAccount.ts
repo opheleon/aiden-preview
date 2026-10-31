@@ -4,8 +4,10 @@ import type { AccountState } from '../../../../packages/contracts/src/accounts-a
 import type { AccountStatus } from '../../../../packages/contracts/src/api';
 import type { DesktopBridge } from '../bridge';
 
-/** How often the Teams screen refreshes while it is open. */
+/** How often the Teams screen refreshes while it is open and no agent work is under way. */
 const refreshMs = 15_000;
+/** How often it refreshes while an agent task is waiting or running, so pickups show promptly. */
+const activeMs = 5_000;
 /** How often it checks while a browser sign-in is waiting. */
 const signingInMs = 2_000;
 
@@ -51,17 +53,26 @@ export function useAccount(call: DesktopBridge['request']): AccountView {
     setState(chosen ? await call('accountState', { accountId: chosen }) : null);
     setRefreshedAt(new Date());
   }, [call, accountId]);
+  // Agent work that is waiting or running can change any moment; idle teams change rarely.
+  const active = !!state?.tasks.some(
+    (task) => task.actor === 'agent' && (task.status === 'queued' || task.status === 'leased'),
+  );
   useEffect(() => {
     mounted.current = true;
     void refresh().catch((e: unknown) =>
       setError(e instanceof Error ? e.message : 'Could not load your team.'),
     );
-    const timer = setInterval(() => void refresh().catch(() => undefined), refreshMs);
     return () => {
       mounted.current = false;
-      clearInterval(timer);
     };
   }, [refresh]);
+  useEffect(() => {
+    const timer = setInterval(
+      () => void refresh().catch(() => undefined),
+      active ? activeMs : refreshMs,
+    );
+    return () => clearInterval(timer);
+  }, [refresh, active]);
   const signingIn = !!status?.signingIn;
   useEffect(() => {
     if (!signingIn) return;
