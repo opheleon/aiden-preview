@@ -203,8 +203,13 @@ export class TeamsSignIn {
     this.access = undefined;
   }
 
-  /** Rotate the refresh token; a rejected one means the session is over. */
-  private async refresh(): Promise<string | undefined> {
+  /**
+   * Rotate the refresh token. Only Auth0 saying the token is no longer valid (`invalid_grant`)
+   * ends the session, and not even then when another Aiden process has meanwhile saved a newer
+   * token: that one is tried instead. Any other failure keeps the sign-in and is retried later.
+   * @param retried Whether this is the retry with a token another process saved.
+   */
+  private async refresh(retried = false): Promise<string | undefined> {
     const current = await this.session.refreshToken();
     if (!current) return undefined;
     try {
@@ -218,13 +223,19 @@ export class TeamsSignIn {
       return tokens.access_token;
     } catch (error) {
       const { status, code } = error as { status?: number; code?: string };
-      if (status === 400 || status === 401 || status === 403) {
-        this.access = undefined;
-        this.failure = `Your Teams sign-in ended (Auth0: ${code ?? `HTTP ${status}`}). Sign in again.`;
-        await this.session.signOut();
-        return undefined;
+      if (code !== 'invalid_grant') {
+        // A network, server, or configuration problem is not the end of the sign-in.
+        if (status)
+          this.failure = `Aiden could not renew your Teams sign-in (Auth0: ${code ?? `HTTP ${status}`}). It will try again.`;
+        throw error;
       }
-      throw error;
+      // Refresh tokens are single use; a newer one saved by another Aiden process is still good.
+      const latest = await this.session.refreshToken();
+      if (!retried && latest && latest !== current) return this.refresh(true);
+      this.access = undefined;
+      this.failure = 'Your Teams sign-in ended (Auth0: invalid_grant). Sign in again.';
+      await this.session.signOut();
+      return undefined;
     }
   }
 

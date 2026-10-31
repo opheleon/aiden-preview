@@ -12,14 +12,17 @@ import {
 import { notionLinks } from '../../contracts/src/tracker-connections.js';
 import { deliveryTickets } from '../../reporting/src/tickets.js';
 import { ToolBroker } from '../../tools/src/broker.js';
+import { githubBrowseTools } from '../../tools/src/github-browse.js';
 import { serveTools } from '../../tools/src/mcp.js';
 import { appendActivity, counted, recordStep } from './activity.js';
 import { partValidators } from './assessment-parts.js';
 import { commitBaseline } from './baseline.js';
 import { answeredDecisions, openDecisions, readCalls, replaceOpenDecisions } from './calls.js';
 import { requestClarification } from './clarification.js';
+import { codeMap, planningSnapshots, type RepositoryMap } from './code-map.js';
 import { contextSources } from './context-sources.js';
 import { executeEstimate } from './estimation-workflow.js';
+import { copyNamedCode } from './find-code.js';
 import { createModelStage, type ModelStage } from './model-stage.js';
 import { assessReport } from './report-analysis.js';
 import { atomic, hash, optionalJson } from './storage.js';
@@ -61,20 +64,50 @@ const lookReason: Record<LookReason, string> = {
 };
 
 /**
- * Write what done means with edge cases and calls. An auto-accepted run commits the baseline
- * itself (it already holds the project lock); otherwise the run stops for review.
+ * Plan before writing. With code connected, map what already exists and let the model search and
+ * read it at the mapped commits. With none yet but a GitHub organization, let the model browse
+ * that organization on GitHub instead, so it learns what each repository does and names the ones
+ * the work touches. A resumed run reuses its saved requirements, so it skips this step.
+ */
+async function planStep(
+  context: WorkflowContext,
+  run: RunManifest,
+  broker: ToolBroker,
+): Promise<RepositoryMap[]> {
+  if (!run.project.repositories.length) {
+    broker.extra = githubBrowseTools(run.project.githubOrganizations ?? []);
+    return [];
+  }
+  context.emit({
+    type: 'progress',
+    runId: run.id,
+    projectId: run.projectId,
+    stage: run.stage,
+    message: 'Mapping the code that already exists',
+  });
+  const existing = await codeMap(run.project.repositories, run.project.context);
+  broker.snapshots = planningSnapshots(existing);
+  return existing;
+}
+
+/**
+ * Plan, then write what done means with edge cases and calls. The plan step maps connected code,
+ * or browses the project's GitHub organization when none is connected; the repositories it names
+ * are then copied read-only. An auto-accepted run commits
+ * the baseline itself (it already holds the project lock); otherwise the run stops for review.
  */
 async function understandIntent(
   context: WorkflowContext,
   run: RunManifest,
   dir: string,
   stage: ModelStage,
+  broker: ToolBroker,
+  signal: AbortSignal,
 ): Promise<void> {
   const previous = await optionalJson<Baseline>(
     path.join(context.store.project(run.projectId), 'baseline.json'),
   );
   const openCalls = await openDecisions(context.store, run.projectId);
-  const repositoryIds = run.project.repositories.map((r) => r.id);
   const checkpoint = await optionalJson<unknown>(path.join(dir, 'understand.json'));
   // Keep the input revision with the checkpoint. A late answer or restart must not make an old
   // model response appear to have incorporated a decision it never received.
@@ -85,6 +118,9 @@ async function understandIntent(
       : hash(await answeredDecisions(context.store, run.projectId));
   if (checkpoint === null) await atomic(revisionFile, decisionsHash);
   const sources = await contextSources(context, run.project);
+  const existing = checkpoint === null ? await planStep(context, run, broker) : [];
+  // Read after the plan step, which may have copied the project's code from its organization.
+  const repositoryIds = run.project.repositories.map((r) => r.id);
   const understanding = await stage<StoredUnderstanding>(
     'understand',
     UnderstandingSchema,
@@ -96,10 +132,14 @@ async function understandIntent(
       previous,
       openCalls,
       repositories: await Promise.all(run.project.repositories.map(describeRepository)),
+      codeMap: existing,
+      githubOrganizations: run.project.githubOrganizations,
     },
     (v) => parseUnderstanding(v, previous, repositoryIds, checkpoint !== null),
   );
   const { product, calls, settledCalls } = productFromUnderstanding(understanding, repositoryIds);
+  // Copy what the plan found the work touches, so the first check and estimate can read it.
+  await copyNamedCode(context, run, product.namedRepositories, signal);
   // Only a new answer or changed intent can settle a blocker; otherwise omission keeps it open.
   const canSettle =
     !previous ||
@@ -237,7 +277,7 @@ export async function execute(
   });
   try {
     if (run.kind === 'prepare') {
-      await understandIntent(context, run, dir, stage);
+      await understandIntent(context, run, dir, stage, broker, signal);
       return;
     }
     await assessReport(context, run, signal, dir, broker, stage, checkpoint);

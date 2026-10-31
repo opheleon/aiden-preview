@@ -43,7 +43,7 @@ export class FixtureRuntime implements AgentRuntime {
         ? 'estimate-history'
         : r.prompt.includes('remaining-work estimator')
           ? 'estimate-remaining'
-          : r.prompt.includes('Establish a minimal')
+          : r.prompt.includes('Establish a complete')
             ? 'understand'
             : r.prompt.includes('how a careful person would check')
               ? 'triage'

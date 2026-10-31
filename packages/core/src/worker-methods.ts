@@ -22,6 +22,7 @@ import { TicketSettingsSchema, TicketToolsSchema } from '../../contracts/src/tic
 import { VerificationUpdateSchema } from '../../contracts/src/verification.js';
 import { Runtimes } from '../../runtimes/src/index.js';
 import { discoverRepositories } from '../../tools/src/discovery.js';
+import { listGithubAccounts } from '../../tools/src/github-accounts.js';
 import { accountMethods } from './accounts/methods.js';
 import { readActivity, readRunLog } from './activity.js';
 import { askWhy, explainEntry, readChat } from './ask-why.js';
@@ -280,6 +281,7 @@ function runtimeMethods(engine: Engine, runtimes: RuntimeControls) {
 function integrationMethods(engine: Engine) {
   return {
     integrations: operation(z.object({}).strict(), () => engine.integrations.list()),
+    githubOrganizations: operation(z.object({}).strict(), () => githubOrganizations()),
     integrationPreset: operation(
       z.object({ provider: z.enum(['linear', 'jira', 'notion']) }).strict(),
       (p) => engine.integrations.preset(p.provider),
@@ -416,4 +418,21 @@ function verificationMethods(engine: Engine) {
       readVerification(engine, p.projectId, p.runId),
     ),
   };
+}
+
+/**
+ * The GitHub organizations the person belongs to, for the start screen's required choice. With no
+ * organizations, their own account is the one choice, so nobody is stuck before starting.
+ * Example: sam in acme and acme-labs gives ["acme", "acme-labs"]; sam in none gives ["sam"].
+ */
+async function githubOrganizations(): Promise<{ items: string[] } | { unavailable: string }> {
+  const listing = await listGithubAccounts(AbortSignal.timeout(30_000));
+  if ('unavailable' in listing)
+    return {
+      unavailable: listing.unavailable.includes('not installed')
+        ? 'Install the GitHub CLI from https://cli.github.com and run gh auth login, so Aiden can find your code.'
+        : 'Run gh auth login in a terminal to sign in to GitHub, so Aiden can find your code.',
+    };
+  const orgs = listing.items.filter((a) => a.kind === 'organization').map((a) => a.login);
+  return { items: orgs.length ? orgs : listing.items.map((a) => a.login) };
 }

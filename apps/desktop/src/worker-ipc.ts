@@ -69,6 +69,7 @@ const methods = new Set([
   'login',
   'updateRuntime',
   'integrations',
+  'githubOrganizations',
   'integrationPreset',
   'integrationAdd',
   'integrationConnect',

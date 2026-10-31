@@ -20,7 +20,7 @@ export async function statusTools(
   const tool = defineTool({
     name: 'report_status',
     description:
-      'Report meaningful progress, an unresolved question, a genuine blocker, or an outcome claim. Use question to continue independent work; use blocked only when no authorized work can continue. Aiden validates completion separately.',
+      'Report meaningful progress, an unresolved question, a genuine blocker, or an outcome claim. Use question to continue independent work; use blocked only when no authorized work can continue. message is a short status line; question is one direct question a person can answer, ending with a question mark and naming the choices, such as "Should F-2 wait for the F-1 pull request to merge, or include F-1 itself?". Aiden validates completion separately.',
     schema: AgentStatusSchema,
     readOnly: false,
     run: async (report) => {

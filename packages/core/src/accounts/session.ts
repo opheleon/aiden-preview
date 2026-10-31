@@ -3,19 +3,19 @@ import path from 'node:path';
 
 import { z } from 'zod/v3';
 
-import { flavorFromEnv } from '../../../contracts/src/app-flavor.js';
+import { usesBetaTeams } from '../../../contracts/src/app-flavor.js';
 import { credentialEntry } from '../../../integrations/src/credential-store.js';
 import { type CredentialEntry, SecretVault } from '../../../integrations/src/credentials.js';
 import { atomic, optionalJson, type Store } from '../storage.js';
 
 /**
  * Credential entries for the Accounts session; replaced in tests so no real keychain is touched.
- * Aiden Beta signs in to a different tenant, so it keeps its own entries.
+ * Aiden Beta and local runs sign in to the beta tenant, so they keep their own entries.
  */
 export const accountSessionEntries = {
   create: (id: string): CredentialEntry =>
     credentialEntry(
-      flavorFromEnv(process.env) === 'beta'
+      usesBetaTeams(process.env)
         ? 'com.opheleon.aiden-beta.accounts'
         : 'com.opheleon.aiden.accounts',
       id,
@@ -48,8 +48,9 @@ const defaults = (): AccountPreferences => ({
 
 /**
  * The Teams sign-in on this machine. The session token lives only in the OS keychain, an
- * owner-only credential file on headless Linux (`AIDEN_CREDENTIAL_STORE=file`), or session memory
- * when neither is available; preferences hold nothing secret.
+ * owner-only credential file (runs from source, and headless Linux with
+ * `AIDEN_CREDENTIAL_STORE=file`), or session memory when neither is available; preferences hold
+ * nothing secret.
  */
 export class AccountSession {
   private readonly file: string;

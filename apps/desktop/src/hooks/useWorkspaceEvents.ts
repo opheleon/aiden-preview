@@ -193,6 +193,9 @@ function receive(state: EventContext, event: RunEvent): void {
     case 'coding':
       // External jobs have their own delivery view; never mix them into analyst run history.
       break;
+    case 'guide':
+      // The Guide's own reply steps; the chat follows these itself.
+      break;
     case 'progress':
       progress(state, event);
       break;

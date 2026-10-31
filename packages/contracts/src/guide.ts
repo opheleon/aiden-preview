@@ -283,7 +283,7 @@ function stepDetails(
     confirm: done.confirm ? 'You confirmed the requirements.' : 'Check that Aiden understood you.',
     code: facts.repositories
       ? `${facts.repositories} ${facts.repositories === 1 ? 'repository' : 'repositories'} connected.`
-      : 'Tell Aiden which GitHub organization holds the code.',
+      : 'Aiden finds the code on GitHub.',
     verify:
       methods.length && !done.verify
         ? methods.every((m) => m === 'code')

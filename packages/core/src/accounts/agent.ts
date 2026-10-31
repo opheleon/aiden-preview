@@ -1,6 +1,7 @@
 import os from 'node:os';
 
 import type { AccountProject, AccountTask, Decision } from '../../../contracts/src/accounts-api.js';
+import { flavorFromEnv } from '../../../contracts/src/app-flavor.js';
 import { scopeName } from '../../../contracts/src/project-name.js';
 import type { Engine } from '../engine.js';
 import { type AccountsClient, AccountsError } from './client.js';
@@ -39,16 +40,20 @@ export interface LastAnswer {
 /** Re-poll quickly after finishing; signed out costs nothing (no network call), so check often. */
 const poll = { signedOut: 30, working: 60, error: 120 } as const;
 
-/** This machine's name as members see it; `AIDEN_DEVICE_NAME` overrides it, for example in a demo. */
+/**
+ * This machine's name as members see it; `AIDEN_DEVICE_NAME` overrides it, for example in a demo.
+ * Aiden run from source adds "(local build)", so it reads apart from Aiden Beta on the same Mac.
+ */
 export function deviceName(): string {
   const chosen = process.env.AIDEN_DEVICE_NAME?.trim();
   if (chosen) return chosen.slice(0, 80);
-  return (
+  const host =
     os
       .hostname()
       .replace(/\.local$/, '')
-      .slice(0, 80) || 'This Mac'
-  );
+      .slice(0, 66) || 'This Mac';
+  // Aiden run from source joins the same beta team as Aiden Beta on the same computer.
+  return flavorFromEnv(process.env) === 'local' ? `${host} (local build)` : host;
 }
 
 /**
@@ -261,6 +266,7 @@ export class AccountAgent {
         ...(output.checks ? { checks: output.checks } : {}),
         outcome: outcome(),
         documentChanged: output.documentChanged,
+        ...(output.review ? { review: output.review } : {}),
         status: 'pending',
       };
       await saveReceipt(this.engine.store, receipt);

@@ -1,5 +1,5 @@
 import { ArrowRight, CircleAlert, Info, SlidersHorizontal } from 'lucide-react';
-import { type JSX, useRef, useState } from 'react';
+import { type JSX, useEffect, useRef, useState } from 'react';
 
 import type { McpConnection } from '../../../../packages/contracts/src/index';
 import {
@@ -14,13 +14,18 @@ import type { Workspace } from '../hooks/useWorkspace';
 import { providerName, runtimeReady } from '../renderer/runtime-readiness';
 const api = window.aiden;
 
+/** The person's GitHub organizations, or why they could not be listed; null while loading. */
+type Orgs = { items: string[] } | { unavailable: string } | null;
+
 /**
- * The whole start: say what you are building, or paste a Notion page link. Code folders and checks
- * come later in the setup chat, where the person can ask what each step means.
+ * The whole start: say what you are building, or paste a Notion page link, and pick the GitHub
+ * organization the code lives in. Aiden finds the repositories there itself; checks come later
+ * in the setup chat, where the person can ask what each step means.
  */
 export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element {
   const { project, setProject, busy, start } = workspace;
-  const missing = startHint(workspace);
+  const [orgs, reloadOrgs] = useGithubOrganizations(workspace);
+  const missing = startHint(workspace, orgs);
   const [showModel, setShowModel] = useState(false);
   const model = useRef<HTMLDivElement>(null);
   /** Open the model settings below the box, bring them into view, and focus their first action. */
@@ -61,6 +66,7 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
             <SlidersHorizontal size={14} aria-hidden="true" /> Model and effort
           </button>
           <div className="goal-starter-actions">
+            <OrgPicker workspace={workspace} orgs={orgs} />
             <ProviderPicker workspace={workspace} onConnect={openModel} />
             {/* A disabled button gets no hover, so its wrapper says what is still needed. */}
             <span className="goal-starter-start" title={missing || undefined}>
@@ -79,6 +85,15 @@ export function SetIntent({ workspace }: { workspace: Workspace }): JSX.Element 
           </div>
         </div>
       </div>
+      {orgs && 'unavailable' in orgs && (
+        <div className="start-blocker" role="status">
+          <CircleAlert size={16} />
+          <p>{orgs.unavailable}</p>
+          <button className="start-blocker-action" onClick={reloadOrgs}>
+            Try again
+          </button>
+        </div>
+      )}
       <NotionNotice workspace={workspace} />
       {showModel && (
         <div id="start-model-settings" className="goal-starter-settings" ref={model}>
@@ -172,6 +187,65 @@ function NotionNotice({ workspace }: { workspace: Workspace }): JSX.Element | nu
 }
 
 /**
+ * Load the person's GitHub organizations, and choose the only one whenever the project has none,
+ * including after Create project starts a fresh one. Returns the listing and a way to try again
+ * after signing in to GitHub.
+ */
+function useGithubOrganizations(workspace: Workspace): [Orgs, () => void] {
+  const { call, setProject, project } = workspace;
+  const [orgs, setOrgs] = useState<Orgs>(null);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let live = true;
+    void call('githubOrganizations', {}).then(
+      (found) => live && setOrgs(found),
+      () => live && setOrgs({ unavailable: 'Aiden could not reach GitHub. Try again.' }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [call, attempt]);
+  const only = orgs && 'items' in orgs && orgs.items.length === 1 ? orgs.items[0] : undefined;
+  const chosen = !!project.githubOrganizations?.length;
+  useEffect(() => {
+    if (only && !chosen)
+      setProject((current) =>
+        current.githubOrganizations?.length ? current : { ...current, githubOrganizations: [only] },
+      );
+  }, [only, chosen, setProject]);
+  /** List the organizations again, for example after `gh auth login`. */
+  const reload = () => {
+    setOrgs(null);
+    setAttempt((n) => n + 1);
+  };
+  return [orgs, reload];
+}
+
+/** The required GitHub organization, next to the provider: only the organizations they belong to. */
+function OrgPicker({ workspace, orgs }: { workspace: Workspace; orgs: Orgs }): JSX.Element {
+  const { project, setProject } = workspace;
+  const items = orgs && 'items' in orgs ? orgs.items : [];
+  return (
+    <select
+      className="chat-model-select"
+      aria-label="GitHub organization"
+      value={project.githubOrganizations?.[0] ?? ''}
+      disabled={!items.length}
+      onChange={(event) => setProject({ ...project, githubOrganizations: [event.target.value] })}
+    >
+      <option value="" disabled>
+        {orgs === null ? 'Finding orgs…' : 'GitHub org'}
+      </option>
+      {items.map((org) => (
+        <option key={org} value={org}>
+          {org}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/**
  * The provider choice with whether it is connected, read from the loaded diagnostics. When it is
  * not connected, the status itself opens the sign-in steps.
  */
@@ -225,13 +299,19 @@ function ProviderPicker({
 
 /**
  * What still stops the start, as one short sentence for the button's tooltip, or empty when
- * Aiden can start. The goal and a connected model are required; everything else comes later in
- * the setup chat.
+ * Aiden can start. The goal, the GitHub organization, and a connected model are required;
+ * everything else comes later in the setup chat.
  * Example: an empty box gives "Describe what you are building first."
  */
-function startHint(workspace: Workspace): string {
+function startHint(workspace: Workspace, orgs: Orgs): string {
   const { project } = workspace;
   if (!project.context.trim()) return 'Describe what you are building first.';
+  if (!project.githubOrganizations?.length)
+    return orgs === null
+      ? 'Finding your GitHub organizations.'
+      : 'unavailable' in orgs
+        ? orgs.unavailable
+        : 'Choose the GitHub organization first.';
   if (runtimeReady(workspace.diagnostics, project.runtime) === false)
     return `Connect ${providerName(project.runtime.provider)} first.`;
   return '';

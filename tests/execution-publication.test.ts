@@ -66,9 +66,10 @@ void test('a lost PR creation acknowledgement reuses verified publication and ne
     assert.equal(pushes, 1);
     const { readFile } = await import('node:fs/promises');
     assert.equal(await readFile(marker, 'utf8'), 'created\n');
+    // A commit that is neither on the open PR nor in the worktree is never published.
     await assert.rejects(
       publishJobBranch({ ...input, commit: 'b'.repeat(40) }),
-      /checkpointed commit/,
+      /checkpointed commit|worktree changed/,
     );
     await assert.rejects(
       publishJobBranch({ ...input, authorize: () => Promise.reject(new Error('stale attempt')) }),

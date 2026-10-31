@@ -1,4 +1,4 @@
-import { flavorFromEnv } from './app-flavor.js';
+import { usesBetaTeams } from './app-flavor.js';
 
 /** Where Teams sign-in happens. All public values: a native app has no client secret. */
 export interface TeamsAuthConfig {
@@ -20,7 +20,7 @@ const defaults: TeamsAuthConfig = {
   ports: [53682, 53683],
 };
 
-/** The beta tenant, used by Aiden Beta (`AIDEN_FLAVOR=beta`). */
+/** The beta tenant, used by Aiden Beta and local runs (`AIDEN_FLAVOR=beta` or `local`). */
 const beta: TeamsAuthConfig = {
   ...defaults,
   issuer: 'https://dev-ojuw8zknxrr27n6o.us.auth0.com/',
@@ -29,7 +29,7 @@ const beta: TeamsAuthConfig = {
 
 /** Read the sign-in settings; the issuer must be HTTPS so tokens never cross the network in the clear. */
 export function teamsAuth(env: Record<string, string | undefined> = {}): TeamsAuthConfig {
-  const base = flavorFromEnv(env) === 'beta' ? beta : defaults;
+  const base = usesBetaTeams(env) ? beta : defaults;
   const issuer = env.AIDEN_AUTH0_ISSUER || base.issuer;
   const url = new URL(issuer);
   if (url.protocol !== 'https:' || !issuer.endsWith('/'))

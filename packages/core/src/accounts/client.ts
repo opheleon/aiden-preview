@@ -19,13 +19,13 @@ import {
   WorkAnswerSchema,
 } from '../../../contracts/src/accounts-api.js';
 import type { AgentStatus, DeliveryCheckpoint } from '../../../contracts/src/accounts-execution.js';
-import { flavorFromEnv } from '../../../contracts/src/app-flavor.js';
+import { usesBetaTeams } from '../../../contracts/src/app-flavor.js';
 import type { QuestionScope, WorkRole } from '../../../contracts/src/work-roles.js';
 import { responseSummary, teamsDebug } from './debug.js';
 
 /**
  * Where the Accounts API lives unless AIDEN_ACCOUNTS_URL points elsewhere (local development).
- * Aiden Beta (`AIDEN_FLAVOR=beta`) uses the beta server.
+ * Aiden Beta and local runs (`AIDEN_FLAVOR=beta` or `local`) use the beta server.
  */
 const defaultUrl = 'https://api.opheleon.ai';
 const betaUrl = 'https://api-beta.opheleon.ai';
@@ -52,9 +52,7 @@ export class AccountsError extends Error {
 
 /** The API base URL: HTTPS, or plain HTTP only for this machine during development. */
 export function accountsUrl(env: NodeJS.ProcessEnv = process.env): string {
-  const url = new URL(
-    env.AIDEN_ACCOUNTS_URL || (flavorFromEnv(env) === 'beta' ? betaUrl : defaultUrl),
-  );
+  const url = new URL(env.AIDEN_ACCOUNTS_URL || (usesBetaTeams(env) ? betaUrl : defaultUrl));
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && local))
     throw new Error('The Accounts server must use HTTPS.');
@@ -122,6 +120,8 @@ export class AccountsClient {
         method,
         headers: {
           'content-type': 'application/json',
+          // This app understands the review status; older apps see a review as blocked.
+          'x-aiden-capabilities': 'review',
           ...(token ? { authorization: `Bearer ${token}` } : {}),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -195,6 +195,19 @@ export class AccountsClient {
       `/projects/${encodeURIComponent(projectId)}/document`,
       AccountProjectSchema,
       { revision, document, ...(name ? { name } : {}) },
+    );
+  }
+
+  /**
+   * Close or reopen a project for the whole team. A closed project gets no Morning check and its
+   * waiting work is held; nothing is deleted.
+   */
+  setProjectStatus(projectId: string, status: 'active' | 'closed'): Promise<AccountProject> {
+    return this.call(
+      'PUT',
+      `/projects/${encodeURIComponent(projectId)}/status`,
+      AccountProjectSchema,
+      { status },
     );
   }
 

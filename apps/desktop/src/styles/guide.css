@@ -8,7 +8,7 @@
 }
 
 /* Long setup explanations scroll on their own so the composer always stays in view. */
-.project-chat-panel .setup-checklist {
+.project-chat-panel .chat-status {
   max-height: 45%;
   overflow: auto;
   scrollbar-width: thin;
@@ -424,4 +424,24 @@
   padding-left: 18px;
   font-size: 13px;
   line-height: 1.5;
+}
+
+/* Shown when new messages arrive while the person reads further up; it floats over the thread. */
+.guide-jump {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-self: center;
+  align-items: center;
+  gap: 4px;
+  margin-top: -44px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
 }

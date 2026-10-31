@@ -110,6 +110,15 @@ export const ProjectSchema = z
         .strict(),
     ),
     runtime: RuntimeSchema,
+    /**
+     * The GitHub organizations the project's code lives in, chosen when it started. It travels in
+     * a team project's shared document, so every member's Aiden knows where to find the code.
+     * One for now; a list so more can be added later.
+     */
+    githubOrganizations: z
+      .array(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/))
+      .max(10)
+      .optional(),
     sources: ProjectSourcesSchema.optional(),
     /** Worker-derived lifecycle; trusted decisions live in a separate file. */
     lifecycle: ProjectLifecycleViewSchema.optional(),
@@ -259,7 +268,9 @@ export type Stage =
 /** Worker progress and terminal notifications; optional payloads depend on the event type and stage. */
 export type RunEvent = {
   projectId?: string;
-  type: 'progress' | 'activity' | 'review' | 'completed' | 'failed' | 'cancelled' | 'coding';
+  /** `guide` is a step of the Guide's own reply, such as a GitHub lookup; its runId is "guide". */
+  type:
+    'progress' | 'activity' | 'review' | 'completed' | 'failed' | 'cancelled' | 'coding' | 'guide';
   codingActive?: boolean;
   runId: string;
   stage?: Stage;

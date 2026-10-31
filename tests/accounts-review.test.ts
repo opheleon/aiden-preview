@@ -149,7 +149,11 @@ void test('a build with no PRs asks its role a question about the task, and an e
   assert.equal(output.followUps?.[0]?.scope, 'task');
   assert.match(output.followUps?.[0]?.instructions ?? '', /claude --resume session-1/);
   assert.deepEqual(blocks, [
-    ['Coding needs a human answer', 'Which auth provider?', { role: 'fe_engineer', scope: 'task' }],
+    [
+      'Coding needs a human answer',
+      'How should this build continue?\n\nWhich auth provider?',
+      { role: 'fe_engineer', scope: 'task' },
+    ],
   ]);
   const unclassified = await runBuild(
     {} as Engine,

@@ -30,6 +30,8 @@ interface SettingsViewProps {
   projects: Project[];
   runtimeControls: React.JSX.Element;
   projectSettings: React.JSX.Element;
+  /** The Teams tab: sign-in, the team, its machines, and how this machine helps. */
+  teams: React.JSX.Element;
   /** Errors and notices from actions taken in settings. */
   feedback: React.JSX.Element;
   api: DesktopBridge | undefined;
@@ -60,6 +62,7 @@ export function SettingsView(props: SettingsViewProps): React.JSX.Element {
     projects,
     runtimeControls,
     projectSettings,
+    teams,
     feedback,
     api,
     updateStatus,
@@ -84,15 +87,17 @@ export function SettingsView(props: SettingsViewProps): React.JSX.Element {
       </div>
       {feedback}
       <div className="settings-tabs">
-        {(['project', 'model', 'integrations', 'preferences', 'desktop'] as const).map((tab) => (
-          <button
-            key={tab}
-            className={settingsTab === tab ? 'active' : ''}
-            onClick={() => setSettingsTab(tab)}
-          >
-            {tab === 'desktop' ? 'Desktop app' : tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
+        {(['project', 'model', 'integrations', 'teams', 'preferences', 'desktop'] as const).map(
+          (tab) => (
+            <button
+              key={tab}
+              className={settingsTab === tab ? 'active' : ''}
+              onClick={() => setSettingsTab(tab)}
+            >
+              {tab === 'desktop' ? 'Desktop app' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ),
+        )}
       </div>
       {settingsTab === 'model' && (
         <div className="settings-stack">
@@ -119,6 +124,7 @@ export function SettingsView(props: SettingsViewProps): React.JSX.Element {
         </div>
       )}
       {settingsTab === 'project' && projectSettings}
+      {settingsTab === 'teams' && teams}
       {settingsTab === 'integrations' && (
         <div className="settings-stack">
           <section className="card integration-hero">

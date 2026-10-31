@@ -301,6 +301,11 @@ export type WorkerAPI = {
   login: { params: { provider: 'codex' | 'claude' }; result: { authUrl?: string } };
   updateRuntime: { params: ProjectRef & { runtime: RuntimeConfig }; result: null };
   integrations: { params: Record<string, never>; result: McpConnection[] };
+  /** The GitHub organizations the person belongs to, through their GitHub CLI sign-in. */
+  githubOrganizations: {
+    params: Record<string, never>;
+    result: { items: string[] } | { unavailable: string };
+  };
   integrationPreset: { params: { provider: IntegrationPreset }; result: McpConnection };
   integrationAdd: {
     params: {

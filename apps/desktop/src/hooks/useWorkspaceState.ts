@@ -16,9 +16,10 @@ import { newProject } from '../renderer/project-state';
 import type { UpdatePreferences, UpdateStatus } from '../updater';
 
 /** Where the main window is: a project's brief, the team's shared work, or settings. */
-export type Area = 'projects' | 'runs' | 'settings' | 'devices' | 'account' | 'work' | 'agents';
+export type Area = 'projects' | 'runs' | 'settings' | 'devices' | 'work';
 /** Settings tabs; the project tab holds everything specific to the selected project. */
-export type SettingsTab = 'project' | 'model' | 'integrations' | 'preferences' | 'desktop';
+export type SettingsTab =
+  'project' | 'model' | 'integrations' | 'teams' | 'preferences' | 'desktop';
 
 /** Own the selected project and what Aiden knows about it. */
 function useProjectState() {
@@ -100,9 +101,13 @@ function usePreferenceState() {
   const [integrationTools, setIntegrationTools] = useState<Record<string, McpTool[]>>({});
   /** The team a new project goes to; empty when the person is not in a team. */
   const [accountScope, setAccountScope] = useState('');
+  /** Whether this computer is signed in to Teams, for the sidebar's Sign in or Sign out. */
+  const [signedIn, setSignedIn] = useState(false);
   return {
     accountScope,
     setAccountScope,
+    signedIn,
+    setSignedIn,
     area,
     setArea,
     settingsTab,

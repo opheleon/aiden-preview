@@ -13,6 +13,7 @@ import { AccountsClient, AccountsError, accountsUrl, dashboardUrl } from './clie
 import { documentFor, localDocument, materialize } from './documents.js';
 import { InventoryProbe } from './inventory.js';
 import { TeamsSignIn } from './oidc.js';
+import { reconcileProjectStatus, sendProjectStatus } from './project-status.js';
 import { AccountSession } from './session.js';
 import { syncSetupTasks } from './setup-tasks.js';
 
@@ -180,6 +181,11 @@ export function accountMethods(
    * arriving after a run finished could leave stuck on busy.
    */
   const busy = (): boolean => engine.hasActiveWork() || !!built?.agent.status().running;
+  // Closing or reopening a team project here closes or reopens it for the whole team.
+  engine.onProjectStatus = async (projectId, status) => {
+    const { session, client } = context();
+    if (await session.refreshToken()) await sendProjectStatus(client, projectId, status);
+  };
   // Desktop tests follow the team admins' allowed app publishers whenever this machine is signed in.
   engine.desktops.teamPublishers = async () => {
     const { session, client } = context();
@@ -309,17 +315,8 @@ async function status({
       ...machine,
     };
   } catch (error) {
-    if (error instanceof AccountsError && error.status === 401) {
-      await session.signOut();
-      return {
-        signedIn: false,
-        email: null,
-        userId: null,
-        accounts: [],
-        message: error.message,
-        ...machine,
-      };
-    }
+    // The client already renewed the token and retried. A rejection that remains, such as during a
+    // server deploy, keeps the sign-in; only Auth0 refusing the refresh token ends it.
     const message =
       error instanceof AccountsError ? error.message : 'Aiden could not reach your account.';
     return {
@@ -333,13 +330,20 @@ async function status({
   }
 }
 
-/** Read the account view and bring this machine's copies of its projects up to the server's revision. */
+/**
+ * Read the account view, settle which projects are closed (the newer decision wins), and bring
+ * this machine's copies of the open ones up to the server's revision.
+ */
 async function syncState(
   engine: Engine,
   client: AccountsClient,
   accountId: string,
 ): Promise<WorkerResult<'accountState'>> {
-  const state = await client.state(accountId);
+  const fetched = await client.state(accountId);
+  const state = {
+    ...fetched,
+    projects: await reconcileProjectStatus(engine, client, fetched.projects),
+  };
   for (const project of state.projects) {
     if (project.status !== 'active') continue;
     const local = await readProject(engine.store, project.id);

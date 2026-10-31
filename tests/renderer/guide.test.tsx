@@ -34,9 +34,12 @@ test('a new project opens on the Guide, plays back the requirements, and sets up
   expect(screen.queryByRole('tab', { name: /Guide/ })).not.toBeInTheDocument();
   // The playback starts on its own once the requirements exist.
   expect(await screen.findByText(/Synthetic playback of the requirements/)).toBeVisible();
-  const checklist = screen.getByRole('region', { name: 'Project setup' });
-  // Setup is one compact line; the steps and their explanations open on demand.
-  expect(within(checklist).getByText(/Step 2 of 5 · Review requirements/)).toBeVisible();
+  const checklist = screen.getByRole('region', { name: 'Project status' });
+  // Setup is part of one slim line; the steps and their explanations open on demand.
+  expect(within(checklist).getByRole('status', { name: 'Setup status' })).toHaveTextContent(
+    'Setup 2 of 5',
+  );
+  expect(within(checklist).getByText(/Review requirements/)).toBeVisible();
   expect(within(checklist).queryByRole('list', { name: 'Setup' })).toBeNull();
   await userEvent.type(within(dialog).getByLabelText('Message the Guide'), 'Keep this draft');
   const requestsBeforeHelp = f.request.mock.calls.length;
@@ -93,7 +96,9 @@ test('a new project opens on the Guide, plays back the requirements, and sets up
     projectId: f.project().id,
     text: 'I checked access and confirmed these verification methods: Code checks, Web app.',
   });
-  expect(await screen.findByText('Step 5 of 5 · Run first check')).toBeVisible();
+  expect(await screen.findByRole('status', { name: 'Setup status' })).toHaveTextContent(
+    'Setup 5 of 5',
+  );
 });
 
 test('a typed message round-trips, and an unanswered one can be asked again', async () => {
@@ -185,7 +190,17 @@ test('Enter while a reply is pending preserves the draft and does not submit twi
   });
   const box = screen.getByLabelText('Message the Guide');
   await userEvent.type(box, 'Slow question{Enter}');
-  await screen.findByRole('status', { name: 'Aiden is thinking' });
+  const thinking = await screen.findByRole('status', { name: 'Aiden is thinking' });
+  // Each step of the reply in progress replaces "Thinking", such as a GitHub lookup.
+  act(() =>
+    f.emit({
+      type: 'guide',
+      runId: 'guide',
+      projectId: f.project().id,
+      message: "Listing acme's repositories on GitHub",
+    }),
+  );
+  expect(thinking).toHaveTextContent("Listing acme's repositories on GitHub");
   await userEvent.type(box, 'Next question{Enter}');
   expect(box).toHaveValue('Next question');
   expect(
@@ -421,7 +436,9 @@ test('progress replaces the current activity without repeating logs or showing i
   );
   expect(within(progress).getByText('Reviewing the sign-in requirements.')).toBeVisible();
   expect(within(progress).queryByText('Reading your goal to write the requirements.')).toBeNull();
-  await userEvent.click(within(progress).getByRole('button', { name: 'Stop' }));
+  // The one Stop sits in the status line, not beside the progress.
+  expect(within(progress).queryByRole('button', { name: 'Stop' })).toBeNull();
+  await userEvent.click(within(chat).getByRole('button', { name: 'Stop' }));
   expect(f.request).toHaveBeenCalledWith('cancel', { runId: 'preparing' });
 });
 
@@ -433,9 +450,9 @@ test('finished checks do not complete setup and switching tabs preserves the dra
   await selectTab('Chat');
   const chat = await chatPanel();
   const status = await within(chat).findByRole('status', { name: 'Setup status' });
-  expect(status).toHaveTextContent('Setup not complete');
+  expect(status).toHaveTextContent('Setup 2 of 5');
   expect(within(chat).queryByText('Check complete')).toBeNull();
-  expect(within(chat).getByText('Step 2 of 5 · Review requirements')).toBeVisible();
+  expect(within(chat).getByText(/Review requirements/)).toBeVisible();
   await userEvent.type(within(chat).getByLabelText('Message the Guide'), 'Keep this question');
   await selectTab('Scope');
   expect(chat).not.toBeVisible();
@@ -473,7 +490,7 @@ test('a running check streams progress and partial results in chat without losin
   expect(within(chat).queryByRole('button', { name: 'View progress' })).toBeNull();
   expect(within(chat).queryByRole('button', { name: 'Close chat' })).toBeNull();
   expect(within(chat).getByRole('status', { name: 'Setup status' })).toHaveTextContent(
-    'Setup not complete',
+    /^Setup \d of \d$/,
   );
   await userEvent.type(within(chat).getByLabelText('Message the Guide'), 'Keep my question');
   const summary = { total: 1, verified: 1, failed: 0, unverified: 0, line: '1 check passed.' };
@@ -679,4 +696,35 @@ test('finished checks stay in the thread, and Latest check links back to them', 
   await userEvent.click(screen.getByRole('button', { name: 'View results in chat' }));
   expect(screen.getByRole('tab', { name: 'Chat' })).toHaveAttribute('aria-selected', 'true');
   expect(document.getElementById('guide-result-older-run')).toHaveFocus();
+});
+
+test('Show log tails the running check in the chat, adding each step as it happens', async () => {
+  const at = '2026-10-30T14:02:11.000Z';
+  f.startRun({ id: 'run-live', kind: 'report' }, [
+    { at, runId: 'run-live', kind: 'step', summary: 'Searched web for "books"' },
+  ]);
+  render(<App />);
+  await userEvent.click(await screen.findByRole('button', { name: 'Synthetic books' }));
+  const chat = await chatPanel();
+  await userEvent.click(await within(chat).findByRole('button', { name: 'Show log' }));
+  const tail = await within(chat).findByRole('region', { name: 'Run log' });
+  const log = within(tail).getByRole('log');
+  expect(await within(log).findByText('Searched web for "books"')).toBeVisible();
+  expect(tail).toHaveTextContent('Live');
+  act(() =>
+    f.emit({
+      type: 'activity',
+      runId: 'run-live',
+      projectId: f.project().id,
+      activity: {
+        at: '2026-10-30T14:02:12.000Z',
+        runId: 'run-live',
+        kind: 'step',
+        summary: 'Read web/app.txt from line 1',
+      },
+    }),
+  );
+  expect(await within(log).findByText('Read web/app.txt from line 1')).toBeVisible();
+  await userEvent.click(within(chat).getByRole('button', { name: 'Hide log' }));
+  expect(within(chat).queryByRole('region', { name: 'Run log' })).toBeNull();
 });

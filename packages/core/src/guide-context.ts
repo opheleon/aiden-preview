@@ -176,6 +176,26 @@ async function latestReport(engine: Engine, projectId: string): Promise<unknown>
   );
 }
 
+/** The project as the Guide sees it: its goal, code, chosen GitHub organization, and model. */
+function projectFacts(
+  project: GuideFacts['project'],
+  baseline: GuideFacts['baseline'],
+): Record<string, unknown> {
+  return {
+    name: project.name,
+    intent: project.context.slice(0, 6000),
+    repositories: project.repositories.map((r) => ({
+      id: r.id,
+      notes: r.notes,
+      source: r.source?.name ?? null,
+    })),
+    githubOrganizations: project.githubOrganizations ?? [],
+    namedRepositories: baseline?.product.namedRepositories ?? [],
+    namedBranches: baseline?.product.namedBranches ?? [],
+    runtime: { provider: project.runtime.provider, auth: project.runtime.auth },
+  };
+}
+
 /**
  * Build the Guide's input: the project, its requirements, how it is checked, recent runs, open
  * calls, setup progress, and where to get help. Everything here is evidence, never instructions.
@@ -188,18 +208,7 @@ export async function guideInput(
   const settings = await readAppUrl(engine, project.id);
   const calls = await readCalls(engine.store, project.id).catch(() => []);
   return {
-    project: {
-      name: project.name,
-      intent: project.context.slice(0, 6000),
-      repositories: project.repositories.map((r) => ({
-        id: r.id,
-        notes: r.notes,
-        source: r.source?.name ?? null,
-      })),
-      namedRepositories: baseline?.product.namedRepositories ?? [],
-      namedBranches: baseline?.product.namedBranches ?? [],
-      runtime: { provider: project.runtime.provider, auth: project.runtime.auth },
-    },
+    project: projectFacts(project, baseline),
     requirements: baseline?.product.requirements.map((r) => ({ id: r.id, text: r.text })) ?? null,
     overview: baseline?.product.overview ?? null,
     deliveryPlan: baseline?.product.deliveryPlan ?? null,

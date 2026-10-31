@@ -66,6 +66,12 @@ export class Engine {
    * sees it running; this second signal lets the host read again once it is really gone.
    */
   onWorkChanged: () => void = () => {};
+  /**
+   * Tell the team that a team project was closed or reopened on this computer. Set while Teams is
+   * available; until then a decision stays here and the next Work refresh brings the two in line.
+   */
+  onProjectStatus: (projectId: string, status: 'active' | 'closed') => Promise<void> = () =>
+    Promise.resolve();
   /** Bind storage, provider, and integration dependencies without starting provider execution. */
   constructor(
     public store = new Store(),

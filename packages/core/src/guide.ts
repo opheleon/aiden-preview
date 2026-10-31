@@ -361,7 +361,8 @@ export function askGuide(engine: Engine, projectId: string, turn: GuideTurn): Pr
         ...(await guideInput(engine, facts)),
       },
       ReplySchema,
-      guideTools(),
+      // Each GitHub lookup shows in the chat while the reply is being written.
+      guideTools((message) => engine.emit({ type: 'guide', runId: 'guide', projectId, message })),
     );
     if (!reply) throw new Error('The Guide could not answer that. Try asking another way.');
     const { widgets, actions } = validated(reply);

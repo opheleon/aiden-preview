@@ -15,7 +15,7 @@ const gap = (requirementId: string, status: string) => ({
   evidence: [],
 });
 
-void test('each unfinished feature becomes one build task across every repository', async () => {
+void test('each unfinished feature becomes one build task, and one that builds on another waits for it', async () => {
   const project = {
     id: 'p1',
     runtime: { provider: 'codex', auth: 'subscription' },
@@ -57,7 +57,8 @@ void test('each unfinished feature becomes one build task across every repositor
   } as unknown as Engine;
   const queued: NewAccountTask[] = [];
   const client = {
-    enqueue: (_projectId: string, task: NewAccountTask) => Promise.resolve(queued.push(task)),
+    enqueue: (_projectId: string, task: NewAccountTask) =>
+      Promise.resolve({ id: `task-${queued.push(task)}` }),
   } as unknown as AccountsClient;
 
   await queueBuild(engine, client, project, baseline);
@@ -73,7 +74,6 @@ void test('each unfinished feature becomes one build task across every repositor
     'acme/calendar-api',
     'acme/calendar-ui',
   ]);
-  assert.match(queued[1]!.instructions!, /Builds on F-1, which may be built at the same time/);
   // A build runs the project's own coding agent, so only a machine with Codex signed in for this
   // billing mode, and under its member's usage cap, may take it.
   assert.deepEqual(queued[0]!.tools, ['git', 'gh', 'codex']);

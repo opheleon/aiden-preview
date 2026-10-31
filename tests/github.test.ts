@@ -7,6 +7,8 @@ import test from 'node:test';
 import { parseGithubRepository, syncGithubRepository } from '../packages/tools/src/github.js';
 import {
   githubCliEnv,
+  githubFile,
+  githubFolder,
   listGithubAccounts,
   listGithubRepositories,
   maxConnectedRepositories,
@@ -58,6 +60,10 @@ if [ -n "$FAKE_GH_FAIL" ]; then echo "auth required" >&2; exit 1; fi
 case "$1 $2" in
   "api user") echo "sam" ;;
   "api user/orgs") printf 'acme\\nnot valid\\nacme-labs\\n' ;;
+  "api repos/acme/web/contents/") echo '[{"path":"src","type":"dir"},{"path":"README.md","type":"file"},{"path":"link","type":"symlink"}]' ;;
+  "api repos/acme/web/contents/README.md") echo "# Storefront web" ;;
+  "api repos/acme/web/contents/one") echo '{"path":"one","type":"file"}' ;;
+  "api repos/acme/web/contents/logo.png") printf 'PNG\\000data' ;;
   "repo list")
     case "$3" in
       acme) echo '${repos}' ;;
@@ -185,6 +191,26 @@ void test('the GitHub CLI lists accounts and active repositories newest first, r
       ],
     );
     assert.deepEqual(await listGithubRepositories('odd'), { items: [] });
+    // Folders and files are read from GitHub without cloning; odd entries and bad paths are refused.
+    assert.deepEqual(await githubFolder('acme', 'web', ''), {
+      items: [
+        { path: 'src', type: 'dir' },
+        { path: 'README.md', type: 'file' },
+      ],
+    });
+    assert.match(JSON.stringify(await githubFolder('acme', 'web', 'one')), /is a file/);
+    assert.match(
+      JSON.stringify(await githubFolder('acme', 'web', 'gone')),
+      /GitHub did not answer/,
+    );
+    assert.match(JSON.stringify(await githubFolder('acme', 'web', 'a/../b')), /not a repository/);
+    assert.deepEqual(await githubFile('acme', 'web', 'README.md'), { text: '# Storefront web\n' });
+    assert.match(JSON.stringify(await githubFile('acme', 'web', 'logo.png')), /not a text file/);
+    assert.match(JSON.stringify(await githubFile('acme', 'web', 'gone')), /GitHub did not answer/);
+    assert.match(
+      JSON.stringify(await githubFile('acme', 'web', '/etc/passwd')),
+      /not a repository/,
+    );
     assert.match(JSON.stringify(await listGithubRepositories('gone')), /GitHub did not answer/);
     const stopped = new AbortController();
     stopped.abort();

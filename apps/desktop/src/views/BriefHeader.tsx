@@ -9,16 +9,19 @@ import type { CodingDeliveryState } from '../hooks/useCodingDelivery';
 import type { Workspace } from '../hooks/useWorkspace';
 import { timeAgo } from '../renderer/time';
 
-/** What Aiden is doing right now, with a way to stop it. */
+/**
+ * What Aiden is doing right now, with a way to stop it, on every tab but Chat: the chat's own
+ * status line says the same there, with the one Stop.
+ */
 function LiveLine({ workspace }: { workspace: Workspace }): JSX.Element | null {
   const { busy, live, activeRun, action, call } = workspace;
   const { open, tab } = useProjectGuide();
-  if (!busy) return null;
+  if (!busy || tab === 'chat') return null;
   return (
     <p className="live-line" aria-live="polite">
       <span className="spinner" aria-hidden="true" />
       {live || 'Aiden is working.'}
-      {activeRun && tab !== 'chat' && (
+      {activeRun && (
         <button className="text-button" onClick={() => open({ type: 'run' })}>
           Show progress
         </button>

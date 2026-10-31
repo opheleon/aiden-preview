@@ -8,18 +8,20 @@ import { useAccount } from '../hooks/useAccount';
 import { teamTarget } from '../hooks/useTeamScope';
 import type { Workspace } from '../hooks/useWorkspace';
 
-/** Teams settings: sign in once, then the team, its machines, and how this machine helps. */
+/** The Teams tab in Settings: sign in once, then the team, its machines, and how this machine helps. */
 export function AccountWork({ workspace }: { workspace: Workspace }): JSX.Element {
   const account = useAccount(workspace.call);
   const { status, state } = account;
-  const { setAccountScope, projects, setProjects, call } = workspace;
+  const { setAccountScope, setSignedIn, projects, setProjects, call } = workspace;
   const team = status?.accounts.find((a) => a.id === account.accountId)?.name ?? 'your team';
-  // Signing in or out here changes the header tabs without a screen change.
+  // Signing in or out here changes the header tabs and the sidebar without a screen change.
   useEffect(() => {
-    if (status) setAccountScope(teamTarget(status).scope);
-  }, [status, setAccountScope]);
+    if (!status) return;
+    setAccountScope(teamTarget(status).scope);
+    setSignedIn(status.signedIn);
+  }, [status, setAccountScope, setSignedIn]);
   return (
-    <div className="content account-view">
+    <div className="account-view">
       {account.error && (
         <p className="error" role="alert">
           {account.error}

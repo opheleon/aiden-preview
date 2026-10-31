@@ -46,7 +46,9 @@ export async function privateBrowserLogin(
       .locator('button:not([type]), button[type="submit"], input[type="submit"]')
       .click({ timeout: 5000 });
     await password.waitFor({ state: 'hidden', timeout: 5000 });
-    await page.waitForURL((url) => samePage(url, target), { timeout: 5000 });
+    // Many apps move from the page given to their own home after sign-in, such as / to /app;
+    // any page of the same app counts, since the session check below requires signed-in content.
+    await page.waitForURL((url) => url.origin === target.origin, { timeout: 5000 });
     const state = await context.storageState();
     if (!state.cookies.length) throw new Error('No sign-in session cookie was created.');
     const cookies = { cookies: state.cookies, origins: [] };
@@ -92,17 +94,10 @@ async function requireAnonymousSignIn(page: Page, target: URL): Promise<void> {
   });
 }
 
-/** Preserve the selected page, including query and hash routing, when validating session access. */
-function samePage(actual: URL, target: URL): boolean {
-  return (
-    actual.origin === target.origin &&
-    actual.pathname === target.pathname &&
-    actual.search === target.search &&
-    actual.hash === target.hash
-  );
-}
-
-/** Reopen without the login page's memory or local storage, then inspect the settled rendered DOM. */
+/**
+ * Reopen without the login page's memory or local storage, then inspect the settled rendered DOM.
+ * The app may move to another of its own pages, such as from / to /app, but never off its origin.
+ */
 async function verifyReusableSession(
   browser: Browser,
   target: URL,
@@ -119,8 +114,8 @@ async function verifyReusableSession(
     // Let client-side session checks settle before accepting a transient application shell.
     await page.waitForLoadState('networkidle', { timeout: 5000 });
     await page.waitForFunction(signedInPageReady, undefined, { timeout: 5000 });
-    if (!samePage(new URL(page.url()), target))
-      throw new Error('The app returned to a different page.');
+    if (new URL(page.url()).origin !== target.origin)
+      throw new Error('The app sent the session to a different site.');
   } finally {
     await context.close();
   }

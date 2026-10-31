@@ -7,6 +7,8 @@ import type { Workspace } from './useWorkspace';
 export type Guide = {
   view: GuideView | null;
   thinking: boolean;
+  /** What the reply in progress is doing, such as "Listing acme's repositories on GitHub". */
+  doing: string;
   /** A message sent but not answered yet, shown until the reply arrives. */
   asking: string;
   error: string;
@@ -27,6 +29,26 @@ const message = (error: unknown, fallback: string): string =>
   error instanceof Error ? error.message : fallback;
 
 /**
+ * The step a Guide reply in progress is on, such as a GitHub lookup, from the worker's guide
+ * events for the open project. It clears whenever a reply starts or ends.
+ * @param current The open project's ID, read when each event arrives.
+ * @param thinking Whether a reply is being written now.
+ */
+function useGuideSteps(current: React.RefObject<string>, thinking: boolean): string {
+  const [doing, setDoing] = useState('');
+  useEffect(() => setDoing(''), [thinking]);
+  useEffect(
+    () =>
+      window.aiden?.onEvent((event) => {
+        if (event.type === 'guide' && event.projectId === current.current)
+          setDoing(event.message ?? '');
+      }),
+    [current],
+  );
+  return doing;
+}
+
+/**
  * Load and drive a project's Guide. The thread reloads when runs change so finished checks show up,
  * and the chat starts the first playback once Aiden has written the requirements and the Guide is
  * on screen, so opening a project never spends a turn by itself.
@@ -43,6 +65,7 @@ export function useGuide(workspace: Workspace): Guide {
   const kicked = useRef(new Set<string>());
   const current = useRef(projectId);
   current.current = projectId;
+  const doing = useGuideSteps(current, thinking);
   const runKey = runs.map((r) => `${r.id}:${r.status}`).join(',');
 
   useEffect(() => {
@@ -96,12 +119,12 @@ export function useGuide(workspace: Workspace): Guide {
     [call],
   );
 
-  const answered = view?.thread.messages.some((m) => m.from === 'aiden') ?? false;
-  const ready = !!view && !!baseline && !answered;
+  const ready = !!view && !!baseline && !view.thread.messages.some((m) => m.from === 'aiden');
 
   return {
     view,
     thinking,
+    doing,
     asking,
     error,
     reload: async () => {

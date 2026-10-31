@@ -16,7 +16,16 @@ import {
 
 const eventSchema = z
   .object({
-    type: z.enum(['progress', 'activity', 'review', 'completed', 'failed', 'cancelled', 'coding']),
+    type: z.enum([
+      'progress',
+      'activity',
+      'review',
+      'completed',
+      'failed',
+      'cancelled',
+      'coding',
+      'guide',
+    ]),
     codingActive: z.boolean().optional(),
     runId: z.string(),
     projectId: z.string().optional(),

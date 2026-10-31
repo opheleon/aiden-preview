@@ -11,22 +11,21 @@ import { useTeamScope } from './hooks/useTeamScope';
 import { useWorkspace } from './hooks/useWorkspace';
 import type { Area } from './hooks/useWorkspaceState';
 import { AccountWork } from './views/AccountWork';
-import { Agents } from './views/Agents';
 import { ApplicationHeader } from './views/ApplicationHeader';
 import { Brief } from './views/Brief';
 import { DeviceTesting } from './views/DeviceTesting';
-import { MyWork } from './views/MyWork';
 import { Runs } from './views/Runs';
 import { SetIntent } from './views/SetIntent';
 import { SettingsView } from './views/SettingsView';
+import { Work } from './views/Work';
 import { WorkspaceDialogs } from './views/WorkspaceDialogs';
 import { WorkspaceFeedback } from './views/WorkspaceFeedback';
 import { WorkspaceSidebar } from './views/WorkspaceSidebar';
 const api = window.aiden;
 /** Screens laid out on their own rather than as the project setup view. */
-const ownLayout = new Set<Area>(['settings', 'account', 'work', 'agents']);
+const ownLayout = new Set<Area>(['settings', 'work']);
 /** Screens only team members see. */
-const teamScreens: Partial<Record<Area, typeof MyWork>> = { work: MyWork, agents: Agents };
+const teamScreens: Partial<Record<Area, typeof Work>> = { work: Work };
 
 /**
  * Compose the desktop app: a project Aiden has not been handed yet shows Set the intent, and a
@@ -66,9 +65,7 @@ export default function App(): JSX.Element {
         <ApplicationHeader {...workspace} />
         <WorkspaceSidebar workspace={workspace} onGettingStarted={guide.show} />
         <main className={!saved && !ownLayout.has(area) ? 'setup-view' : ''}>
-          {area === 'account' ? (
-            <AccountWork workspace={workspace} />
-          ) : TeamScreen ? (
+          {TeamScreen ? (
             <TeamScreen workspace={workspace} />
           ) : area === 'devices' && saved ? (
             <DeviceTesting
@@ -83,6 +80,7 @@ export default function App(): JSX.Element {
               {...workspace}
               runtimeControls={runtimeControls}
               projectSettings={<ProjectSettings workspace={workspace} />}
+              teams={<AccountWork workspace={workspace} />}
               feedback={<WorkspaceFeedback workspace={workspace} />}
               api={api}
             />

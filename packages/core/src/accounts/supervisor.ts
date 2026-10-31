@@ -113,6 +113,7 @@ export async function superviseAttempt(input: SupervisionInput): Promise<Supervi
           await client.needsHuman(task.id, { ...binding, title, question, ...routing });
           stop(`The task is waiting on a person: ${title}.`);
         },
+        original: (taskId) => client.task(taskId),
         activity: (activity) => watch.observe(activity, clock().getTime()),
         progress: (line) => {
           messages.push(line.slice(0, 500));

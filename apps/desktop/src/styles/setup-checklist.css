@@ -1,49 +1,98 @@
-/* Setup is one compact line at the top of the chat; its steps open on demand. */
-.setup-checklist {
+/* One slim status line above the composer: the work, why it waits, setup, and the one Stop. */
+.chat-status {
   flex-shrink: 0;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+  padding: 6px 2px 0;
+  border-top: 1px solid var(--border);
 }
 
-.setup-heading,
-.setup-current {
+.chat-status-line {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.setup-heading {
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
+  min-height: 24px;
+  font-size: 13px;
 }
 
-.setup-current {
-  flex-shrink: 0;
+.chat-status-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.chat-status-dot--live {
+  background: #22a06b;
+  animation: chat-status-pulse 1.6s ease-in-out infinite;
+}
+
+.chat-status-dot--wait {
+  background: #cfcbc1;
+}
+
+.chat-status-dot--ended {
+  background: #e08a4b;
+}
+
+@keyframes chat-status-pulse {
+  50% {
+    box-shadow: 0 0 0 4px rgb(34 160 107 / 18%);
+  }
+}
+
+.chat-status-line .chat-status-work {
+  flex: none;
+  max-width: 45%;
   margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.setup-current svg {
-  align-self: center;
-  color: var(--brand);
-}
-
-.setup-next-action {
-  flex: 1 1 160px;
-  min-width: 0;
-  margin: 0;
+  padding: 0;
   overflow: hidden;
-  color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.setup-toggle {
-  flex-shrink: 0;
+.chat-status-line .text-button {
+  flex: none;
+  font-size: 13px;
+}
+
+.chat-status-sub {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chat-status-setup {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.chat-status-setup svg {
+  color: var(--brand);
+}
+
+.chat-status-toggle {
   margin-left: auto;
-  font-size: 14px;
+}
+
+.chat-status-reason {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.chat-status .setup-steps {
+  margin: 0 0 2px;
 }
 
 .setup-steps {
@@ -109,15 +158,16 @@
   border-style: dashed;
 }
 
-/* A team project's current Aiden task, right under setup, so a wait always says why. */
-.team-task {
-  flex-shrink: 0;
-  display: grid;
-  gap: 4px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
+@media (prefers-reduced-motion: reduce) {
+  .chat-status-dot--live {
+    animation: none;
+  }
 }
 
-.team-task p {
-  margin: 0;
+.chat-status-log {
+  margin-left: auto;
+}
+
+.chat-status-toggle + .chat-status-log {
+  margin-left: 12px;
 }

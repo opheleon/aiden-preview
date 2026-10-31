@@ -107,6 +107,10 @@ export async function decideProject(
       at,
     });
     await atomic(path.join(folder, 'lifecycle.json'), ProjectLifecycleSchema.parse(saved));
+    // A team project closes or reopens for the whole team. If the team cannot be reached, this
+    // newer decision wins at the next Work refresh, so the person is never blocked here.
+    if (project.account && decision.action !== 'accepted')
+      await engine.onProjectStatus(projectId, saved.status).catch(() => undefined);
     return { ...project, lifecycle: await lifecycleView(engine.store, project) };
   } finally {
     await release();
