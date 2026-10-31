@@ -28,6 +28,10 @@ export interface AccountView {
   signOut: () => Promise<void>;
   take: (taskId: string) => Promise<void>;
   finish: (taskId: string, answer?: string) => Promise<void>;
+  /** As the task's reviewer, approve Aiden's work or ask for changes with a short note. */
+  review: (taskId: string, decision: 'approve' | 'changes', note?: string) => Promise<void>;
+  /** As the task's reviewer, pass or fail one manual check. */
+  check: (taskId: string, checkId: string, passed: boolean) => Promise<void>;
   setPickup: (change: { pickupEnabled?: boolean; usageCapPct?: number }) => Promise<void>;
   /** Move a project made on this computer into the team; a failure shows in `error`. */
   share: (projectId: string) => Promise<void>;
@@ -109,6 +113,12 @@ export function useAccount(call: DesktopBridge['request']): AccountView {
     take: (taskId: string) => act(() => call('accountTakeTask', { taskId })),
     finish: (taskId: string, answer?: string) =>
       act(() => call('accountFinishTask', answer ? { taskId, answer } : { taskId })),
+    review: (taskId: string, decision: 'approve' | 'changes', note?: string) =>
+      act(() =>
+        call('accountReviewTask', note ? { taskId, decision, note } : { taskId, decision }),
+      ),
+    check: (taskId: string, checkId: string, passed: boolean) =>
+      act(() => call('accountCheckTask', { taskId, checkId, passed })),
     setPickup: (change: { pickupEnabled?: boolean; usageCapPct?: number }) =>
       act(() => call('accountSetPickup', change)),
     share: (projectId: string) =>

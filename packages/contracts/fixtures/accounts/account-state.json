@@ -12,7 +12,8 @@
       "name": "ALICE",
       "avatar": null,
       "role": "owner",
-      "isAdmin": true
+      "isAdmin": true,
+      "roles": []
     },
     {
       "id": "00000000-0000-4000-8000-000000000004",
@@ -20,7 +21,8 @@
       "name": "BOB",
       "avatar": null,
       "role": "member",
-      "isAdmin": false
+      "isAdmin": false,
+      "roles": []
     }
   ],
   "projects": [
@@ -78,7 +80,20 @@
       "queuedAt": "2026-10-20T15:00:00.000Z",
       "updatedAt": "2026-10-20T15:00:00.000Z",
       "waiting": null,
-      "progress": "Reading the spec"
+      "progress": "Reading the spec",
+      "role": null,
+      "reviewerUserId": "00000000-0000-4000-8000-000000000004",
+      "parentTaskId": null,
+      "revisionOf": null,
+      "verification": null,
+      "review": null,
+      "checks": [],
+      "timeline": {
+        "startedAt": "2026-10-20T15:00:00.000Z",
+        "reviewAt": null,
+        "verifyAt": null,
+        "finishedAt": null
+      }
     },
     {
       "id": "00000000-0000-4000-8000-000000000007",
@@ -98,7 +113,7 @@
       },
       "status": "queued",
       "blockedBy": null,
-      "assigneeUserId": "00000000-0000-4000-8000-000000000001",
+      "assigneeUserId": "00000000-0000-4000-8000-000000000004",
       "leasedDeviceId": null,
       "leaseExpiresAt": null,
       "attempts": 0,
@@ -108,7 +123,20 @@
       "queuedAt": "2026-10-20T15:00:00.000Z",
       "updatedAt": "2026-10-20T15:00:00.000Z",
       "waiting": null,
-      "progress": null
+      "progress": null,
+      "role": null,
+      "reviewerUserId": null,
+      "parentTaskId": "00000000-0000-4000-8000-000000000006",
+      "revisionOf": null,
+      "verification": null,
+      "review": null,
+      "checks": [],
+      "timeline": {
+        "startedAt": null,
+        "reviewAt": null,
+        "verifyAt": null,
+        "finishedAt": null
+      }
     }
   ],
   "devices": [

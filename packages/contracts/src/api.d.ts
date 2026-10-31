@@ -107,6 +107,16 @@ export type WorkerAPI = {
   accountState: { params: { accountId: string }; result: AccountState };
   accountTakeTask: { params: { taskId: string }; result: AccountTask };
   accountFinishTask: { params: { taskId: string; answer?: string }; result: AccountTask };
+  /** The task's reviewer approves Aiden's work or asks for changes, with a short note. */
+  accountReviewTask: {
+    params: { taskId: string; decision: 'approve' | 'changes'; note?: string };
+    result: AccountTask;
+  };
+  /** The task's reviewer marks one manual check passed or failed while the task is in verify. */
+  accountCheckTask: {
+    params: { taskId: string; checkId: string; passed: boolean; note?: string };
+    result: AccountTask;
+  };
   accountSetPickup: {
     params: { pickupEnabled?: boolean; usageCapPct?: number };
     result: AccountStatus;

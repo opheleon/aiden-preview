@@ -5,12 +5,17 @@ import type { AccountTask } from '../../../contracts/src/accounts-api.js';
 import type { Project } from '../../../contracts/src/index.js';
 import { MissingPublicationCommit, publishJobBranch } from '../../../tools/src/delivery-git.js';
 import type { Engine } from '../engine.js';
+import { questionTasks, recoveredReview } from './review-packet.js';
 import type { TaskControls, TaskOutput } from './runner.js';
 
 /** Injectable publication boundary; recovery must never invoke a coding model. */
 export const publicationRecoveryServices = { publish: publishJobBranch };
 
-/** Reconcile every committed repository before acknowledging a previously interrupted delivery. */
+/**
+ * Reconcile every committed repository before acknowledging a previously interrupted delivery.
+ * The recovered pull requests go to the task's reviewer as a review packet, and saved questions
+ * become routed question tasks.
+ */
 export async function recoverPublication(
   engine: Engine,
   project: Project,
@@ -47,7 +52,10 @@ export async function recoverPublication(
       });
     } catch (error) {
       if (error instanceof MissingPublicationCommit && controls.block)
-        await controls.block('Recover committed work from the previous machine', error.message);
+        await controls.block('Recover committed work from the previous machine', error.message, {
+          ...(task.role ? { role: task.role } : {}),
+          scope: 'task',
+        });
       throw error;
     }
     urls.push(reference.pullRequestUrl);
@@ -61,20 +69,7 @@ export async function recoverPublication(
       pullRequestUrls: urls,
       checks: checkpoint.checks,
     },
-    followUps: [
-      ...(checkpoint.openQuestions ?? []).map((item) => ({
-        actor: 'human' as const,
-        kind: 'coding-question',
-        title: item.question.slice(0, 200),
-        instructions: item.question,
-        ...(item.assigneeUserId ? { assigneeUserId: item.assigneeUserId } : {}),
-      })),
-      {
-        actor: 'human',
-        kind: 'review-pr',
-        title: 'Review and merge the recovered pull requests',
-        instructions: [checkpoint.summary, ...urls].join('\n').slice(0, 20_000),
-      },
-    ],
+    followUps: questionTasks(checkpoint.openQuestions ?? [], task.role),
+    review: recoveredReview(checkpoint.summary, urls),
   };
 }

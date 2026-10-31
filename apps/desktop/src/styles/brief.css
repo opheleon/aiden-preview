@@ -472,7 +472,8 @@
   white-space: nowrap;
 }
 
-.task-status--in-progress {
+.task-status--in-progress,
+.task-status--in-review {
   color: var(--color-brand-dark);
 }
 

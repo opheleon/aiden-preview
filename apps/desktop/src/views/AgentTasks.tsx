@@ -4,6 +4,7 @@ import type { AccountState, AccountTask } from '../../../../packages/contracts/s
 import { lastError } from '../components/TeamTaskStatus';
 import {
   type Dot,
+  finishedWord,
   memberName,
   projectName,
   toggle,
@@ -102,12 +103,13 @@ export function stoppedLine(state: AccountState, task: AccountTask): TaskLine {
   };
 }
 
-/** A task that finished: who ran it and when. */
+/** A task that finished: who ran it, how reviewed work ended (Verified, Checks failed), and when. */
 export function finishedLine(state: AccountState, task: AccountTask): TaskLine {
+  const word = finishedWord(task);
   return {
-    dot: 'brand',
+    dot: word === 'Checks failed' ? 'warn' : 'brand',
     sub: `${machine(state, task)} · ${projectName(state, task)}`,
-    meta: `Done ${when(task.updatedAt)}`,
+    meta: `${word} ${when(task.updatedAt)}`,
     facts: [],
     actions: [],
   };

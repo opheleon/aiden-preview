@@ -33,7 +33,13 @@ void test('each unfinished feature becomes one build task across every repositor
         { id: 'REQ-3', text: 'Recurring events' },
       ],
       deliveryPlan: [
-        { id: 'F-1', title: 'Sign in', requirementIds: ['REQ-1'], dependsOn: [] },
+        {
+          id: 'F-1',
+          title: 'Sign in',
+          requirementIds: ['REQ-1'],
+          dependsOn: [],
+          role: 'fe_engineer',
+        },
         { id: 'F-2', title: 'Private events', requirementIds: ['REQ-2'], dependsOn: ['F-1'] },
         { id: 'F-3', title: 'Recurring events', requirementIds: ['REQ-3'], dependsOn: [] },
       ],
@@ -72,4 +78,9 @@ void test('each unfinished feature becomes one build task across every repositor
   // billing mode, and under its member's usage cap, may take it.
   assert.deepEqual(queued[0]!.tools, ['git', 'gh', 'codex']);
   assert.equal(queued[0]!.usesModel, true);
+  // The plan's role decides who reviews the build; a plan without one gets the backend guess.
+  assert.deepEqual(
+    queued.map((task) => task.role),
+    ['fe_engineer', 'be_engineer'],
+  );
 });

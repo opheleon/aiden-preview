@@ -109,8 +109,8 @@ export async function superviseAttempt(input: SupervisionInput): Promise<Supervi
           await authorize();
           await client.checkpoint(task.id, { ...binding, checkpoint });
         },
-        block: async (title, question) => {
-          await client.needsHuman(task.id, { ...binding, title, question });
+        block: async (title, question, routing) => {
+          await client.needsHuman(task.id, { ...binding, title, question, ...routing });
           stop(`The task is waiting on a person: ${title}.`);
         },
         activity: (activity) => watch.observe(activity, clock().getTime()),

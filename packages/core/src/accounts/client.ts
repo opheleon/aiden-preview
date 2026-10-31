@@ -8,16 +8,19 @@ import {
   type AccountTask,
   AccountTaskSchema,
   ApiErrorSchema,
+  type CheckInput,
   type Me,
   MeSchema,
   type NewAccountTask,
   type ProjectCreated,
   ProjectCreatedSchema,
+  type ReviewPacket,
   type WorkAnswer,
   WorkAnswerSchema,
 } from '../../../contracts/src/accounts-api.js';
 import type { AgentStatus, DeliveryCheckpoint } from '../../../contracts/src/accounts-execution.js';
 import { flavorFromEnv } from '../../../contracts/src/app-flavor.js';
+import type { QuestionScope, WorkRole } from '../../../contracts/src/work-roles.js';
 import { responseSummary, teamsDebug } from './debug.js';
 
 /**
@@ -92,7 +95,7 @@ export class AccountsClient {
   private async call<T>(
     method: string,
     route: string,
-    schema: z.ZodType<T>,
+    schema: z.ZodType<T, z.ZodTypeDef, unknown>,
     body?: unknown,
   ): Promise<T> {
     try {
@@ -108,7 +111,7 @@ export class AccountsClient {
   private async send<T>(
     method: string,
     route: string,
-    schema: z.ZodType<T>,
+    schema: z.ZodType<T, z.ZodTypeDef, unknown>,
     body?: unknown,
   ): Promise<T> {
     const token = await this.token();
@@ -220,7 +223,10 @@ export class AccountsClient {
     );
   }
 
-  /** Finish an agent task. */
+  /**
+   * Finish an agent task. With `review`, the task goes to its reviewer instead of done; `checks`
+   * carries the results of a verify task, applied to the reviewed task it checks.
+   */
   complete(
     taskId: string,
     body: {
@@ -229,6 +235,8 @@ export class AccountsClient {
       result: unknown;
       followUps: NewAccountTask[];
       outcome: unknown;
+      review?: ReviewPacket;
+      checks?: CheckInput[];
     },
   ): Promise<AccountTask> {
     return this.call(
@@ -239,10 +247,19 @@ export class AccountsClient {
     );
   }
 
-  /** Report a failed attempt. */
+  /**
+   * Report a failed attempt. `permanent` says another machine would fail the same way, so the
+   * server fails the task for good instead of retrying it elsewhere.
+   */
   fail(
     taskId: string,
-    body: { deviceId: string; attemptId: string; error: string; outcome: unknown },
+    body: {
+      deviceId: string;
+      attemptId: string;
+      error: string;
+      outcome: unknown;
+      permanent?: boolean;
+    },
   ): Promise<AccountTask> {
     return this.call('POST', `/tasks/${encodeURIComponent(taskId)}/fail`, AccountTaskSchema, body);
   }
@@ -286,7 +303,14 @@ export class AccountsClient {
   /** Park the attempt behind an assigned human question without waiting inside the agent. */
   needsHuman(
     taskId: string,
-    body: { deviceId: string; attemptId: string; title: string; question: string },
+    body: {
+      deviceId: string;
+      attemptId: string;
+      title: string;
+      question: string;
+      role?: WorkRole;
+      scope?: QuestionScope;
+    },
   ): Promise<AccountTask> {
     return this.call(
       'POST',
@@ -321,5 +345,23 @@ export class AccountsClient {
     return this.call('POST', `/tasks/${encodeURIComponent(taskId)}/done`, AccountTaskSchema, {
       answer,
     });
+  }
+
+  /** As the task's reviewer, approve the work or ask for changes; only the reviewer may. */
+  review(taskId: string, decision: 'approve' | 'changes', note: string): Promise<AccountTask> {
+    return this.call('POST', `/tasks/${encodeURIComponent(taskId)}/review`, AccountTaskSchema, {
+      decision,
+      note,
+    });
+  }
+
+  /** As the task's reviewer, mark one manual check passed or failed while the task is in verify. */
+  markCheck(taskId: string, checkId: string, passed: boolean, note: string): Promise<AccountTask> {
+    return this.call(
+      'POST',
+      `/tasks/${encodeURIComponent(taskId)}/checks/${encodeURIComponent(checkId)}`,
+      AccountTaskSchema,
+      { passed, note },
+    );
   }
 }

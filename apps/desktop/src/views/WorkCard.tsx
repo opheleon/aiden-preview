@@ -95,9 +95,21 @@ export function summary(task: AccountTask): string {
     .trim();
 }
 
-/** The GitHub pull requests a task points at. */
+/** The GitHub pull requests a task points at: its review packet's, or those in its text. */
 export function pullRequests(task: AccountTask): string[] {
+  if (task.review?.pullRequestUrls.length) return task.review.pullRequestUrls;
   return task.instructions.match(/https:\/\/github\.com\/\S+\/pull\/\d+/g) ?? [];
+}
+
+/**
+ * How finished Aiden work ended, in a word: reviewed work says whether its checks passed or the
+ * reviewer asked for changes; anything else is simply done.
+ */
+export function finishedWord(task: AccountTask): string {
+  if (task.verification === 'passed') return 'Verified';
+  if (task.verification === 'failed') return 'Checks failed';
+  if (task.verification === 'changes_requested') return 'Changes requested';
+  return 'Done';
 }
 
 /** One row open at a time: toggling the open one closes it. */

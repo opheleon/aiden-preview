@@ -1,13 +1,19 @@
 import { z } from 'zod/v3';
 
 import { RuntimeSchema } from './runtime.js';
+import { questionScopes, workRoles } from './work-roles.js';
 
-/** A coding question requiring review, with optional routing to a known team member. */
+/**
+ * A coding question requiring review, with optional routing to a known team member, the work role
+ * that can answer it, and whether it is about this slice or a general product question.
+ */
 const CodingQuestionSchema = z
   .object({
     question: z.string().min(1).max(2000),
     assigneeUserId: z.string().max(64).optional(),
     blocking: z.boolean(),
+    role: z.enum(workRoles).optional(),
+    scope: z.enum(questionScopes).optional(),
   })
   .strict();
 
@@ -91,6 +97,8 @@ export const CodingOutputSchema = z
             question: z.string().min(1).max(2000),
             assigneeUserId: z.string().max(64).nullable(),
             blocking: z.boolean(),
+            role: z.enum(workRoles).nullable(),
+            scope: z.enum(questionScopes),
           })
           .strict(),
       )
@@ -100,7 +108,7 @@ export const CodingOutputSchema = z
   .strict();
 /**
  * The agent's report as Aiden reads it: a delivery claim, independently checked against GitHub
- * before scheduling beta. Missing lists read as empty and a null assignee as none.
+ * before scheduling beta. Missing lists read as empty, and a null assignee or role as none.
  */
 export const CodingResultSchema = z
   .object({
@@ -114,6 +122,10 @@ export const CodingResultSchema = z
             .max(64)
             .nullish()
             .transform((id) => id ?? undefined),
+          role: z
+            .enum(workRoles)
+            .nullish()
+            .transform((value) => value ?? undefined),
         }),
       )
       .max(20)

@@ -1,0 +1,79 @@
+{
+  "id": "00000000-0000-4000-8000-000000000008",
+  "accountId": "00000000-0000-4000-8000-000000000004",
+  "projectId": "00000000-0000-4000-8000-000000000007",
+  "actor": "agent",
+  "kind": "build",
+  "title": "Build: Sign in",
+  "instructions": "Turn the goal into requirements.",
+  "requirementIds": [],
+  "requires": {
+    "tools": [],
+    "connections": [],
+    "runtime": null,
+    "pinnedUserId": null,
+    "pinnedDeviceId": null
+  },
+  "status": "done",
+  "blockedBy": null,
+  "assigneeUserId": null,
+  "leasedDeviceId": "bob-mac",
+  "leaseExpiresAt": null,
+  "attempts": 1,
+  "execution": {
+    "attemptId": "00000000-0000-4000-8000-000000000008:1",
+    "location": "local",
+    "startedAt": "2026-10-20T15:00:00.000Z",
+    "deadlineAt": "2026-10-20T17:00:00.000Z",
+    "activityAt": "2026-10-20T15:00:00.000Z",
+    "activitySequence": 0,
+    "reportedAt": null,
+    "phase": "completed",
+    "limits": {
+      "idleMs": 900000,
+      "toolMs": 2700000,
+      "absoluteMs": 7200000
+    },
+    "checkpoint": null
+  },
+  "result": {
+    "pullRequestUrls": ["https://github.com/acme/api/pull/7"]
+  },
+  "resume": null,
+  "queuedAt": "2026-10-20T15:00:00.000Z",
+  "updatedAt": "2026-10-20T15:00:00.000Z",
+  "progress": null,
+  "role": "be_engineer",
+  "reviewerUserId": "00000000-0000-4000-8000-000000000003",
+  "parentTaskId": null,
+  "revisionOf": null,
+  "verification": "passed",
+  "review": {
+    "summary": "Adds email sign-in to the API.",
+    "pullRequestUrls": ["https://github.com/acme/api/pull/7"]
+  },
+  "checks": [
+    {
+      "id": "1",
+      "name": "CI: acme/api#7",
+      "kind": "automated",
+      "state": "passed",
+      "detail": null,
+      "url": "https://github.com/acme/api/pull/7"
+    },
+    {
+      "id": "2",
+      "name": "REQ-1: People sign in by email",
+      "kind": "manual",
+      "state": "passed",
+      "detail": "Signed in on beta",
+      "url": null
+    }
+  ],
+  "timeline": {
+    "startedAt": "2026-10-20T15:00:00.000Z",
+    "reviewAt": "2026-10-20T15:00:00.000Z",
+    "verifyAt": "2026-10-20T15:00:00.000Z",
+    "finishedAt": "2026-10-20T15:00:00.000Z"
+  }
+}

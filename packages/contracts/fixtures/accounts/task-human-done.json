@@ -16,7 +16,7 @@
   },
   "status": "done",
   "blockedBy": null,
-  "assigneeUserId": "00000000-0000-4000-8000-000000000001",
+  "assigneeUserId": "00000000-0000-4000-8000-000000000004",
   "leasedDeviceId": null,
   "leaseExpiresAt": null,
   "attempts": 0,
@@ -25,5 +25,18 @@
   "resume": null,
   "queuedAt": "2026-10-20T15:00:00.000Z",
   "updatedAt": "2026-10-20T15:00:00.000Z",
-  "progress": null
+  "progress": null,
+  "role": null,
+  "reviewerUserId": null,
+  "parentTaskId": "00000000-0000-4000-8000-000000000006",
+  "revisionOf": null,
+  "verification": null,
+  "review": null,
+  "checks": [],
+  "timeline": {
+    "startedAt": null,
+    "reviewAt": null,
+    "verifyAt": null,
+    "finishedAt": "2026-10-20T15:00:00.000Z"
+  }
 }

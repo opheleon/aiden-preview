@@ -1,5 +1,6 @@
 import type { DeliveryFeature } from '../../../contracts/src/delivery-plan.js';
 import type { Baseline, Project, Report } from '../../../contracts/src/index.js';
+import type { WorkRole } from '../../../contracts/src/work-roles.js';
 import type { Engine } from '../engine.js';
 import type { AccountsClient } from './client.js';
 import { teamsDebug } from './debug.js';
@@ -17,6 +18,28 @@ export function buildRepositories(instructions: string): string[] {
     .split(',')
     .map((name) => name.trim())
     .filter(Boolean);
+}
+
+/** Words that mark a slice whose reviewable change is mostly user interface. */
+const interfaceWords =
+  /\b(ui|ux|page|pages|screen|screens|button|buttons|form|forms|view|views|layout|frontend|front-end|css|style|styles|component|components|modal|dialog|dashboard|navigation|menu)\b/i;
+
+/**
+ * Who reviews a feature's build: the role the delivery plan gave it, or, for plans written before
+ * roles (or a null answer), a deterministic guess. Platform work is backend; a feature whose title
+ * or outcome talks about screens, pages, forms, or other interface words is frontend; anything
+ * else is backend, since most slices carry an API or data change. Product managers are only chosen
+ * by the plan itself, because their slices cannot be told apart from wording alone.
+ * Example: "Edit books on a new page" with no role is fe_engineer; "Sync invoices" is be_engineer.
+ */
+export function featureRole(
+  feature: Pick<DeliveryFeature, 'title'> & Partial<DeliveryFeature>,
+): WorkRole {
+  if (feature.role) return feature.role;
+  if (feature.kind === 'platform') return 'be_engineer';
+  return interfaceWords.test(`${feature.title} ${feature.outcome ?? ''}`)
+    ? 'fe_engineer'
+    : 'be_engineer';
 }
 
 /** A requirement the code check found partly or not implemented. */
@@ -104,6 +127,7 @@ export async function queueBuild(
       tools: ['git', 'gh', project.runtime.provider],
       usesModel: true,
       dedupeKey: `build:${project.id}:${baseline.id}:${feature.id}`,
+      role: featureRole(feature),
     });
   }
 }

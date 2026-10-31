@@ -244,4 +244,34 @@ void test('the coding answer schema meets Codex strict output, and older answers
   assert.deepEqual(read.decisions, []);
   assert.equal(read.openQuestions[0]!.question, 'Which label?');
   assert.equal(read.openQuestions[0]!.assigneeUserId, undefined, 'null reads as no assignee');
+  // Questions carry who can answer them and whether they are about this slice; null role is none.
+  const routed = CodingResultSchema.parse({
+    outcome: 'needs_input',
+    summary: 'Waiting',
+    pullRequestUrl: null,
+    localChecks: [],
+    openQuestions: [
+      { question: 'Which copy?', assigneeUserId: null, blocking: true, role: null, scope: 'task' },
+      {
+        question: 'Move all services to the new auth?',
+        assigneeUserId: null,
+        blocking: false,
+        role: 'be_engineer',
+        scope: 'general',
+      },
+    ],
+  });
+  assert.deepEqual(
+    routed.openQuestions.map((q) => [q.role, q.scope]),
+    [
+      [undefined, 'task'],
+      ['be_engineer', 'general'],
+    ],
+  );
+  assert.throws(() =>
+    CodingResultSchema.parse({
+      ...routed,
+      openQuestions: [{ question: 'Q', blocking: false, role: 'designer' }],
+    }),
+  );
 });

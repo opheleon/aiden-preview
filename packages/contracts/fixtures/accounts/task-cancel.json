@@ -45,5 +45,18 @@
   "resume": null,
   "queuedAt": "2026-10-20T15:00:00.000Z",
   "updatedAt": "2026-10-20T15:00:00.000Z",
-  "progress": null
+  "progress": null,
+  "role": null,
+  "reviewerUserId": "00000000-0000-4000-8000-000000000001",
+  "parentTaskId": null,
+  "revisionOf": null,
+  "verification": null,
+  "review": null,
+  "checks": [],
+  "timeline": {
+    "startedAt": "2026-10-20T15:00:00.000Z",
+    "reviewAt": null,
+    "verifyAt": null,
+    "finishedAt": null
+  }
 }

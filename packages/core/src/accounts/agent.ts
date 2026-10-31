@@ -12,6 +12,7 @@ import { runAccountTask, supportedTaskKinds, type TaskControls } from './runner.
 import type { AccountSession } from './session.js';
 import { syncSetupTasks } from './setup-tasks.js';
 import { superviseAttempt } from './supervisor.js';
+import { PermanentTaskError } from './task-errors.js';
 
 /** Machine signals only Electron main can read, plus whether local work is running. */
 export interface PollInput {
@@ -256,6 +257,8 @@ export class AccountAgent {
         attemptId: task.execution!.attemptId,
         result: output.result,
         followUps: output.followUps ?? [],
+        ...(output.review ? { review: output.review } : {}),
+        ...(output.checks ? { checks: output.checks } : {}),
         outcome: outcome(),
         documentChanged: output.documentChanged,
         status: 'pending',
@@ -283,6 +286,8 @@ export class AccountAgent {
           attemptId: task.execution!.attemptId,
           error: message || 'The task failed.',
           outcome: outcome(),
+          // Only a failure every machine would hit is permanent; anything else may work elsewhere.
+          ...(error instanceof PermanentTaskError ? { permanent: true } : {}),
         })
         .catch(() => undefined);
     }
